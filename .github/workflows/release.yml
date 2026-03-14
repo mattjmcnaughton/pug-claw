@@ -1,10 +1,7 @@
 name: Release
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    branches: [main]
-    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,7 +12,6 @@ jobs:
   release:
     name: Semantic Release
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success'
     outputs:
       new-release-published: ${{ steps.semantic.outputs.new-release-published }}
       new-release-version: ${{ steps.semantic.outputs.new-release-version }}
