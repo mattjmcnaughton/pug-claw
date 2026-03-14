@@ -12,6 +12,12 @@
       { "npmPublish": false }
     ],
     [
+      "@semantic-release/exec",
+      {
+        "publishCmd": "echo \"new-release-version=${nextRelease.version}\" >> $GITHUB_OUTPUT && echo \"new-release-published=true\" >> $GITHUB_OUTPUT"
+      }
+    ],
+    [
       "@semantic-release/git",
       {
         "assets": ["package.json", "CHANGELOG.md"],

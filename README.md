@@ -12,10 +12,37 @@ A multi-driver AI agent bot with Discord and TUI frontends. Swap between **Claud
 
 ## Installation
 
+### Homebrew
+
 ```bash
-cd experiments/discord/pug-claw
+brew install mattjmcnaughton/tap/pug-claw
+```
+
+### Standalone binary
+
+Download the latest binary for your platform from [GitHub Releases](../../releases):
+
+```bash
+# macOS (Apple Silicon)
+curl -L https://github.com/mattjmcnaughton/pug-claw/releases/latest/download/pug-claw-macos-aarch64.tar.gz | tar xz
+chmod +x pug-claw-macos-aarch64
+mv pug-claw-macos-aarch64 /usr/local/bin/pug-claw
+
+# Linux (x86_64)
+curl -L https://github.com/mattjmcnaughton/pug-claw/releases/latest/download/pug-claw-linux-x86_64.tar.gz | tar xz
+chmod +x pug-claw-linux-x86_64
+mv pug-claw-linux-x86_64 /usr/local/bin/pug-claw
+```
+
+### From source
+
+If you're forking or developing locally:
+
+```bash
 bun install
 ```
+
+If you would like an npm package, please [file an issue](https://github.com/mattjmcnaughton/pug-claw/issues/new) and let me know :)
 
 ## Configuration
 
