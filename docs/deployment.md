@@ -1,0 +1,132 @@
+# Deployment
+
+This guide covers running pug-claw on a host machine with systemd for process management.
+
+## Prerequisites
+
+Install the following on your host:
+
+- **Bun** >= 1.0: `curl -fsSL https://bun.sh/install | bash`
+- **Node.js** >= 20: Required by some transitive dependencies
+- **Git**: To clone and update the repository
+
+## Setup
+
+```bash
+# Clone the repo and navigate to pug-claw
+cd /opt/pug-claw  # or your preferred location
+git clone <repo-url> .
+cd experiments/discord/pug-claw
+
+# Install dependencies
+bun install
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your secrets
+```
+
+## Environment variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DISCORD_BOT_TOKEN` | Yes | Discord bot token |
+| `ANTHROPIC_API_KEY` | Yes (Claude) | Anthropic API key |
+| `OPENROUTER_API_KEY` | No | OpenRouter API key (Pi driver) |
+| `LOG_LEVEL` | No | `debug`, `info` (default), `warn`, `error`, `fatal` |
+| `NODE_ENV` | No | Set to `production` for JSON logs |
+
+## Running directly
+
+```bash
+# Discord mode
+bun main.ts
+
+# TUI mode (for testing)
+bun main.ts --tui
+```
+
+## systemd service
+
+Create a systemd unit file to run pug-claw as a managed service.
+
+### Unit file
+
+Create `/etc/systemd/system/pug-claw.service`:
+
+```ini
+[Unit]
+Description=pug-claw Discord bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pug-claw
+Group=pug-claw
+WorkingDirectory=/opt/pug-claw/experiments/discord/pug-claw
+ExecStart=/usr/local/bin/bun main.ts
+Restart=on-failure
+RestartSec=5
+
+EnvironmentFile=/opt/pug-claw/experiments/discord/pug-claw/.env
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/pug-claw
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+```
+
+> Adjust the `ExecStart` path to match your Bun installation. Find it with `which bun`.
+
+### Create a service user
+
+```bash
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin pug-claw
+sudo chown -R pug-claw:pug-claw /opt/pug-claw
+```
+
+### Enable and start
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable pug-claw
+sudo systemctl start pug-claw
+```
+
+### Managing the service
+
+```bash
+# Check status
+sudo systemctl status pug-claw
+
+# View logs
+sudo journalctl -u pug-claw -f
+
+# Restart after config changes
+sudo systemctl restart pug-claw
+
+# Stop
+sudo systemctl stop pug-claw
+```
+
+## Logging
+
+In production, set `NODE_ENV=production` in your `.env` file. This outputs structured JSON logs (one JSON object per line), which integrates well with `journalctl` and log aggregation tools.
+
+For development or debugging, omit `NODE_ENV` to get colorized pretty-printed output via `pino-pretty`.
+
+## Updating
+
+```bash
+cd /opt/pug-claw
+git pull
+cd experiments/discord/pug-claw
+bun install
+sudo systemctl restart pug-claw
+```

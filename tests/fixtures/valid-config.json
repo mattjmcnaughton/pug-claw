@@ -1,0 +1,17 @@
+{
+  "default_agent": "default",
+  "default_driver": "claude",
+  "drivers": {
+    "claude": {},
+    "pi": {
+      "default_model": "openrouter/minimax/minimax-m2.5"
+    }
+  },
+  "channels": {
+    "123": {
+      "agent": "custom",
+      "driver": "pi",
+      "model": "openrouter/minimax/minimax-m2.5"
+    }
+  }
+}

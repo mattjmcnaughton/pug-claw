@@ -1,0 +1,157 @@
+# Skills
+
+Skills are modular capabilities that extend an agent's behavior. They are defined as markdown files with YAML frontmatter and are automatically discovered and injected into the agent's system prompt at session creation.
+
+For basic setup, see [agents.md](./agents.md). This document covers the skill system in depth.
+
+## How skills work
+
+```
+User sends message
+  -> pug-claw creates a session (if needed)
+  -> discovers skills in agents/<name>/skills/
+  -> parses SKILL.md frontmatter for each skill
+  -> builds a catalog: name + description + file path
+  -> appends the catalog to the agent's SYSTEM.md prompt
+  -> sends the combined prompt to the driver
+```
+
+The AI backend receives a skill catalog like this in its system prompt:
+
+```xml
+<available-skills>
+  <skill name="summarize" path="/abs/path/to/agents/default/skills/summarize/SKILL.md">
+    Summarize articles, documents, or web pages into concise bullet points
+  </skill>
+  <skill name="translate" path="/abs/path/to/agents/default/skills/translate/SKILL.md">
+    Translate text between languages
+  </skill>
+</available-skills>
+```
+
+When a user's request matches a skill, the AI reads the full `SKILL.md` file for detailed instructions. This lazy-loading approach keeps the system prompt compact while making detailed skill instructions available on demand.
+
+## Directory structure
+
+```
+agents/
+  my-agent/
+    SYSTEM.md
+    skills/
+      summarize/
+        SKILL.md
+      translate/
+        SKILL.md
+        examples/          # optional supporting files
+          formal.md
+          casual.md
+```
+
+Each skill is a directory under `skills/` containing at minimum a `SKILL.md` file. You can include additional files (examples, templates, reference data) alongside `SKILL.md` — the AI can read them if instructed to in the skill definition.
+
+## SKILL.md format
+
+### Frontmatter
+
+YAML frontmatter between `---` delimiters. Both fields are required:
+
+```yaml
+---
+name: summarize
+description: Summarize articles, documents, or web pages into concise bullet points
+---
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Unique identifier for the skill. Used in the catalog and `!skills` output. |
+| `description` | string | Yes | One-line description. Keep it concise — this appears in the system prompt for every message. |
+
+### Body
+
+The markdown body after the frontmatter contains the full skill instructions. This is what the AI reads when it decides to use the skill.
+
+Write skill instructions as if you're briefing a knowledgeable assistant:
+
+```markdown
+---
+name: eli5
+description: Explain complex topics in simple terms, as if to a five-year-old
+---
+
+# ELI5
+
+When asked to explain something simply:
+
+1. Identify the core concept (strip away jargon)
+2. Find a relatable analogy from everyday life
+3. Build up from the analogy to the actual concept
+4. Keep sentences short — aim for 8th grade reading level
+5. End with a one-sentence "the real version" for context
+
+## Tone
+
+Friendly and patient. Use "imagine..." and "it's kind of like..." constructions.
+Avoid disclaimers like "well, it's actually more complicated than this."
+
+## Examples
+
+**Topic:** Quantum entanglement
+**Response:** Imagine you have two magic dice. Whenever you roll one and get a 6,
+the other one — even if it's on the other side of the world — also shows 6, instantly.
+Scientists found that tiny particles can be connected like this. The real version:
+entangled particles share a quantum state, so measuring one instantly determines the other.
+```
+
+## Writing effective skills
+
+### Keep descriptions short
+
+The description appears in the system prompt for every message in the session. Long descriptions bloat the prompt. Aim for one sentence under 100 characters.
+
+### Be specific in the body
+
+The body is only read when the skill is activated, so there's no cost to being thorough. Include:
+
+- Step-by-step instructions
+- Constraints and edge cases
+- Tone/style guidance
+- Examples of good output
+
+### Use supporting files
+
+For skills that need reference data, templates, or examples, put them in the skill directory and reference them from `SKILL.md`:
+
+```markdown
+---
+name: code-review
+description: Review code for bugs, style issues, and security concerns
+---
+
+# Code Review
+
+Read the checklist at ./checklist.md before starting each review.
+Use the severity scale defined in ./severity-levels.md.
+```
+
+### One skill per concern
+
+Prefer focused skills over broad ones. Instead of a "writing" skill that handles everything, create `summarize`, `proofread`, `rewrite-formal`, etc. This gives the AI clearer signals about when to activate each skill.
+
+## Skill discovery details
+
+The discovery process (`skills.ts`) works as follows:
+
+1. Looks for a `skills/` directory inside the agent directory
+2. Iterates over subdirectories (non-directory entries are ignored)
+3. Checks each subdirectory for a `SKILL.md` file
+4. Parses the YAML frontmatter from each `SKILL.md`
+5. Skills with missing or invalid frontmatter are skipped (with a warning log)
+6. Valid skills are sorted alphabetically by name
+7. The catalog is appended to the system prompt
+
+Skills are discovered once at session creation. To pick up new or modified skills, reset the session with `!new` (Discord) or `/new` (TUI).
+
+## Listing skills
+
+Use `!skills` (Discord) or `/skills` (TUI) to see all discovered skills for the current agent. The output shows each skill's name and description.
