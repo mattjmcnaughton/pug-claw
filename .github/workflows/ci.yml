@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  gate:
+    name: Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - name: Check formatting
+        run: bunx biome format src/ tests/
+      - name: Lint
+        run: bunx biome lint src/ tests/
+      - name: Typecheck
+        run: bunx tsc --noEmit
+      - name: Unit tests
+        run: bun test tests/unit/
+      - name: Integration tests
+        run: bun test tests/integration/
+      - name: E2E tests
+        run: bun test tests/e2e/
