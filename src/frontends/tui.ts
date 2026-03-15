@@ -1,4 +1,3 @@
-import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   CombinedAutocompleteProvider,
@@ -16,6 +15,7 @@ import {
   TUI,
 } from "@mariozechner/pi-tui";
 import chalk from "chalk";
+import { listAvailableAgents, resolveAgentDir } from "../agents.ts";
 import type { Driver } from "../drivers/types.ts";
 import { discoverSkills } from "../skills.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
@@ -52,10 +52,11 @@ const markdownTheme: MarkdownTheme = {
 
 export class TuiFrontend implements Frontend {
   async start(ctx: FrontendContext): Promise<void> {
-    const { drivers, config, agentsDir, buildSystemPrompt, logger } = ctx;
+    const { drivers, config, buildSystemPrompt, logger } = ctx;
+    const { agentsDir } = config;
 
-    let currentDriverName = config.default_driver;
-    let currentAgentName = config.default_agent;
+    let currentDriverName = config.defaultDriver;
+    let currentAgentName = config.defaultAgent;
     let currentModel: string | undefined;
     let currentSessionId: string | undefined;
 
@@ -224,18 +225,14 @@ export class TuiFrontend implements Frontend {
 
         if (cmd === "agent") {
           if (!arg) {
-            const available = readdirSync(agentsDir, { withFileTypes: true })
-              .filter((d) => d.isDirectory())
-              .map((d) => d.name)
-              .sort()
-              .join(", ");
+            const available = listAvailableAgents(agentsDir).join(", ");
             showInfo(
               `Current agent: ${currentAgentName}\nAvailable: ${available}`,
             );
             return;
           }
-          const agentDir = resolve(agentsDir, arg);
-          if (!existsSync(agentDir)) {
+          const agentDir = resolveAgentDir(agentsDir, arg);
+          if (!agentDir) {
             showInfo(`Unknown agent: ${arg}`);
             return;
           }

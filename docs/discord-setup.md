@@ -8,19 +8,10 @@ Step-by-step guide to creating a Discord bot and connecting it to pug-claw.
 2. Click **New Application**
 3. Name it (e.g., "pug-claw") and click **Create**
 
-## 2. Create the bot user
+## 2. Configure the bot
 
 1. In your application, go to the **Bot** tab
-2. Click **Add Bot** (if not already created)
-3. Under **Privileged Gateway Intents**, enable:
-   - **Message Content Intent** (required — pug-claw reads message text)
-4. Optionally disable **Public Bot** if you don't want others to invite it
-
-## 3. Get the bot token
-
-1. On the **Bot** tab, click **Reset Token**
-2. Copy the token
-3. Add it to your `.env` file:
+2. Click **Reset Token**, copy the token, and add it to your `.env` file:
 
 ```
 DISCORD_BOT_TOKEN=your-token-here
@@ -28,17 +19,26 @@ DISCORD_BOT_TOKEN=your-token-here
 
 > Never commit this token or share it publicly. If compromised, reset it immediately in the Developer Portal.
 
-## 4. Invite the bot to your server
+3. Ensure **Public Bot** is enabled
+4. Under **Privileged Gateway Intents**, enable all three:
+   - **Presence Intent**
+   - **Server Members Intent**
+   - **Message Content Intent** (required — pug-claw reads message text)
+
+## 3. Invite the bot to your server
 
 1. Go to the **OAuth2** tab
-2. Under **OAuth2 URL Generator**, select scopes:
-   - `bot`
+2. Under **Scopes**, select `bot`
 3. Under **Bot Permissions**, select:
-   - Send Messages
-   - Read Message History
-   - View Channels
-4. Copy the generated URL and open it in your browser
-5. Select the server you want to add the bot to and click **Authorize**
+   - **General Permissions:** Manage Roles, Manage Channels, View Channels, Manage Events, Create Events, Manage Expressions, Create Expressions
+   - **Text Permissions:** Send Messages, Create Public Threads, Create Private Threads, Send Messages in Threads, Manage Messages, Pin Messages, Manage Threads, Embed Links, Attach Files, Read Message History, Mention Everyone, Add Reactions, Create Polls, Send Voice Messages
+4. Under **Integration Type**, select **Guild Install**
+5. Copy the **Generated URL** and open it in your browser
+6. Select the server you want to add the bot to and click **Authorize**
+
+## 4. Lock down the bot
+
+Once the bot has been invited to your server, go back to the **Bot** tab and disable **Public Bot** to prevent others from inviting it.
 
 ## 5. Verify
 
@@ -56,6 +56,8 @@ Send a message in any channel the bot can see. It should respond.
 |--------|-----|
 | Guilds | Track which servers the bot is in |
 | Guild Messages | Receive messages in server channels |
+| Presence | Receive presence update events (privileged) |
+| Server Members | Receive events for guild member updates (privileged) |
 | Message Content | Read the text content of messages (privileged) |
 
 ## Troubleshooting

@@ -36,34 +36,36 @@ mv pug-claw-linux-x86_64 /usr/local/bin/pug-claw
 
 ### From source
 
-If you're forking or developing locally:
+Clone the repo and install globally with `bun link`:
 
 ```bash
+git clone <repo-url>
+cd pug-claw
 bun install
+bun link       # makes `pug-claw` available globally
 ```
 
-If you would like an npm package, please [file an issue](https://github.com/mattjmcnaughton/pug-claw/issues/new) and let me know :)
+After linking, you can run `pug-claw init`, `pug-claw start`, etc. from anywhere.
 
 ## Configuration
 
-### Environment variables
+### Quick start
 
-Copy the example and fill in your secrets:
+Run the interactive setup wizard to create `~/.pug-claw/` with a `config.json`, default agent, and optional `.env` secrets file:
 
 ```bash
-cp .env.example .env
+bun run init
 ```
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DISCORD_BOT_TOKEN` | Yes (Discord mode) | Bot token from the Discord Developer Portal |
-| `OPENROUTER_API_KEY` | No | API key for OpenRouter-backed models (Pi driver) |
-| `LOG_LEVEL` | No | Logging level: `debug`, `info` (default), `warn`, `error`, `fatal` |
-| `NODE_ENV` | No | Set to `production` for JSON log output; otherwise uses pretty-printing |
+You can also set `PUG_CLAW_HOME` to use a different directory:
 
-### Bot configuration
+```bash
+PUG_CLAW_HOME=/opt/pug-claw bun run init
+```
 
-Edit `agents.json` to set defaults and per-channel overrides:
+### Config file
+
+All configuration lives in `~/.pug-claw/config.json` (created by `pug-claw init`):
 
 ```json
 {
@@ -80,16 +82,36 @@ Edit `agents.json` to set defaults and per-channel overrides:
       "driver": "pi",
       "model": "openrouter/openai/gpt-4o"
     }
+  },
+  "secrets": {
+    "provider": "dotenv"
+  },
+  "discord": {
+    "guild_id": "123456789",
+    "owner_id": "987654321"
   }
 }
 ```
+
+### Environment variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DISCORD_BOT_TOKEN` | Yes (Discord mode) | Bot token from the Discord Developer Portal |
+| `ANTHROPIC_API_KEY` | Yes (Claude driver) | Anthropic API key |
+| `OPENROUTER_API_KEY` | No | API key for OpenRouter-backed models (Pi driver) |
+| `LOG_LEVEL` | No | Logging level: `debug`, `info` (default), `warn`, `error`, `fatal` |
+| `NODE_ENV` | No | Set to `production` for JSON log output; otherwise uses pretty-printing |
+| `PUG_CLAW_HOME` | No | Override the home directory (default: `~/.pug-claw`) |
+
+Secrets can be provided via environment variables directly, or via a `.env` file when `"secrets": {"provider": "dotenv"}` is set in `config.json`.
 
 ## Usage
 
 ### Discord mode (default)
 
 ```bash
-bun start
+bun run start
 ```
 
 ### TUI mode
@@ -115,12 +137,14 @@ bun run tui
 ## Architecture
 
 ```
-pug-claw/
-  main.ts              # Entrypoint — wires drivers, config, and frontend
-  config.ts            # Zod-validated config loading from agents.json
+src/
+  main.ts              # CLI entrypoint (Commander: start, tui, init)
+  resources.ts         # Config loading, path resolution, secrets providers
+  agents.ts            # Agent directory resolution
   logger.ts            # Pino structured logger
   skills.ts            # Agent skill discovery and system prompt injection
-  agents.json          # Bot configuration
+  commands/
+    init.ts            # Interactive setup wizard (@clack/prompts)
   drivers/
     types.ts           # Driver interface (createSession, query, destroySession)
     claude.ts          # Claude Agent SDK driver
@@ -129,10 +153,16 @@ pug-claw/
     types.ts           # Frontend interface
     discord.ts         # Discord.js frontend with per-channel state
     tui.ts             # Terminal UI frontend (pi-tui)
+
+~/.pug-claw/           # User home directory (created by `pug-claw init`)
+  config.json          # Consolidated configuration
   agents/
     default/
       SYSTEM.md        # Default agent system prompt
-      skills/          # Optional skill directories
+      skills/          # Agent-specific skills
+  skills/              # Global skills (available to all agents)
+  data/                # Runtime data
+  .env                 # Optional dotenv secrets file
 ```
 
 ### Drivers
@@ -142,7 +172,7 @@ pug-claw/
 
 ### Agents and skills
 
-Agents live in `agents/<name>/` with a `SYSTEM.md` system prompt. Each agent can optionally have a `skills/` directory containing skill definitions (`SKILL.md` with YAML frontmatter). Skills are automatically discovered and injected into the system prompt.
+Agents live in `~/.pug-claw/agents/<name>/` with a `SYSTEM.md` system prompt. Each agent can have a `skills/` directory containing skill definitions (`SKILL.md` with YAML frontmatter). Global skills in `~/.pug-claw/skills/` are available to all agents. Agent-specific skills take precedence on name collision. Skills are automatically discovered and injected into the system prompt.
 
 ## Discord Bot Setup
 

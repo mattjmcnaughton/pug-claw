@@ -13,17 +13,16 @@ Install the following on your host:
 ## Setup
 
 ```bash
-# Clone the repo and navigate to pug-claw
+# Clone the repo
 cd /opt/pug-claw  # or your preferred location
 git clone <repo-url> .
-cd experiments/discord/pug-claw
 
 # Install dependencies
 bun install
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your secrets
+# Initialize configuration
+bun run init
+# Or set a custom home: PUG_CLAW_HOME=/etc/pug-claw bun run init
 ```
 
 ## Environment variables
@@ -40,10 +39,10 @@ cp .env.example .env
 
 ```bash
 # Discord mode
-bun main.ts
+bun run start
 
 # TUI mode (for testing)
-bun main.ts --tui
+bun run tui
 ```
 
 ## systemd service
@@ -64,12 +63,12 @@ Wants=network-online.target
 Type=simple
 User=pug-claw
 Group=pug-claw
-WorkingDirectory=/opt/pug-claw/experiments/discord/pug-claw
-ExecStart=/usr/local/bin/bun main.ts
+WorkingDirectory=/opt/pug-claw
+ExecStart=/usr/local/bin/bun src/main.ts start
 Restart=on-failure
 RestartSec=5
 
-EnvironmentFile=/opt/pug-claw/experiments/discord/pug-claw/.env
+EnvironmentFile=/opt/pug-claw/.env
 
 # Hardening
 NoNewPrivileges=true
@@ -126,7 +125,6 @@ For development or debugging, omit `NODE_ENV` to get colorized pretty-printed ou
 ```bash
 cd /opt/pug-claw
 git pull
-cd experiments/discord/pug-claw
 bun install
 sudo systemctl restart pug-claw
 ```

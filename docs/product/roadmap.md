@@ -9,6 +9,13 @@
 - [x] CI pipeline (lint, format, typecheck, tests)
 - [x] Semantic-release with GitHub Releases
 - [x] Standalone binary builds (Linux x86_64, macOS ARM64) — **paused** (CI workflow disabled; flip `publish-binaries` flag in CI config to re-enable)
+- [x] Resource discovery: `~/.pug-claw` home directory with consolidated `config.json`
+- [x] CLI framework (Commander.js) with `start`, `tui`, `init` subcommands
+- [x] Interactive `pug-claw init` wizard (@clack/prompts)
+- [x] Global + agent-specific skills with merge and precedence
+- [x] Secrets provider abstraction (`env`, `dotenv`)
+- [x] Discord guild filtering and owner identity config
+- [x] Global CLI install via `bun link`
 
 ---
 
@@ -18,12 +25,17 @@ Core infrastructure that unblocks everything else.
 
 ### Resource Discovery
 
-Configurable paths for where pug-claw finds agents, skills, config, secrets, memory, data, and brain sources. Today everything is hardcoded relative to the binary root.
+Configurable paths for where pug-claw finds agents, skills, config, secrets, memory, data, and brain sources.
 
-- [ ] Resource resolution config (`pug-claw.toml` or extend `agents.json`)
-- [ ] Search order: CLI flag > env var > project-local > user (`~/.config/pug-claw/`) > system (`/etc/pug-claw/`)
+- [x] `~/.pug-claw/config.json` as consolidated config file (replaces `agents.json`)
+- [x] Override precedence: CLI flag > env var > config file > default
+- [x] `pug-claw init` interactive setup wizard (Commander + @clack/prompts)
+- [x] Global + agent-specific skills with merge (agent wins on name collision)
+- [x] Secrets provider abstraction (`env` | `dotenv`)
+- [x] Discord identity config (`guild_id`, `owner_id`) with guild filtering
+- [x] Hard-fail with `pug-claw init` guidance when config missing
 - [ ] Multi-path merging for agents and skills (layer project + personal + system)
-- [ ] Secrets provider abstraction (`env` | `dotenv` | `1password` | `sops`)
+- [ ] Additional secrets providers (`1password` | `sops`)
 
 ### User Identity
 
@@ -37,9 +49,10 @@ Agents have zero awareness of who they're talking to. Needed by memory, permissi
 
 ### Config Refinements
 
-- [ ] Refine and extend `agents.json` schema for new features
+- [x] Zod-validated `config.json` with clear error messages on invalid data
+- [x] Hard-fail with actionable "Run `pug-claw init`" message when config missing
+- [ ] Refine and extend `config.json` schema for new features
 - [ ] Config validation CLI command (`pug-claw check-config`)
-- [ ] Better error messages on invalid config
 
 ### Type Normalization
 
@@ -124,7 +137,7 @@ Agents can search and write to your personal knowledge base.
 
 Simple timer-based agent actions. Enables conversation capture, memory compaction, brain reindexing, and daily summaries without full workflow infrastructure.
 
-- [ ] Schedule config in `agents.json` or `schedules.yaml`
+- [ ] Schedule config in `config.json` or `schedules.yaml`
 - [ ] Timer runtime (`setInterval`-based, runs inside the main process)
 - [ ] Each job: agent + prompt + output target (Discord channel, brain, log only)
 - [ ] `!schedules` / `/schedules` command to list active jobs
@@ -248,7 +261,7 @@ Utility:
 ### Quality
 
 - [ ] Better test coverage (frontends, drivers, integration with real APIs)
-- [ ] Refactoring pass on shared frontend logic (Discord + TUI command handling is duplicated)
+- [ ] Refactoring pass on shared frontend logic (Discord + TUI command handling is still duplicated; agent resolution extracted to `src/agents.ts`)
 - [ ] Error recovery and retry logic for drivers
 - [ ] Dev mode hot reload (`bun --watch`)
 - [ ] Agent/skill scaffolding CLI (`pug-claw new-agent`, `pug-claw new-skill`)

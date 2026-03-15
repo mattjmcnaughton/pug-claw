@@ -3,16 +3,22 @@
   "module": "src/main.ts",
   "type": "module",
   "private": true,
+  "bin": {
+    "pug-claw": "src/main.ts"
+  },
   "scripts": {
-    "start": "bun src/main.ts",
-    "tui": "bun src/main.ts --tui"
+    "start": "bun src/main.ts start",
+    "tui": "bun src/main.ts tui",
+    "init": "bun src/main.ts init"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.47",
-    "@mariozechner/pi-coding-agent": "latest",
+    "@clack/prompts": "^1.1.0",
     "@mariozechner/pi-ai": "latest",
+    "@mariozechner/pi-coding-agent": "latest",
     "@mariozechner/pi-tui": "latest",
     "chalk": "^5.4.1",
+    "commander": "^14.0.3",
     "discord.js": "^14.18.0",
     "js-yaml": "^4.1.0",
     "pino": "^9.6.0",

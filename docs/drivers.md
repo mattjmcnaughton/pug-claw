@@ -21,7 +21,7 @@ You can also pass any valid Claude model ID directly via `!model <id>`.
 
 ### Default tools
 
-Claude sessions are created with these tools enabled: `Read`, `Glob`, `Grep`, `Bash`. Per-channel tool overrides can be configured in `agents.json`.
+Claude sessions are created with these tools enabled: `Read`, `Glob`, `Grep`, `Bash`. Per-channel tool overrides can be configured in `config.json`.
 
 ### Session behavior
 
@@ -79,7 +79,7 @@ Use `!driver <name>` (Discord) or `/driver <name>` (TUI) to switch. Switching dr
 
 ## Per-channel driver configuration
 
-In `agents.json`, you can set a default driver per channel:
+In `config.json`, you can set a default driver per channel:
 
 ```json
 {
