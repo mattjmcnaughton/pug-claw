@@ -4,9 +4,8 @@
 
 - `src/` — TypeScript source code
 - `tests/` — Test suite (unit, integration, e2e)
-- `agents/` — Agent definitions (SYSTEM.md, skills)
 - `docs/` — Documentation
-- `agents.json` — Bot configuration
+- `agents/` — Agent definitions (SYSTEM.md, skills) — legacy location, new installs use `~/.pug-claw/agents/`
 
 ## Development
 
@@ -27,6 +26,7 @@ This is a Bun + TypeScript project.
 
 ### Running
 
+- `bun run init` — Initialize `~/.pug-claw` configuration (interactive)
 - `bun run start` — Start with Discord frontend
 - `bun run tui` — Start with TUI frontend
 

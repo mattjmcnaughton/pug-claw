@@ -1,14 +1,15 @@
-import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { Client, GatewayIntentBits, type Message } from "discord.js";
-import { getChannelConfig } from "../config.ts";
+import { listAvailableAgents, resolveAgentDir } from "../agents.ts";
 import type { Driver } from "../drivers/types.ts";
+import { getChannelConfig } from "../resources.ts";
 import { discoverSkills } from "../skills.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
 
 export class DiscordFrontend implements Frontend {
   async start(ctx: FrontendContext): Promise<void> {
-    const { drivers, config, agentsDir, buildSystemPrompt, logger } = ctx;
+    const { drivers, config, buildSystemPrompt, logger } = ctx;
+    const { agentsDir } = config;
 
     const client = new Client({
       intents: [
@@ -28,7 +29,7 @@ export class DiscordFrontend implements Frontend {
       return (
         channelDrivers.get(channelId) ??
         getChannelConfig(config, channelId).driver ??
-        config.default_driver
+        config.defaultDriver
       );
     }
 
@@ -43,7 +44,7 @@ export class DiscordFrontend implements Frontend {
       return (
         channelAgents.get(channelId) ??
         getChannelConfig(config, channelId).agent ??
-        config.default_agent
+        config.defaultAgent
       );
     }
 
@@ -128,20 +129,18 @@ export class DiscordFrontend implements Frontend {
       } else if (cmd === "agent") {
         if (!arg) {
           const current = resolveAgentName(channelId);
-          const available = readdirSync(agentsDir, { withFileTypes: true })
-            .filter((d) => d.isDirectory())
-            .map((d) => `\`${d.name}\``)
-            .sort()
+          const available = listAvailableAgents(agentsDir)
+            .map((name) => `\`${name}\``)
             .join(", ");
           await message.channel.send(
             `Current agent: \`${current}\`\nAvailable: ${available}`,
           );
           return true;
         }
-        const agentDir = resolve(agentsDir, arg);
-        if (!existsSync(agentDir)) {
+        const agentDir = resolveAgentDir(agentsDir, arg);
+        if (!agentDir) {
           await message.channel.send(
-            `Unknown agent \`${arg}\`. Directory \`agents/${arg}/\` does not exist.`,
+            `Unknown agent \`${arg}\`. No agent with SYSTEM.md found at \`agents/${arg}/\`.`,
           );
           return true;
         }
@@ -199,8 +198,10 @@ export class DiscordFrontend implements Frontend {
           bot_user: client.user?.tag,
           bot_id: client.user?.id,
           guilds: client.guilds.cache.map((g) => ({ id: g.id, name: g.name })),
-          default_driver: config.default_driver,
-          default_agent: config.default_agent,
+          default_driver: config.defaultDriver,
+          default_agent: config.defaultAgent,
+          owner_id: config.discord?.ownerId,
+          guild_filter: config.discord?.guildId,
         },
         "bot_ready",
       );
@@ -208,6 +209,14 @@ export class DiscordFrontend implements Frontend {
 
     client.on("messageCreate", async (message: Message) => {
       if (message.author.bot) return;
+
+      // Guild filter: ignore messages from other guilds if configured
+      if (
+        config.discord?.guildId &&
+        message.guildId !== config.discord.guildId
+      ) {
+        return;
+      }
 
       logger.info(
         {
@@ -288,12 +297,7 @@ export class DiscordFrontend implements Frontend {
       }
     });
 
-    const token = process.env.DISCORD_BOT_TOKEN;
-    if (!token) {
-      logger.fatal("DISCORD_BOT_TOKEN environment variable is required");
-      process.exit(1);
-    }
-
+    const token = config.secrets.require("DISCORD_BOT_TOKEN");
     await client.login(token);
   }
 }

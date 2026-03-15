@@ -60,14 +60,13 @@ function parseSkillFrontmatter(filePath: string): SkillSummary | null {
   return { name, description, path: resolve(filePath) };
 }
 
-export function discoverSkills(agentDir: string): SkillSummary[] {
-  const skillsDir = `${agentDir}/skills`;
-  if (!existsSync(skillsDir)) return [];
+function discoverSkillsFromDir(dir: string): SkillSummary[] {
+  if (!existsSync(dir)) return [];
 
   const skills: SkillSummary[] = [];
-  for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const skillMd = `${skillsDir}/${entry.name}/SKILL.md`;
+    const skillMd = `${dir}/${entry.name}/SKILL.md`;
     if (!existsSync(skillMd)) continue;
 
     const summary = parseSkillFrontmatter(skillMd);
@@ -79,7 +78,29 @@ export function discoverSkills(agentDir: string): SkillSummary[] {
       );
     }
   }
-  return skills.sort((a, b) => a.name.localeCompare(b.name));
+  return skills;
+}
+
+export function discoverSkills(
+  agentDir: string,
+  globalSkillsDir?: string,
+): SkillSummary[] {
+  const agentSkills = discoverSkillsFromDir(`${agentDir}/skills`);
+
+  if (!globalSkillsDir) {
+    return agentSkills.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const globalSkills = discoverSkillsFromDir(globalSkillsDir);
+
+  // Agent-specific skills win on name collision
+  const agentSkillNames = new Set(agentSkills.map((s) => s.name));
+  const merged = [
+    ...agentSkills,
+    ...globalSkills.filter((s) => !agentSkillNames.has(s.name)),
+  ];
+
+  return merged.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function buildSkillCatalog(skills: SkillSummary[]): string {
@@ -103,9 +124,12 @@ function loadSystemPrompt(agentDir: string): string {
   return readFileSync(systemMd, "utf-8");
 }
 
-export function buildFullSystemPrompt(agentDir: string): string {
+export function buildFullSystemPrompt(
+  agentDir: string,
+  globalSkillsDir?: string,
+): string {
   let prompt = loadSystemPrompt(agentDir);
-  const skills = discoverSkills(agentDir);
+  const skills = discoverSkills(agentDir, globalSkillsDir);
   const catalog = buildSkillCatalog(skills);
 
   if (catalog) {

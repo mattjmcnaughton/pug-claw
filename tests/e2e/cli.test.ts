@@ -10,7 +10,7 @@ const hasDiscordToken = !!process.env.DISCORD_BOT_TOKEN;
 
 describe("CLI e2e", () => {
   test("exits with error when DISCORD_BOT_TOKEN is missing", async () => {
-    const proc = Bun.spawn(["bun", MAIN], {
+    const proc = Bun.spawn(["bun", MAIN, "start"], {
       env: { ...process.env, DISCORD_BOT_TOKEN: "" },
       stderr: "pipe",
     });

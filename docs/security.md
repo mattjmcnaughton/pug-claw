@@ -17,15 +17,17 @@ pug-claw sits between untrusted user input (Discord messages) and powerful AI ba
 
 | Secret | Location | Format |
 |--------|----------|--------|
-| `DISCORD_BOT_TOKEN` | `.env` file | Plaintext environment variable |
-| `ANTHROPIC_API_KEY` | `.env` file | Plaintext environment variable |
-| `OPENROUTER_API_KEY` | `.env` file | Plaintext environment variable |
+| `DISCORD_BOT_TOKEN` | Environment or `~/.pug-claw/.env` | Plaintext |
+| `ANTHROPIC_API_KEY` | Environment or `~/.pug-claw/.env` | Plaintext |
+| `OPENROUTER_API_KEY` | Environment or `~/.pug-claw/.env` | Plaintext |
 | OpenAI Codex OAuth | `~/.pi/agent/auth.json` | JSON (managed by pi-ai CLI) |
+
+Secrets can be loaded from environment variables (default) or from a `.env` file when `config.json` has `"secrets": {"provider": "dotenv"}`. With dotenv, environment variables always take precedence over file values.
 
 ### Protection measures
 
 - **`.env` is gitignored** — The `.gitignore` includes `.env` and `auth.json` to prevent accidental commits
-- **No secrets in code** — All secrets are loaded from environment variables at runtime
+- **No secrets in code** — All secrets are loaded via the `SecretsProvider` abstraction at runtime
 - **No secrets in logs** — Pino's structured logging only outputs fields explicitly passed; secrets are never logged
 
 ### Best practices
@@ -49,7 +51,7 @@ Both drivers grant filesystem and shell access by default. Any user who can mess
 - Execute arbitrary shell commands as the process user
 - Search the filesystem
 
-The Claude driver runs in `acceptEdits` permission mode, which requires approval for file modifications. You can restrict tools per-channel via `agents.json`:
+The Claude driver runs in `acceptEdits` permission mode, which requires approval for file modifications. You can restrict tools per-channel via `config.json`:
 
 ```json
 {
