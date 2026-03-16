@@ -93,7 +93,10 @@ function makeCtx(
     drivers: { mock: driver },
     config,
     pluginDirs: new Map(),
-    resolveAgent: () => ({ systemPrompt: "system prompt", skills: [] }),
+    resolveAgent: () => ({
+      systemPrompt: "system prompt",
+      skills: [],
+    }),
     logger: {
       info: () => {},
       warn: () => {},

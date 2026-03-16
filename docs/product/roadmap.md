@@ -356,6 +356,7 @@ Broader web UI for managing pug-claw beyond process recovery (the Management Web
 
 ## Future / Someday
 
+- [ ] Fine-grained agent permissions (per-agent permission modes, tool allow/deny lists, filesystem sandboxing). Currently all agents run with full permissions (`bypassPermissions` on Claude, unrestricted on Pi).
 - [ ] Multi-user permissions model
 - [ ] Cost / token tracking per user and per agent
 - [ ] Rate limiting and per-user quotas

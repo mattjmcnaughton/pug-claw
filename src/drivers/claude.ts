@@ -36,7 +36,8 @@ export class ClaudeDriver implements Driver {
       prompt: "Acknowledge you are ready. Respond with only: Ready.",
       options: {
         allowedTools: tools,
-        permissionMode: "acceptEdits" as const,
+        permissionMode: "bypassPermissions" as const,
+        allowDangerouslySkipPermissions: true,
         model,
         systemPrompt,
         plugins: options.pluginDir
