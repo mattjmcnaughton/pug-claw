@@ -1,8 +1,9 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { userInfo } from "node:os";
+import { homedir, userInfo } from "node:os";
 import * as p from "@clack/prompts";
 import { EnvVars, Paths } from "../constants.ts";
+import { expandTilde } from "../resources.ts";
 
 export async function runInitService(): Promise<void> {
   p.intro("pug-claw init-service");
@@ -37,28 +38,91 @@ export async function runInitService(): Promise<void> {
     process.exit(0);
   }
 
-  const workingDir = await p.text({
-    message: "Working directory?",
-    initialValue: resolve(import.meta.dir, "../.."),
-    validate: (val) => {
-      if (!val?.trim()) return "Path cannot be empty";
-    },
+  const runMode = await p.select({
+    message: "How will pug-claw be launched?",
+    options: [
+      { value: "bun", label: "bun + script", hint: "bun src/main.ts start" },
+      { value: "binary", label: "binary", hint: "pug-claw start" },
+    ],
   });
 
-  if (p.isCancel(workingDir)) {
+  if (p.isCancel(runMode)) {
     p.cancel("Cancelled.");
     process.exit(0);
   }
 
-  const bunPath = await p.text({
-    message: "Path to bun?",
-    initialValue: detectedBun,
+  let execStart: string;
+  let workingDir: string;
+
+  if (runMode === "binary") {
+    const binaryPath = await p.text({
+      message: "Path to pug-claw binary?",
+      initialValue: "/usr/local/bin/pug-claw",
+      validate: (val) => {
+        if (!val?.trim()) return "Path cannot be empty";
+      },
+    });
+
+    if (p.isCancel(binaryPath)) {
+      p.cancel("Cancelled.");
+      process.exit(0);
+    }
+
+    const wd = await p.text({
+      message: "Working directory?",
+      initialValue: "/opt/pug-claw",
+      validate: (val) => {
+        if (!val?.trim()) return "Path cannot be empty";
+      },
+    });
+
+    if (p.isCancel(wd)) {
+      p.cancel("Cancelled.");
+      process.exit(0);
+    }
+
+    execStart = `${binaryPath} start`;
+    workingDir = wd;
+  } else {
+    const bunPath = await p.text({
+      message: "Path to bun?",
+      initialValue: detectedBun,
+      validate: (val) => {
+        if (!val?.trim()) return "Path cannot be empty";
+      },
+    });
+
+    if (p.isCancel(bunPath)) {
+      p.cancel("Cancelled.");
+      process.exit(0);
+    }
+
+    const wd = await p.text({
+      message: "Working directory?",
+      initialValue: resolve(import.meta.dir, "../.."),
+      validate: (val) => {
+        if (!val?.trim()) return "Path cannot be empty";
+      },
+    });
+
+    if (p.isCancel(wd)) {
+      p.cancel("Cancelled.");
+      process.exit(0);
+    }
+
+    execStart = `${bunPath} ${mainScript} start`;
+    workingDir = wd;
+  }
+
+  const pathEnv = await p.text({
+    message: "PATH for service? (systemd default is minimal)",
+    initialValue: process.env.PATH ?? "/usr/local/bin:/usr/bin:/bin",
     validate: (val) => {
-      if (!val?.trim()) return "Path cannot be empty";
+      if (!val?.trim()) return "PATH cannot be empty";
     },
   });
 
-  if (p.isCancel(bunPath)) {
+  if (p.isCancel(pathEnv)) {
     p.cancel("Cancelled.");
     process.exit(0);
   }
@@ -76,6 +140,10 @@ export async function runInitService(): Promise<void> {
     process.exit(0);
   }
 
+  // Resolve to absolute path so systemd doesn't need tilde expansion
+  const absoluteHome = resolve(expandTilde(home));
+  const userHome = homedir();
+
   const unit = `[Unit]
 Description=pug-claw AI bot framework
 After=network-online.target
@@ -85,10 +153,12 @@ Wants=network-online.target
 Type=simple
 User=${user}
 WorkingDirectory=${workingDir}
-ExecStart=${bunPath} ${mainScript} start
+ExecStart=${execStart}
 Restart=on-failure
 RestartSec=5
-Environment=${EnvVars.HOME}=${home}
+Environment=HOME=${userHome}
+Environment=PATH=${pathEnv}
+Environment=${EnvVars.HOME}=${absoluteHome}
 Environment=NODE_ENV=production
 
 [Install]
