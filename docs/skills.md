@@ -9,14 +9,17 @@ For basic setup, see [agents.md](./agents.md). This document covers the skill sy
 ```
 User sends message
   -> pug-claw creates a session (if needed)
-  -> discovers skills in agents/<name>/skills/
-  -> parses SKILL.md frontmatter for each skill
-  -> builds a catalog: name + description + file path
-  -> appends the catalog to the agent's SYSTEM.md prompt
-  -> sends the combined prompt to the driver
+  -> discovers skills in agents/<name>/skills/ and global skills/
+  -> returns skills as structured data alongside the system prompt
+  -> the driver injects skills using its native mechanism
+  -> sends the prompt + skills to the AI backend
 ```
 
-The AI backend receives a skill catalog like this in its system prompt:
+### Driver-specific injection
+
+**Claude driver:** Skills are injected as native plugins via the Claude Code SDK. At startup (and on `!reload`), pug-claw generates per-agent plugin directories at `~/.pug-claw/plugins/{agentName}/skills/` containing symlinks to each allowed skill's directory. The SDK discovers these natively.
+
+**Pi driver (and fallback):** Skills are injected as an XML catalog appended to the system prompt:
 
 ```xml
 <available-skills>
@@ -30,6 +33,8 @@ The AI backend receives a skill catalog like this in its system prompt:
 ```
 
 When a user's request matches a skill, the AI reads the full `SKILL.md` file for detailed instructions. This lazy-loading approach keeps the system prompt compact while making detailed skill instructions available on demand.
+
+See [ADR-001](./adrs/001-per-agent-native-skill-injection.md) for the design rationale.
 
 ## Directory structure
 
@@ -165,9 +170,9 @@ The discovery process (`skills.ts`) works as follows:
 4. Parses the YAML frontmatter from each `SKILL.md`
 5. Skills with missing or invalid frontmatter are skipped (with a warning log)
 6. Valid skills are sorted alphabetically by name
-7. The catalog is appended to the system prompt
+7. Skills are returned as structured data for driver-specific injection
 
-Skills are discovered once at session creation. To pick up new or modified skills, reset the session with `!new` (Discord) or `/new` (TUI).
+Plugin directories (`~/.pug-claw/plugins/`) are regenerated on startup and `!reload`. Skills are discovered once at session creation. To pick up new or modified skills, use `!reload` or reset the session with `!new` (Discord) or `/new` (TUI).
 
 ## Listing skills
 
