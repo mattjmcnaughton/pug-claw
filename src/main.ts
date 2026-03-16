@@ -45,7 +45,7 @@ async function startFrontend(
   logger.info({ drivers: Object.keys(drivers) }, "drivers_initialized");
 
   const pluginsDir = resolve(config.homeDir, Paths.PLUGINS_DIR);
-  let pluginDirs = generateAgentPlugins(
+  const pluginDirs = generateAgentPlugins(
     config.agentsDir,
     config.skillsDir,
     pluginsDir,

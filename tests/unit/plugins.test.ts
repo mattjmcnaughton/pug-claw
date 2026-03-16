@@ -61,7 +61,7 @@ describe("generateAgentPlugins", () => {
       const result = generateAgentPlugins(agentsDir, skillsDir, pluginsDir);
 
       expect(result.has("test-agent")).toBe(true);
-      const agentPluginDir = result.get("test-agent")!;
+      const agentPluginDir = result.get("test-agent") as string;
       const linkPath = resolve(agentPluginDir, "skills/my-skill");
       expect(existsSync(linkPath)).toBe(true);
       expect(lstatSync(linkPath).isSymbolicLink()).toBe(true);
@@ -126,7 +126,7 @@ describe("generateAgentPlugins", () => {
       const result = generateAgentPlugins(agentsDir, skillsDir, pluginsDir);
       expect(result.has("local-agent")).toBe(true);
       const linkPath = resolve(
-        result.get("local-agent")!,
+        result.get("local-agent") as string,
         "skills/local-skill",
       );
       expect(existsSync(linkPath)).toBe(true);
@@ -168,12 +168,12 @@ describe("generateAgentPlugins", () => {
       expect(result.has("agent-two")).toBe(true);
 
       // agent-one only has skill-a
-      const oneSkills = resolve(result.get("agent-one")!, "skills");
+      const oneSkills = resolve(result.get("agent-one") as string, "skills");
       expect(existsSync(resolve(oneSkills, "skill-a"))).toBe(true);
       expect(existsSync(resolve(oneSkills, "skill-b"))).toBe(false);
 
       // agent-two has both
-      const twoSkills = resolve(result.get("agent-two")!, "skills");
+      const twoSkills = resolve(result.get("agent-two") as string, "skills");
       expect(existsSync(resolve(twoSkills, "skill-a"))).toBe(true);
       expect(existsSync(resolve(twoSkills, "skill-b"))).toBe(true);
     } finally {
