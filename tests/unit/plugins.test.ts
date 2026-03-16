@@ -2,6 +2,7 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  readFileSync,
   readlinkSync,
   rmSync,
   writeFileSync,
@@ -66,6 +67,31 @@ describe("generateAgentPlugins", () => {
       expect(existsSync(linkPath)).toBe(true);
       expect(lstatSync(linkPath).isSymbolicLink()).toBe(true);
       expect(readlinkSync(linkPath)).toBe(resolve(skillsDir, "my-skill"));
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("creates .claude-plugin/plugin.json manifest", () => {
+    const tmpDir = makeTmpDir();
+    const agentsDir = resolve(tmpDir, "agents");
+    const skillsDir = resolve(tmpDir, "skills");
+    const pluginsDir = resolve(tmpDir, "plugins");
+
+    writeSkillMd(skillsDir, "my-skill", "A test skill");
+    writeAgentSystemMd(agentsDir, "test-agent", ["my-skill"]);
+
+    try {
+      const result = generateAgentPlugins(agentsDir, skillsDir, pluginsDir);
+      const agentPluginDir = result.get("test-agent") as string;
+      const manifestPath = resolve(
+        agentPluginDir,
+        ".claude-plugin/plugin.json",
+      );
+      expect(existsSync(manifestPath)).toBe(true);
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+      expect(manifest.name).toBe("test-agent");
+      expect(manifest.version).toBe("1.0.0");
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });
     }
