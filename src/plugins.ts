@@ -4,6 +4,7 @@ import {
   readdirSync,
   rmSync,
   symlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { resolve } from "node:path";
 import { parseAgentSystemMd } from "./agents.ts";
@@ -44,6 +45,19 @@ export function generateAgentPlugins(
     if (skills.length === 0) continue;
 
     const agentPluginDir = resolve(pluginsDir, agentName);
+
+    // Claude Code SDK requires .claude-plugin/plugin.json to recognize a plugin
+    const manifestDir = resolve(agentPluginDir, ".claude-plugin");
+    mkdirSync(manifestDir, { recursive: true });
+    writeFileSync(
+      resolve(manifestDir, "plugin.json"),
+      JSON.stringify({
+        name: agentName,
+        description: `Skills for the ${agentName} agent`,
+        version: "1.0.0",
+      }),
+    );
+
     const skillsSymlinkDir = resolve(agentPluginDir, "skills");
     mkdirSync(skillsSymlinkDir, { recursive: true });
 
