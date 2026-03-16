@@ -1,17 +1,18 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import yaml from "js-yaml";
+import { parseAgentSystemMd } from "./agents.ts";
 import { Paths } from "./constants.ts";
 import { logger } from "./logger.ts";
 import { toError } from "./resources.ts";
 
-interface SkillSummary {
+export interface SkillSummary {
   name: string;
   description: string;
   path: string;
 }
 
-function parseSkillFrontmatter(filePath: string): SkillSummary | null {
+export function parseSkillFrontmatter(filePath: string): SkillSummary | null {
   let text: string;
   try {
     text = readFileSync(filePath, "utf-8");
@@ -86,6 +87,7 @@ function discoverSkillsFromDir(dir: string): SkillSummary[] {
 export function discoverSkills(
   agentDir: string,
   globalSkillsDir?: string,
+  allowedGlobalSkills?: string[],
 ): SkillSummary[] {
   const agentSkills = discoverSkillsFromDir(`${agentDir}/skills`);
 
@@ -93,7 +95,20 @@ export function discoverSkills(
     return agentSkills.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  const globalSkills = discoverSkillsFromDir(globalSkillsDir);
+  // If allowedGlobalSkills is undefined, no global skills are injected (safe default)
+  if (allowedGlobalSkills === undefined) {
+    return agentSkills.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // If allowedGlobalSkills is an empty array, no global skills are injected
+  if (allowedGlobalSkills.length === 0) {
+    return agentSkills.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const allowedSet = new Set(allowedGlobalSkills);
+  const globalSkills = discoverSkillsFromDir(globalSkillsDir).filter((s) =>
+    allowedSet.has(s.name),
+  );
 
   // Agent-specific skills win on name collision
   const agentSkillNames = new Set(agentSkills.map((s) => s.name));
@@ -118,20 +133,17 @@ function buildSkillCatalog(skills: SkillSummary[]): string {
   return lines.join("\n");
 }
 
-function loadSystemPrompt(agentDir: string): string {
-  const systemMd = `${agentDir}/${Paths.SYSTEM_MD}`;
-  if (!existsSync(systemMd)) {
-    throw new Error(`Missing SYSTEM.md in ${agentDir}`);
-  }
-  return readFileSync(systemMd, "utf-8");
-}
-
 export function buildFullSystemPrompt(
   agentDir: string,
   globalSkillsDir?: string,
 ): string {
-  let prompt = loadSystemPrompt(agentDir);
-  const skills = discoverSkills(agentDir, globalSkillsDir);
+  const parsed = parseAgentSystemMd(agentDir);
+  let prompt = parsed.systemPrompt;
+  const skills = discoverSkills(
+    agentDir,
+    globalSkillsDir,
+    parsed.meta.allowedSkills,
+  );
   const catalog = buildSkillCatalog(skills);
 
   if (catalog) {

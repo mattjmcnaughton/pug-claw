@@ -5,7 +5,7 @@
 - `src/` — TypeScript source code
 - `tests/` — Test suite (unit, integration, e2e)
 - `docs/` — Documentation
-- `agents/` — Agent definitions (SYSTEM.md, skills) — legacy location, new installs use `~/.pug-claw/agents/`
+- `builtins/` — Built-in skills and agents shipped with pug-claw (installed to `~/.pug-claw/` during init)
 
 ## Development
 

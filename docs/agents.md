@@ -40,6 +40,56 @@ The entire contents of `SYSTEM.md` are passed as the system prompt to the underl
 
 3. Switch to your agent via `!agent my-agent` (Discord) or `/agent my-agent` (TUI).
 
+## SYSTEM.md Frontmatter
+
+SYSTEM.md files support optional YAML frontmatter for metadata and skill filtering:
+
+```markdown
+---
+name: my-agent
+description: A specialized research assistant
+allowed-skills:
+  - read-pug-claw-config
+  - read-discord
+metadata:
+  managed-by: user
+---
+
+You are a specialized research assistant...
+```
+
+### Frontmatter Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | No | Agent display name |
+| `description` | string | No | Agent description |
+| `allowed-skills` | string[] | No | Global skills this agent can use |
+| `metadata` | object | No | Key-value pairs (e.g., `managed-by`) |
+
+### allowed-skills Behavior
+
+- **Omitted**: No global skills are injected (safe default)
+- **Empty array** (`[]`): No global skills are injected
+- **List of names**: Only the named global skills are available to this agent
+
+Agent-specific skills (under `{agent}/skills/`) are always available regardless of `allowed-skills`.
+
+### Backward Compatibility
+
+SYSTEM.md without frontmatter works exactly as before — the entire file is the system prompt and no global skills are injected.
+
+## Built-in Agents
+
+Pug-claw ships with two built-in agents installed during `pug-claw init`:
+
+| Agent | Description |
+|-------|-------------|
+| `default` | Generic helpful assistant with no global skills |
+| `pug-claw-manager` | Administrative agent with access to all built-in skills |
+
+Built-in agents have `metadata.managed-by: pug-claw` and are updated automatically via `pug-claw init --builtins-only`.
+
 ## Skills
 
 Skills extend an agent's capabilities. Each skill lives in a subdirectory of `agents/<name>/skills/` and contains a `SKILL.md` file.
