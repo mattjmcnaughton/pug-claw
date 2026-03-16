@@ -8,6 +8,8 @@ import { toError } from "./resources.ts";
 export interface AgentMeta {
   name?: string;
   description?: string;
+  driver?: string;
+  model?: string;
   allowedSkills?: string[];
   metadata?: Record<string, string>;
 }
@@ -62,6 +64,12 @@ export function parseAgentSystemMd(agentDir: string): ParsedAgent {
   }
   if (typeof record.description === "string") {
     meta.description = record.description;
+  }
+  if (typeof record.driver === "string") {
+    meta.driver = record.driver;
+  }
+  if (typeof record.model === "string") {
+    meta.model = record.model;
   }
   if (Array.isArray(record["allowed-skills"])) {
     meta.allowedSkills = record["allowed-skills"].filter(

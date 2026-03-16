@@ -2,8 +2,9 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, test } from "bun:test";
+import { parseAgentSystemMd } from "../../src/agents.ts";
 import {
-  buildFullSystemPrompt,
+  resolveAgent,
   discoverSkills,
   parseSkillFrontmatter,
 } from "../../src/skills.ts";
@@ -160,6 +161,31 @@ describe("parseSkillFrontmatter", () => {
   });
 });
 
+describe("discoverSkills for agents with only global skills (regression)", () => {
+  const FRONTMATTER_AGENT = resolve(FIXTURES, "agents/agent-with-frontmatter");
+
+  test("returns global skills when called with globalSkillsDir and allowedSkills from frontmatter", () => {
+    const parsed = parseAgentSystemMd(FRONTMATTER_AGENT);
+    const skills = discoverSkills(
+      FRONTMATTER_AGENT,
+      GLOBAL_SKILLS_DIR,
+      parsed.meta.allowedSkills,
+    );
+    const names = skills.map((s) => s.name);
+    expect(names).toContain("global-skill");
+  });
+
+  test("returns nothing when globalSkillsDir is omitted (the bug pattern)", () => {
+    const skills = discoverSkills(FRONTMATTER_AGENT);
+    expect(skills).toEqual([]);
+  });
+
+  test("returns nothing when allowedSkills is omitted even with globalSkillsDir", () => {
+    const skills = discoverSkills(FRONTMATTER_AGENT, GLOBAL_SKILLS_DIR);
+    expect(skills).toEqual([]);
+  });
+});
+
 describe("discoverSkills with allowedGlobalSkills", () => {
   test("returns only allowed global skills when allow-list provided", () => {
     const skills = discoverSkills(PUG_CLAW_AGENT, GLOBAL_SKILLS_DIR, [
@@ -211,43 +237,78 @@ describe("discoverSkills with allowedGlobalSkills", () => {
   });
 });
 
-describe("buildFullSystemPrompt", () => {
+describe("resolveAgent", () => {
   test("includes system prompt and skill catalog", () => {
-    const prompt = buildFullSystemPrompt(TEST_AGENT);
-    expect(prompt).toContain("You are a test agent.");
-    expect(prompt).toContain("<available-skills>");
-    expect(prompt).toContain('name="greet"');
+    const resolved = resolveAgent(TEST_AGENT);
+    expect(resolved.systemPrompt).toContain("You are a test agent.");
+    expect(resolved.systemPrompt).toContain("<available-skills>");
+    expect(resolved.systemPrompt).toContain('name="greet"');
   });
 
   test("strips frontmatter from system prompt (body only)", () => {
     const agentDir = resolve(FIXTURES, "agents/agent-with-frontmatter");
-    const prompt = buildFullSystemPrompt(agentDir);
-    expect(prompt).toContain("You are a test agent with frontmatter.");
-    expect(prompt).not.toContain("allowed-skills");
+    const resolved = resolveAgent(agentDir);
+    expect(resolved.systemPrompt).toContain(
+      "You are a test agent with frontmatter.",
+    );
+    expect(resolved.systemPrompt).not.toContain("allowed-skills");
   });
 
   test("agent without frontmatter gets no global skills (safe default)", () => {
     const agentDir = resolve(FIXTURES, "agents/agent-no-frontmatter");
-    const prompt = buildFullSystemPrompt(agentDir, GLOBAL_SKILLS_DIR);
-    expect(prompt).toContain("You are a test agent without frontmatter.");
-    expect(prompt).not.toContain("<available-skills>");
+    const resolved = resolveAgent(agentDir, GLOBAL_SKILLS_DIR);
+    expect(resolved.systemPrompt).toContain(
+      "You are a test agent without frontmatter.",
+    );
+    expect(resolved.systemPrompt).not.toContain("<available-skills>");
   });
 
   test("agent with empty allowed-skills gets no global skills", () => {
     const agentDir = resolve(FIXTURES, "agents/agent-empty-allowed");
-    const prompt = buildFullSystemPrompt(agentDir, GLOBAL_SKILLS_DIR);
-    expect(prompt).not.toContain('name="global-skill"');
+    const resolved = resolveAgent(agentDir, GLOBAL_SKILLS_DIR);
+    expect(resolved.systemPrompt).not.toContain('name="global-skill"');
   });
 
   test("agent with allowed-skills gets only listed global skills", () => {
     const agentDir = resolve(FIXTURES, "agents/agent-partial-allowed");
-    const prompt = buildFullSystemPrompt(agentDir, GLOBAL_SKILLS_DIR);
-    expect(prompt).toContain('name="global-skill"');
+    const resolved = resolveAgent(agentDir, GLOBAL_SKILLS_DIR);
+    expect(resolved.systemPrompt).toContain('name="global-skill"');
   });
 
   test("filters global skills by agent's allowed-skills list", () => {
     const agentDir = resolve(FIXTURES, "agents/agent-with-frontmatter");
-    const prompt = buildFullSystemPrompt(agentDir, GLOBAL_SKILLS_DIR);
-    expect(prompt).toContain('name="global-skill"');
+    const resolved = resolveAgent(agentDir, GLOBAL_SKILLS_DIR);
+    expect(resolved.systemPrompt).toContain('name="global-skill"');
+  });
+
+  test("returns driver from agent frontmatter", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-with-frontmatter");
+    const resolved = resolveAgent(agentDir);
+    expect(resolved.driver).toBe("claude");
+  });
+
+  test("returns model from agent frontmatter", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-with-frontmatter");
+    const resolved = resolveAgent(agentDir);
+    expect(resolved.model).toBe("claude-opus-4-6");
+  });
+
+  test("returns undefined driver when not in frontmatter", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-no-frontmatter");
+    const resolved = resolveAgent(agentDir);
+    expect(resolved.driver).toBeUndefined();
+  });
+
+  test("returns undefined model when not in frontmatter", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-no-frontmatter");
+    const resolved = resolveAgent(agentDir);
+    expect(resolved.model).toBeUndefined();
+  });
+
+  test("includes global skills in system prompt for agent with only allowed-skills (regression)", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-with-frontmatter");
+    const resolved = resolveAgent(agentDir, GLOBAL_SKILLS_DIR);
+    expect(resolved.systemPrompt).toContain("<available-skills>");
+    expect(resolved.systemPrompt).toContain('name="global-skill"');
   });
 });

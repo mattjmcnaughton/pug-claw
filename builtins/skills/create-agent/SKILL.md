@@ -31,6 +31,8 @@ SYSTEM.md supports optional YAML frontmatter followed by the system prompt:
 ---
 name: my-agent
 description: A description of what this agent does
+driver: claude
+model: claude-opus-4-6
 allowed-skills:
   - skill-name-1
   - skill-name-2
@@ -47,6 +49,8 @@ You are a specialized assistant that...
 |-------|------|----------|-------------|
 | `name` | string | No | Agent display name |
 | `description` | string | No | What this agent does |
+| `driver` | string | No | Preferred driver (e.g., `claude`, `pi`). Overridden by channel config and runtime commands. |
+| `model` | string | No | Preferred model (e.g., `claude-opus-4-6`). Overridden by channel config and runtime commands. |
 | `allowed-skills` | string[] | No | Global skills this agent can use. If omitted, no global skills are injected. |
 | `metadata` | object | No | Key-value pairs (e.g., `managed-by`) |
 

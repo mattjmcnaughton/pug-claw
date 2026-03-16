@@ -85,6 +85,8 @@ describe("parseAgentSystemMd", () => {
     const parsed = parseAgentSystemMd(agentDir);
     expect(parsed.meta.name).toBe("test-agent-with-frontmatter");
     expect(parsed.meta.description).toBe("A test agent with full frontmatter");
+    expect(parsed.meta.driver).toBe("claude");
+    expect(parsed.meta.model).toBe("claude-opus-4-6");
     expect(parsed.meta.allowedSkills).toEqual([
       "global-skill",
       "another-skill",
@@ -160,6 +162,65 @@ describe("parseAgentSystemMd", () => {
       const parsed = parseAgentSystemMd(tmpDir);
       expect(parsed.meta.name).toBe("empty-body");
       expect(parsed.systemPrompt).toBe("");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("parses driver from frontmatter", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-driver-only");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.meta.driver).toBe("pi");
+  });
+
+  test("parses model from frontmatter", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-with-frontmatter");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.meta.model).toBe("claude-opus-4-6");
+  });
+
+  test("driver is undefined when not in frontmatter", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-no-frontmatter");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.meta.driver).toBeUndefined();
+  });
+
+  test("model is undefined when not in frontmatter", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-driver-only");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.meta.model).toBeUndefined();
+  });
+
+  test("parses both driver and model together", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-with-frontmatter");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.meta.driver).toBe("claude");
+    expect(parsed.meta.model).toBe("claude-opus-4-6");
+  });
+
+  test("ignores non-string driver values", () => {
+    const tmpDir = makeTmpDir();
+    writeFileSync(
+      resolve(tmpDir, "SYSTEM.md"),
+      "---\nname: test\ndriver: 123\n---\n\nPrompt.\n",
+    );
+    try {
+      const parsed = parseAgentSystemMd(tmpDir);
+      expect(parsed.meta.driver).toBeUndefined();
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("ignores non-string model values", () => {
+    const tmpDir = makeTmpDir();
+    writeFileSync(
+      resolve(tmpDir, "SYSTEM.md"),
+      "---\nname: test\nmodel: true\n---\n\nPrompt.\n",
+    );
+    try {
+      const parsed = parseAgentSystemMd(tmpDir);
+      expect(parsed.meta.model).toBeUndefined();
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });
     }

@@ -14,7 +14,7 @@ import type { Frontend } from "./frontends/types.ts";
 import { configureLogger, logger } from "./logger.ts";
 import type { ConfigOptions, ResolvedConfig } from "./resources.ts";
 import { expandTilde, resolveConfig, toError } from "./resources.ts";
-import { buildFullSystemPrompt } from "./skills.ts";
+import { resolveAgent } from "./skills.ts";
 
 async function startFrontend(
   frontend: Frontend,
@@ -47,16 +47,16 @@ async function startFrontend(
     const newConfig = await resolveConfig(opts);
     return {
       config: newConfig,
-      buildSystemPrompt: (agentDir: string) =>
-        buildFullSystemPrompt(agentDir, newConfig.skillsDir),
+      resolveAgent: (agentDir: string) =>
+        resolveAgent(agentDir, newConfig.skillsDir),
     };
   };
 
   await frontend.start({
     drivers,
     config,
-    buildSystemPrompt: (agentDir: string) =>
-      buildFullSystemPrompt(agentDir, config.skillsDir),
+    resolveAgent: (agentDir: string) =>
+      resolveAgent(agentDir, config.skillsDir),
     logger,
     reloadConfig,
   });

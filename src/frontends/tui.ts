@@ -15,8 +15,16 @@ import {
   TUI,
 } from "@mariozechner/pi-tui";
 import chalk from "chalk";
-import { listAvailableAgents, resolveAgentDir } from "../agents.ts";
+import {
+  listAvailableAgents,
+  parseAgentSystemMd,
+  resolveAgentDir,
+} from "../agents.ts";
 import type { Driver } from "../drivers/types.ts";
+import {
+  resolveDriverName as resolveDriverNameFromInputs,
+  resolveModelName,
+} from "../resolve.ts";
 import { toError } from "../resources.ts";
 import { discoverSkills } from "../skills.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
@@ -54,17 +62,30 @@ const markdownTheme: MarkdownTheme = {
 export class TuiFrontend implements Frontend {
   async start(ctx: FrontendContext): Promise<void> {
     const { drivers, logger } = ctx;
-    let { config, buildSystemPrompt } = ctx;
+    let { config, resolveAgent } = ctx;
     let agentsDir = config.agentsDir;
 
     let currentDriverName = config.defaultDriver;
     let currentAgentName = config.defaultAgent;
     let currentModel: string | undefined;
     let currentSessionId: string | undefined;
+    let userOverrodeDriver = false;
+    let userOverrodeModel = false;
+
+    function getEffectiveDriverName(): string {
+      const agentDir = resolve(agentsDir, currentAgentName);
+      const resolved = resolveAgent(agentDir);
+      return resolveDriverNameFromInputs({
+        runtimeOverride: userOverrodeDriver ? currentDriverName : undefined,
+        agentFrontmatter: resolved.driver,
+        globalDefault: config.defaultDriver,
+      });
+    }
 
     function getDriver(): Driver {
-      const driver = drivers[currentDriverName];
-      if (!driver) throw new Error(`Unknown driver: ${currentDriverName}`);
+      const name = getEffectiveDriverName();
+      const driver = drivers[name];
+      if (!driver) throw new Error(`Unknown driver: ${name}`);
       return driver;
     }
 
@@ -79,12 +100,16 @@ export class TuiFrontend implements Frontend {
       if (!currentSessionId) {
         const driver = getDriver();
         const agentDir = resolve(agentsDir, currentAgentName);
-        const systemPrompt = buildSystemPrompt(agentDir);
-        const model = currentModel ?? driver.defaultModel;
+        const resolved = resolveAgent(agentDir);
+        const effectiveModel = resolveModelName({
+          runtimeOverride: userOverrodeModel ? currentModel : undefined,
+          agentFrontmatter: resolved.model,
+          driverDefault: driver.defaultModel,
+        });
 
         currentSessionId = await driver.createSession({
-          systemPrompt,
-          model,
+          systemPrompt: resolved.systemPrompt,
+          model: effectiveModel,
         });
       }
       return currentSessionId;
@@ -95,11 +120,19 @@ export class TuiFrontend implements Frontend {
     const tui = new TUI(terminal);
 
     function makeHeaderText(): string {
+      const effectiveDriver = getEffectiveDriverName();
       const d = getDriver();
+      const agentDir = resolve(agentsDir, currentAgentName);
+      const resolved = resolveAgent(agentDir);
+      const effectiveModel = resolveModelName({
+        runtimeOverride: userOverrodeModel ? currentModel : undefined,
+        agentFrontmatter: resolved.model,
+        driverDefault: d.defaultModel,
+      });
       return (
         chalk.bold("pug-claw") +
         chalk.gray(
-          ` | driver: ${currentDriverName} | model: ${currentModel ?? d.defaultModel} | agent: ${currentAgentName}`,
+          ` | driver: ${effectiveDriver} | model: ${effectiveModel} | agent: ${currentAgentName}`,
         )
       );
     }
@@ -185,7 +218,7 @@ export class TuiFrontend implements Frontend {
           try {
             const reloaded = await ctx.reloadConfig();
             config = reloaded.config;
-            buildSystemPrompt = reloaded.buildSystemPrompt;
+            resolveAgent = reloaded.resolveAgent;
             agentsDir = config.agentsDir;
             await destroySession();
             updateHeader();
@@ -208,11 +241,12 @@ export class TuiFrontend implements Frontend {
 
         if (cmd === "driver") {
           if (!arg) {
+            const effectiveDriver = getEffectiveDriverName();
             const available = Object.keys(drivers)
               .map((k) => `${k}`)
               .join(", ");
             showInfo(
-              `Current driver: ${currentDriverName}\nAvailable: ${available}`,
+              `Current driver: ${effectiveDriver}\nAvailable: ${available}`,
             );
             return;
           }
@@ -224,7 +258,9 @@ export class TuiFrontend implements Frontend {
           }
           await destroySession();
           currentDriverName = arg;
+          userOverrodeDriver = true;
           currentModel = undefined;
+          userOverrodeModel = false;
           updateHeader();
           showInfo(`Driver switched to ${arg}. Session reset.`);
           logger.info({ driver: arg }, "tui_command_driver");
@@ -233,8 +269,14 @@ export class TuiFrontend implements Frontend {
 
         if (cmd === "model") {
           const d = getDriver();
+          const agentDirForModel = resolve(agentsDir, currentAgentName);
+          const resolvedForModel = resolveAgent(agentDirForModel);
           if (!arg) {
-            const current = currentModel ?? d.defaultModel;
+            const current = resolveModelName({
+              runtimeOverride: userOverrodeModel ? currentModel : undefined,
+              agentFrontmatter: resolvedForModel.model,
+              driverDefault: d.defaultModel,
+            });
             const aliases = Object.entries(d.availableModels)
               .map(([k, v]) => `  ${k} → ${v}`)
               .join("\n");
@@ -246,6 +288,7 @@ export class TuiFrontend implements Frontend {
           const model = d.availableModels[arg.toLowerCase()] ?? arg;
           await destroySession();
           currentModel = model;
+          userOverrodeModel = true;
           updateHeader();
           showInfo(`Model switched to ${model}. Session reset.`);
           logger.info({ model }, "tui_command_model");
@@ -267,6 +310,9 @@ export class TuiFrontend implements Frontend {
           }
           await destroySession();
           currentAgentName = arg;
+          userOverrodeDriver = false;
+          userOverrodeModel = false;
+          currentModel = undefined;
           updateHeader();
           showInfo(`Agent switched to ${arg}. Session reset.`);
           logger.info({ agent: arg }, "tui_command_agent");
@@ -275,7 +321,12 @@ export class TuiFrontend implements Frontend {
 
         if (cmd === "skills") {
           const agentDir = resolve(agentsDir, currentAgentName);
-          const skills = discoverSkills(agentDir);
+          const parsed = parseAgentSystemMd(agentDir);
+          const skills = discoverSkills(
+            agentDir,
+            config.skillsDir,
+            parsed.meta.allowedSkills,
+          );
           if (skills.length === 0) {
             showInfo(`No skills found for agent ${currentAgentName}.`);
           } else {
@@ -289,10 +340,17 @@ export class TuiFrontend implements Frontend {
         }
 
         if (cmd === "status") {
+          const effectiveDriver = getEffectiveDriverName();
           const d = getDriver();
-          const model = currentModel ?? d.defaultModel;
+          const agentDirForStatus = resolve(agentsDir, currentAgentName);
+          const resolvedForStatus = resolveAgent(agentDirForStatus);
+          const effectiveModel = resolveModelName({
+            runtimeOverride: userOverrodeModel ? currentModel : undefined,
+            agentFrontmatter: resolvedForStatus.model,
+            driverDefault: d.defaultModel,
+          });
           showInfo(
-            `Driver: ${currentDriverName}\nAgent: ${currentAgentName}\nModel: ${model}\nActive session: ${!!currentSessionId}`,
+            `Driver: ${effectiveDriver}\nAgent: ${currentAgentName}\nModel: ${effectiveModel}\nActive session: ${!!currentSessionId}`,
           );
           return;
         }

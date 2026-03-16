@@ -92,7 +92,7 @@ function makeCtx(
   return {
     drivers: { mock: driver },
     config,
-    buildSystemPrompt: () => "system prompt",
+    resolveAgent: () => ({ systemPrompt: "system prompt" }),
     logger: {
       info: () => {},
       warn: () => {},
@@ -102,7 +102,7 @@ function makeCtx(
     } as unknown as Logger,
     reloadConfig: mock(async () => ({
       config: makeConfig(configOverrides),
-      buildSystemPrompt: () => "reloaded system prompt",
+      resolveAgent: () => ({ systemPrompt: "reloaded system prompt" }),
     })),
     driver,
   };

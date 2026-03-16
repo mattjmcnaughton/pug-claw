@@ -1,6 +1,8 @@
 ---
 name: test-agent-with-frontmatter
 description: A test agent with full frontmatter
+driver: claude
+model: claude-opus-4-6
 allowed-skills:
   - global-skill
   - another-skill

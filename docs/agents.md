@@ -48,6 +48,8 @@ SYSTEM.md files support optional YAML frontmatter for metadata and skill filteri
 ---
 name: my-agent
 description: A specialized research assistant
+driver: claude
+model: claude-opus-4-6
 allowed-skills:
   - read-pug-claw-config
   - read-discord
@@ -64,8 +66,21 @@ You are a specialized research assistant...
 |-------|------|----------|-------------|
 | `name` | string | No | Agent display name |
 | `description` | string | No | Agent description |
+| `driver` | string | No | Preferred driver for this agent (e.g., `claude`, `pi`) |
+| `model` | string | No | Preferred model for this agent (e.g., `claude-opus-4-6`) |
 | `allowed-skills` | string[] | No | Global skills this agent can use |
 | `metadata` | object | No | Key-value pairs (e.g., `managed-by`) |
+
+### Driver/Model Resolution Precedence
+
+When determining which driver and model to use, the following precedence applies (highest to lowest):
+
+1. **Runtime command** — `!driver`/`!model` (Discord) or `/driver`/`/model` (TUI)
+2. **Channel config** — `channels[id].driver`/`channels[id].model` in `config.json`
+3. **Agent frontmatter** — `driver`/`model` fields in `SYSTEM.md`
+4. **Global default** — `default_driver` in `config.json` / driver's `defaultModel`
+
+Agent frontmatter acts as a soft default — stronger than the global default but overridden by explicit channel or runtime settings.
 
 ### allowed-skills Behavior
 
