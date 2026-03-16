@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
@@ -33,7 +33,7 @@ const DiscordConfigSchema = z.object({
   owner_id: z.string().optional(),
 });
 
-const ConfigFileSchema = z.object({
+export const ConfigFileSchema = z.object({
   paths: PathsConfigSchema.optional(),
   secrets: SecretsConfigSchema.optional(),
   discord: DiscordConfigSchema.optional(),
@@ -165,6 +165,57 @@ export interface ConfigOptions {
   dataDir?: string;
 }
 
+// --- Config Loading Helpers ---
+
+export function loadAndValidateConfig(
+  configPath: string,
+): z.infer<typeof ConfigFileSchema> {
+  const content = readFileSync(configPath, "utf-8");
+  return ConfigFileSchema.parse(JSON.parse(content));
+}
+
+function loadConfigWithFallback(
+  configPath: string,
+  fallbackPath: string,
+): z.infer<typeof ConfigFileSchema> {
+  let primaryError: Error | undefined;
+
+  // Try primary config
+  if (existsSync(configPath)) {
+    try {
+      const config = loadAndValidateConfig(configPath);
+      // On success, save as last-good
+      try {
+        copyFileSync(configPath, fallbackPath);
+      } catch {
+        // Non-fatal if copy fails
+      }
+      return config;
+    } catch (err) {
+      primaryError = err instanceof Error ? err : new Error(String(err));
+    }
+  } else {
+    primaryError = new Error(
+      `config.json not found in ${resolve(configPath, "..")}\n\nRun \`pug-claw init\` to set up your configuration.`,
+    );
+  }
+
+  // Try fallback
+  if (existsSync(fallbackPath)) {
+    try {
+      const config = loadAndValidateConfig(fallbackPath);
+      console.warn(
+        `Warning: config.json failed to load (${primaryError?.message}). Using config.last-good.json as fallback.`,
+      );
+      return config;
+    } catch {
+      // Fallback also failed, throw original error
+    }
+  }
+
+  throw primaryError;
+}
+
 // --- Main Entry Point ---
 
 export async function resolveConfig(
@@ -182,16 +233,10 @@ export async function resolveConfig(
   }
 
   const configPath = resolve(homeDir, "config.json");
-  if (!existsSync(configPath)) {
-    throw new Error(
-      `config.json not found in ${homeDir}\n\nRun \`pug-claw init\` to set up your configuration.`,
-    );
-  }
+  const fallbackPath = resolve(homeDir, "config.last-good.json");
 
-  // 3. Load and validate config.json
-  let rawConfig: z.infer<typeof ConfigFileSchema> = {};
-  const content = readFileSync(configPath, "utf-8");
-  rawConfig = ConfigFileSchema.parse(JSON.parse(content));
+  // 3. Load and validate config.json (with fallback)
+  const rawConfig = loadConfigWithFallback(configPath, fallbackPath);
 
   // 4. Resolve paths
   const agentsDir = resolvePathWithOverrides(

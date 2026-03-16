@@ -8,8 +8,9 @@ import type { Frontend, FrontendContext } from "./types.ts";
 
 export class DiscordFrontend implements Frontend {
   async start(ctx: FrontendContext): Promise<void> {
-    const { drivers, config, buildSystemPrompt, logger } = ctx;
-    const { agentsDir } = config;
+    const { drivers, logger } = ctx;
+    let { config, buildSystemPrompt } = ctx;
+    let agentsDir = config.agentsDir;
 
     const client = new Client({
       intents: [
@@ -174,6 +175,42 @@ export class DiscordFrontend implements Frontend {
         await message.channel.send(
           `Driver: \`${driverName}\`\nAgent: \`${agentName}\`\nModel: \`${model}\`\nActive session: \`${hasSession}\``,
         );
+      } else if (cmd === "restart") {
+        if (message.author.id !== config.discord?.ownerId) {
+          await message.channel.send(
+            "Only the bot owner can use this command.",
+          );
+          return true;
+        }
+        logger.info("command_restart");
+        await message.channel.send("Restarting...");
+        process.exit(1);
+      } else if (cmd === "reload") {
+        if (message.author.id !== config.discord?.ownerId) {
+          await message.channel.send(
+            "Only the bot owner can use this command.",
+          );
+          return true;
+        }
+        try {
+          const reloaded = await ctx.reloadConfig();
+          config = reloaded.config;
+          buildSystemPrompt = reloaded.buildSystemPrompt;
+          agentsDir = config.agentsDir;
+          // Destroy all active sessions so they pick up new config
+          const sessionChannelIds = [...channelSessions.keys()];
+          for (const channelId of sessionChannelIds) {
+            await destroySession(channelId);
+          }
+          await message.channel.send(
+            "Config, agents, and skills reloaded. All sessions reset.",
+          );
+          logger.info("command_reload");
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          logger.error({ error: errMsg }, "reload_error");
+          await message.channel.send(`Reload failed: ${errMsg}`);
+        }
       } else if (cmd === "help") {
         await message.channel.send(
           "**Commands:**\n" +
@@ -183,6 +220,8 @@ export class DiscordFrontend implements Frontend {
             "`!agent [name]` — Show/switch agent (resets session)\n" +
             "`!skills` — List skills for the current agent\n" +
             "`!status` — Show current driver, agent, model, and session state\n" +
+            "`!reload` — Reload config, agents, and skills from disk\n" +
+            "`!restart` — Restart the process (requires systemd)\n" +
             "`!help` — Show this message",
         );
       } else {

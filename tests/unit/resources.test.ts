@@ -1,4 +1,10 @@
-import { mkdirSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, test } from "bun:test";
@@ -269,6 +275,73 @@ describe("resolveConfig secrets", () => {
       try {
         const config = await resolveConfig({ home: tmpDir });
         expect(config.secrets.get("DOTENV_CONFLICT")).toBe("from-env");
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    }),
+  );
+});
+
+describe("config fallback", () => {
+  test(
+    "writes config.last-good.json on successful load",
+    withEnv(cleanEnv, async () => {
+      const tmpDir = makeTmpDir();
+      const validConfig = JSON.stringify({ default_agent: "good" });
+      writeFileSync(resolve(tmpDir, "config.json"), validConfig);
+      try {
+        const config = await resolveConfig({ home: tmpDir });
+        expect(config.defaultAgent).toBe("good");
+        const lastGood = resolve(tmpDir, "config.last-good.json");
+        expect(existsSync(lastGood)).toBe(true);
+        expect(readFileSync(lastGood, "utf-8")).toBe(validConfig);
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  test(
+    "falls back to config.last-good.json when config.json is corrupt",
+    withEnv(cleanEnv, async () => {
+      const tmpDir = makeTmpDir();
+      writeFileSync(resolve(tmpDir, "config.json"), "{ bad json }}}");
+      writeFileSync(
+        resolve(tmpDir, "config.last-good.json"),
+        JSON.stringify({ default_agent: "fallback-agent" }),
+      );
+      try {
+        const config = await resolveConfig({ home: tmpDir });
+        expect(config.defaultAgent).toBe("fallback-agent");
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  test(
+    "throws original error when both config.json and fallback fail",
+    withEnv(cleanEnv, async () => {
+      const tmpDir = makeTmpDir();
+      writeFileSync(resolve(tmpDir, "config.json"), "{ bad json }}}");
+      writeFileSync(resolve(tmpDir, "config.last-good.json"), "{ also bad }}}");
+      try {
+        await expect(resolveConfig({ home: tmpDir })).rejects.toThrow();
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  test(
+    "throws when config.json missing and no fallback exists",
+    withEnv(cleanEnv, async () => {
+      const tmpDir = makeTmpDir();
+      // No config.json and no fallback
+      try {
+        await expect(resolveConfig({ home: tmpDir })).rejects.toThrow(
+          "config.json not found",
+        );
       } finally {
         rmSync(tmpDir, { recursive: true, force: true });
       }

@@ -168,6 +168,7 @@ export async function runInit(): Promise<void> {
   mkdirSync(agentDir, { recursive: true });
   mkdirSync(skillsDir, { recursive: true });
   mkdirSync(dataDir, { recursive: true });
+  mkdirSync(resolve(resolvedHome, "logs", "system"), { recursive: true });
 
   // Write config.json
   writeFileSync(

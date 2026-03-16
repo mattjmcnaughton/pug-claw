@@ -52,8 +52,9 @@ const markdownTheme: MarkdownTheme = {
 
 export class TuiFrontend implements Frontend {
   async start(ctx: FrontendContext): Promise<void> {
-    const { drivers, config, buildSystemPrompt, logger } = ctx;
-    const { agentsDir } = config;
+    const { drivers, logger } = ctx;
+    let { config, buildSystemPrompt } = ctx;
+    let agentsDir = config.agentsDir;
 
     let currentDriverName = config.defaultDriver;
     let currentAgentName = config.defaultAgent;
@@ -132,6 +133,8 @@ export class TuiFrontend implements Frontend {
         { name: "agent", description: "Show/switch agent" },
         { name: "skills", description: "List skills for current agent" },
         { name: "status", description: "Show current state" },
+        { name: "reload", description: "Reload config, agents, and skills" },
+        { name: "restart", description: "Restart the process" },
         { name: "quit", description: "Exit" },
       ],
       process.cwd(),
@@ -168,6 +171,31 @@ export class TuiFrontend implements Frontend {
           await destroySession();
           tui.stop();
           process.exit(0);
+        }
+
+        if (cmd === "restart") {
+          logger.info("tui_command_restart");
+          showInfo("Restarting...");
+          tui.stop();
+          process.exit(1);
+        }
+
+        if (cmd === "reload") {
+          try {
+            const reloaded = await ctx.reloadConfig();
+            config = reloaded.config;
+            buildSystemPrompt = reloaded.buildSystemPrompt;
+            agentsDir = config.agentsDir;
+            await destroySession();
+            updateHeader();
+            showInfo("Config, agents, and skills reloaded. Session reset.");
+            logger.info("tui_command_reload");
+          } catch (err) {
+            showInfo(
+              `Reload failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
+          return;
         }
 
         if (cmd === "new") {
