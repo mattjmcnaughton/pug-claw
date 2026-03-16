@@ -12,6 +12,7 @@ import { DiscordFrontend } from "./frontends/discord.ts";
 import { TuiFrontend } from "./frontends/tui.ts";
 import type { Frontend } from "./frontends/types.ts";
 import { configureLogger, logger } from "./logger.ts";
+import { generateAgentPlugins } from "./plugins.ts";
 import type { ConfigOptions, ResolvedConfig } from "./resources.ts";
 import { expandTilde, resolveConfig, toError } from "./resources.ts";
 import { resolveAgent } from "./skills.ts";
@@ -43,10 +44,24 @@ async function startFrontend(
 
   logger.info({ drivers: Object.keys(drivers) }, "drivers_initialized");
 
+  const pluginsDir = resolve(config.homeDir, Paths.PLUGINS_DIR);
+  let pluginDirs = generateAgentPlugins(
+    config.agentsDir,
+    config.skillsDir,
+    pluginsDir,
+  );
+
   const reloadConfig = async () => {
     const newConfig = await resolveConfig(opts);
+    const newPluginsDir = resolve(newConfig.homeDir, Paths.PLUGINS_DIR);
+    const newPluginDirs = generateAgentPlugins(
+      newConfig.agentsDir,
+      newConfig.skillsDir,
+      newPluginsDir,
+    );
     return {
       config: newConfig,
+      pluginDirs: newPluginDirs,
       resolveAgent: (agentDir: string) =>
         resolveAgent(agentDir, newConfig.skillsDir),
     };
@@ -55,6 +70,7 @@ async function startFrontend(
   await frontend.start({
     drivers,
     config,
+    pluginDirs,
     resolveAgent: (agentDir: string) =>
       resolveAgent(agentDir, config.skillsDir),
     logger,

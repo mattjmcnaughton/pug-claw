@@ -62,7 +62,7 @@ const markdownTheme: MarkdownTheme = {
 export class TuiFrontend implements Frontend {
   async start(ctx: FrontendContext): Promise<void> {
     const { drivers, logger } = ctx;
-    let { config, resolveAgent } = ctx;
+    let { config, resolveAgent, pluginDirs } = ctx;
     let agentsDir = config.agentsDir;
 
     let currentDriverName = config.defaultDriver;
@@ -110,6 +110,8 @@ export class TuiFrontend implements Frontend {
         currentSessionId = await driver.createSession({
           systemPrompt: resolved.systemPrompt,
           model: effectiveModel,
+          skills: resolved.skills,
+          pluginDir: pluginDirs.get(currentAgentName),
         });
       }
       return currentSessionId;
@@ -219,6 +221,7 @@ export class TuiFrontend implements Frontend {
             const reloaded = await ctx.reloadConfig();
             config = reloaded.config;
             resolveAgent = reloaded.resolveAgent;
+            pluginDirs = reloaded.pluginDirs;
             agentsDir = config.agentsDir;
             await destroySession();
             updateHeader();

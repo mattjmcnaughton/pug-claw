@@ -120,7 +120,7 @@ export function discoverSkills(
   return merged.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function buildSkillCatalog(skills: SkillSummary[]): string {
+export function buildSkillCatalog(skills: SkillSummary[]): string {
   if (skills.length === 0) return "";
 
   const lines = ["<available-skills>"];
@@ -133,8 +133,24 @@ function buildSkillCatalog(skills: SkillSummary[]): string {
   return lines.join("\n");
 }
 
+export function appendSkillCatalog(
+  systemPrompt: string,
+  skills: SkillSummary[],
+): string {
+  const catalog = buildSkillCatalog(skills);
+  if (!catalog) return systemPrompt;
+  return (
+    systemPrompt +
+    "\n\n# Available Skills\n\n" +
+    "The following skills are available. When a user's request matches a skill, " +
+    "use the Read tool to read the full SKILL.md file at the given path for detailed instructions.\n\n" +
+    catalog
+  );
+}
+
 export interface ResolvedAgent {
   systemPrompt: string;
+  skills: SkillSummary[];
   driver?: string;
   model?: string;
 }
@@ -144,24 +160,15 @@ export function resolveAgent(
   globalSkillsDir?: string,
 ): ResolvedAgent {
   const parsed = parseAgentSystemMd(agentDir);
-  let prompt = parsed.systemPrompt;
   const skills = discoverSkills(
     agentDir,
     globalSkillsDir,
     parsed.meta.allowedSkills,
   );
-  const catalog = buildSkillCatalog(skills);
-
-  if (catalog) {
-    prompt +=
-      "\n\n# Available Skills\n\n" +
-      "The following skills are available. When a user's request matches a skill, " +
-      "use the Read tool to read the full SKILL.md file at the given path for detailed instructions.\n\n" +
-      catalog;
-  }
 
   return {
-    systemPrompt: prompt,
+    systemPrompt: parsed.systemPrompt,
+    skills,
     driver: parsed.meta.driver,
     model: parsed.meta.model,
   };

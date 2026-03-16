@@ -124,6 +124,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
 
     mkdirSync(resolve(resolvedHome, Paths.SKILLS_DIR), { recursive: true });
     mkdirSync(resolve(resolvedHome, Paths.AGENTS_DIR), { recursive: true });
+    mkdirSync(resolve(resolvedHome, Paths.PLUGINS_DIR), { recursive: true });
 
     const result = installBuiltins(resolvedHome);
     p.note(
@@ -302,6 +303,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
 
   mkdirSync(agentDir, { recursive: true });
   mkdirSync(skillsDir, { recursive: true });
+  mkdirSync(resolve(resolvedHome, Paths.PLUGINS_DIR), { recursive: true });
   mkdirSync(dataDir, { recursive: true });
   mkdirSync(resolve(resolvedHome, Paths.LOG_DIR), { recursive: true });
 

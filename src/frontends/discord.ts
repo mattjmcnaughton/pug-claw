@@ -16,7 +16,7 @@ import type { Frontend, FrontendContext } from "./types.ts";
 export class DiscordFrontend implements Frontend {
   async start(ctx: FrontendContext): Promise<void> {
     const { drivers, logger } = ctx;
-    let { config, resolveAgent } = ctx;
+    let { config, resolveAgent, pluginDirs } = ctx;
     let agentsDir = config.agentsDir;
 
     const client = new Client({
@@ -221,6 +221,7 @@ export class DiscordFrontend implements Frontend {
           const reloaded = await ctx.reloadConfig();
           config = reloaded.config;
           resolveAgent = reloaded.resolveAgent;
+          pluginDirs = reloaded.pluginDirs;
           agentsDir = config.agentsDir;
           channelResolvedAgents.clear();
           // Destroy all active sessions so they pick up new config
@@ -309,10 +310,13 @@ export class DiscordFrontend implements Frontend {
         const tools = getChannelConfig(config, channelId).tools;
 
         try {
+          const agentName = resolveAgentName(channelId);
           const sessionId = await driver.createSession({
             systemPrompt: resolved.systemPrompt,
             model,
             tools,
+            skills: resolved.skills,
+            pluginDir: pluginDirs.get(agentName),
           });
           channelSessions.set(channelId, sessionId);
         } catch (err) {

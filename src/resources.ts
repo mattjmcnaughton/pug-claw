@@ -115,6 +115,14 @@ class DotenvSecretsProvider implements SecretsProvider {
         this.vars[key] = value;
       }
     }
+
+    // Inject into process.env so third-party libraries (e.g. Pi's getEnvApiKey)
+    // can read secrets directly. Existing env vars take precedence.
+    for (const [key, value] of Object.entries(this.vars)) {
+      if (process.env[key] === undefined) {
+        process.env[key] = value;
+      }
+    }
   }
 
   get(key: string): string | undefined {

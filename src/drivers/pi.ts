@@ -11,6 +11,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { logger } from "../logger.ts";
 import { toError } from "../resources.ts";
+import { appendSkillCatalog } from "../skills.ts";
 import type { Driver, DriverOptions, DriverResponse } from "./types.ts";
 
 interface PiSession {
@@ -90,6 +91,11 @@ export class PiDriver implements Driver {
     const { model, provider } = this.resolveModel(modelStr);
     await this.checkCodexAuth(provider);
 
+    // Append skill catalog to system prompt for Pi (no native plugin support)
+    const systemPrompt = options.skills
+      ? appendSkillCatalog(options.systemPrompt, options.skills)
+      : options.systemPrompt;
+
     const settingsManager = SettingsManager.inMemory({
       compaction: { enabled: true },
       retry: { enabled: true, maxRetries: 2 },
@@ -97,7 +103,7 @@ export class PiDriver implements Driver {
 
     const loader = new DefaultResourceLoader({
       settingsManager,
-      systemPromptOverride: () => options.systemPrompt,
+      systemPromptOverride: () => systemPrompt,
     });
     await loader.reload();
 

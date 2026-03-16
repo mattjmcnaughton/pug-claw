@@ -7,6 +7,7 @@ export const Paths = {
   DOT_ENV: ".env",
   AGENTS_DIR: "agents",
   SKILLS_DIR: "skills",
+  PLUGINS_DIR: "plugins",
   DATA_DIR: "data",
   LOG_DIR: "logs/system",
 } as const;

@@ -7,6 +7,8 @@ export interface DriverOptions {
   systemPrompt: string;
   model?: string;
   tools?: string[];
+  skills?: import("../skills.ts").SkillSummary[];
+  pluginDir?: string;
 }
 
 export interface Driver {

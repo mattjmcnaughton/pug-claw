@@ -264,6 +264,49 @@ describe("resolveConfig secrets", () => {
   );
 
   test(
+    "DotenvSecretsProvider injects vars into process.env",
+    withEnv({ ...cleanEnv, DOTENV_INJECTED_TEST: undefined }, async () => {
+      const tmpDir = makeTmpDir();
+      await Bun.write(
+        resolve(tmpDir, "config.json"),
+        JSON.stringify({ secrets: { provider: "dotenv" } }),
+      );
+      await Bun.write(
+        resolve(tmpDir, ".env"),
+        "DOTENV_INJECTED_TEST=injected-value\n",
+      );
+      try {
+        await resolveConfig({ home: tmpDir });
+        expect(process.env.DOTENV_INJECTED_TEST).toBe("injected-value");
+      } finally {
+        delete process.env.DOTENV_INJECTED_TEST;
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  test(
+    "DotenvSecretsProvider does not overwrite existing process.env",
+    withEnv({ ...cleanEnv, DOTENV_EXISTING_TEST: "original" }, async () => {
+      const tmpDir = makeTmpDir();
+      await Bun.write(
+        resolve(tmpDir, "config.json"),
+        JSON.stringify({ secrets: { provider: "dotenv" } }),
+      );
+      await Bun.write(
+        resolve(tmpDir, ".env"),
+        "DOTENV_EXISTING_TEST=from-file\n",
+      );
+      try {
+        await resolveConfig({ home: tmpDir });
+        expect(process.env.DOTENV_EXISTING_TEST).toBe("original");
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  test(
     "DotenvSecretsProvider env wins over dotenv file",
     withEnv({ ...cleanEnv, DOTENV_CONFLICT: "from-env" }, async () => {
       const tmpDir = makeTmpDir();

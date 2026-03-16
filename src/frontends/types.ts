@@ -6,10 +6,12 @@ import type { ResolvedAgent } from "../skills.ts";
 export interface FrontendContext {
   drivers: Record<string, Driver>;
   config: ResolvedConfig;
+  pluginDirs: Map<string, string>;
   resolveAgent: (agentDir: string) => ResolvedAgent;
   logger: Logger;
   reloadConfig: () => Promise<{
     config: ResolvedConfig;
+    pluginDirs: Map<string, string>;
     resolveAgent: (agentDir: string) => ResolvedAgent;
   }>;
 }

@@ -1,5 +1,6 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { logger } from "../logger.ts";
+import { appendSkillCatalog } from "../skills.ts";
 import type { Driver, DriverOptions, DriverResponse } from "./types.ts";
 
 interface SessionState {
@@ -21,6 +22,13 @@ export class ClaudeDriver implements Driver {
     const model = options.model ?? this.defaultModel;
     const tools = options.tools ?? ["Read", "Glob", "Grep", "Bash"];
 
+    // If pluginDir is set, skills are injected natively via Claude Code SDK plugins.
+    // Otherwise, fall back to embedding the skill catalog in the system prompt.
+    const systemPrompt =
+      !options.pluginDir && options.skills
+        ? appendSkillCatalog(options.systemPrompt, options.skills)
+        : options.systemPrompt;
+
     let sessionId: string | undefined;
 
     // Send an initial no-op query to establish the session and capture the session ID.
@@ -30,7 +38,10 @@ export class ClaudeDriver implements Driver {
         allowedTools: tools,
         permissionMode: "acceptEdits" as const,
         model,
-        systemPrompt: options.systemPrompt,
+        systemPrompt,
+        plugins: options.pluginDir
+          ? [{ type: "local" as const, path: options.pluginDir }]
+          : undefined,
       },
     })) {
       if (
