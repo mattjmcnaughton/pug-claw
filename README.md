@@ -172,7 +172,9 @@ src/
 
 ### Agents and skills
 
-Agents live in `~/.pug-claw/agents/<name>/` with a `SYSTEM.md` system prompt. Each agent can have a `skills/` directory containing skill definitions (`SKILL.md` with YAML frontmatter). Global skills in `~/.pug-claw/skills/` are available to all agents. Agent-specific skills take precedence on name collision. Skills are automatically discovered and injected into the system prompt.
+Agents live in `~/.pug-claw/agents/<name>/` with a `SYSTEM.md` system prompt. Each agent can have a `skills/` directory containing skill definitions (`SKILL.md` with YAML frontmatter). Global skills in `~/.pug-claw/skills/` are available to agents that list them in their `allowed-skills` frontmatter. Agent-specific skills are always available.
+
+Skills are injected natively per driver: the Claude driver uses per-agent plugin directories (symlinks in `~/.pug-claw/plugins/`) so skills appear as native Claude Code skills, while the Pi driver appends a skill catalog to the system prompt.
 
 ## Discord Bot Setup
 
