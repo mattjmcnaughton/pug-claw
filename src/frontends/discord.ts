@@ -1,16 +1,22 @@
 import { resolve } from "node:path";
 import { Client, GatewayIntentBits, type Message } from "discord.js";
-import { listAvailableAgents, resolveAgentDir } from "../agents.ts";
+import {
+  listAvailableAgents,
+  parseAgentSystemMd,
+  resolveAgentDir,
+} from "../agents.ts";
 import { Limits } from "../constants.ts";
 import type { Driver } from "../drivers/types.ts";
+import { resolveDriverName as resolveDriverNameFromInputs } from "../resolve.ts";
 import { getChannelConfig, toError } from "../resources.ts";
+import type { ResolvedAgent } from "../skills.ts";
 import { discoverSkills } from "../skills.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
 
 export class DiscordFrontend implements Frontend {
   async start(ctx: FrontendContext): Promise<void> {
     const { drivers, logger } = ctx;
-    let { config, buildSystemPrompt } = ctx;
+    let { config, resolveAgent } = ctx;
     let agentsDir = config.agentsDir;
 
     const client = new Client({
@@ -26,17 +32,30 @@ export class DiscordFrontend implements Frontend {
     const channelModels = new Map<string, string>();
     const channelAgents = new Map<string, string>();
     const channelSessions = new Map<string, string>();
+    const channelResolvedAgents = new Map<string, ResolvedAgent>();
 
-    function resolveDriverName(channelId: string): string {
-      return (
-        channelDrivers.get(channelId) ??
-        getChannelConfig(config, channelId).driver ??
-        config.defaultDriver
-      );
+    function getResolvedAgent(channelId: string): ResolvedAgent {
+      const cached = channelResolvedAgents.get(channelId);
+      if (cached) return cached;
+      const agentName = resolveAgentName(channelId);
+      const agentDir = resolve(agentsDir, agentName);
+      const resolved = resolveAgent(agentDir);
+      channelResolvedAgents.set(channelId, resolved);
+      return resolved;
+    }
+
+    function resolveChannelDriverName(channelId: string): string {
+      const resolved = getResolvedAgent(channelId);
+      return resolveDriverNameFromInputs({
+        runtimeOverride: channelDrivers.get(channelId),
+        channelConfig: getChannelConfig(config, channelId).driver,
+        agentFrontmatter: resolved.driver,
+        globalDefault: config.defaultDriver,
+      });
     }
 
     function resolveDriver(channelId: string): Driver {
-      const name = resolveDriverName(channelId);
+      const name = resolveChannelDriverName(channelId);
       const driver = drivers[name];
       if (!driver) throw new Error(`Unknown driver: ${name}`);
       return driver;
@@ -50,11 +69,10 @@ export class DiscordFrontend implements Frontend {
       );
     }
 
-    function resolveModel(channelId: string): string | undefined {
-      return (
-        channelModels.get(channelId) ??
-        getChannelConfig(config, channelId).model
-      );
+    function resolveChannelModel(channelId: string): string | undefined {
+      const resolved = getResolvedAgent(channelId);
+      const channelCfg = getChannelConfig(config, channelId);
+      return channelModels.get(channelId) ?? channelCfg.model ?? resolved.model;
     }
 
     async function destroySession(channelId: string) {
@@ -84,7 +102,7 @@ export class DiscordFrontend implements Frontend {
         logger.info({ channel_id: channelId }, "command_new");
       } else if (cmd === "driver") {
         if (!arg) {
-          const current = resolveDriverName(channelId);
+          const current = resolveChannelDriverName(channelId);
           const available = Object.keys(drivers)
             .map((k) => `\`${k}\``)
             .join(", ");
@@ -112,7 +130,7 @@ export class DiscordFrontend implements Frontend {
       } else if (cmd === "model") {
         const driver = resolveDriver(channelId);
         if (!arg) {
-          const current = resolveModel(channelId) ?? driver.defaultModel;
+          const current = resolveChannelModel(channelId) ?? driver.defaultModel;
           const aliases = Object.entries(driver.availableModels)
             .map(([k, v]) => `\`${k}\` → ${v}`)
             .join("\n");
@@ -147,6 +165,7 @@ export class DiscordFrontend implements Frontend {
           return true;
         }
         channelAgents.set(channelId, arg);
+        channelResolvedAgents.delete(channelId);
         await destroySession(channelId);
         await message.channel.send(
           `Agent switched to \`${arg}\`. Session reset.`,
@@ -155,7 +174,12 @@ export class DiscordFrontend implements Frontend {
       } else if (cmd === "skills") {
         const agentName = resolveAgentName(channelId);
         const agentDir = resolve(agentsDir, agentName);
-        const skills = discoverSkills(agentDir);
+        const parsed = parseAgentSystemMd(agentDir);
+        const skills = discoverSkills(
+          agentDir,
+          config.skillsDir,
+          parsed.meta.allowedSkills,
+        );
         if (skills.length === 0) {
           await message.channel.send(
             `No skills found for agent \`${agentName}\`.`,
@@ -168,9 +192,9 @@ export class DiscordFrontend implements Frontend {
           await message.channel.send(lines.join("\n"));
         }
       } else if (cmd === "status") {
-        const driverName = resolveDriverName(channelId);
+        const driverName = resolveChannelDriverName(channelId);
         const driver = resolveDriver(channelId);
-        const model = resolveModel(channelId) ?? driver.defaultModel;
+        const model = resolveChannelModel(channelId) ?? driver.defaultModel;
         const agentName = resolveAgentName(channelId);
         const hasSession = channelSessions.has(channelId);
         await message.channel.send(
@@ -196,12 +220,13 @@ export class DiscordFrontend implements Frontend {
         try {
           const reloaded = await ctx.reloadConfig();
           config = reloaded.config;
-          buildSystemPrompt = reloaded.buildSystemPrompt;
+          resolveAgent = reloaded.resolveAgent;
           agentsDir = config.agentsDir;
+          channelResolvedAgents.clear();
           // Destroy all active sessions so they pick up new config
           const sessionChannelIds = [...channelSessions.keys()];
-          for (const channelId of sessionChannelIds) {
-            await destroySession(channelId);
+          for (const chId of sessionChannelIds) {
+            await destroySession(chId);
           }
           await message.channel.send(
             "Config, agents, and skills reloaded. All sessions reset.",
@@ -276,18 +301,16 @@ export class DiscordFrontend implements Frontend {
 
       const channelId = message.channelId;
       const driver = resolveDriver(channelId);
-      const agentName = resolveAgentName(channelId);
-      const agentDir = resolve(agentsDir, agentName);
 
       // Create session if needed
       if (!channelSessions.has(channelId)) {
-        const systemPrompt = buildSystemPrompt(agentDir);
-        const model = resolveModel(channelId) ?? driver.defaultModel;
+        const resolved = getResolvedAgent(channelId);
+        const model = resolveChannelModel(channelId) ?? driver.defaultModel;
         const tools = getChannelConfig(config, channelId).tools;
 
         try {
           const sessionId = await driver.createSession({
-            systemPrompt,
+            systemPrompt: resolved.systemPrompt,
             model,
             tools,
           });

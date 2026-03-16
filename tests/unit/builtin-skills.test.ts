@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, test } from "bun:test";
 import { parseAgentSystemMd } from "../../src/agents.ts";
-import { parseSkillFrontmatter } from "../../src/skills.ts";
+import { discoverSkills, parseSkillFrontmatter } from "../../src/skills.ts";
 
 const BUILTINS = resolve(import.meta.dir, "../../builtins");
 const BUILTINS_SKILLS = resolve(BUILTINS, "skills");
@@ -91,5 +91,29 @@ describe("built-in agents", () => {
     const agentDir = resolve(BUILTINS_AGENTS, "pug-claw-manager");
     const parsed = parseAgentSystemMd(agentDir);
     expect(parsed.meta.metadata?.["managed-by"]).toBe("pug-claw");
+  });
+
+  test("pug-claw-manager has driver: claude in frontmatter", () => {
+    const agentDir = resolve(BUILTINS_AGENTS, "pug-claw-manager");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.meta.driver).toBe("claude");
+  });
+
+  test("pug-claw-manager discovers all allowed global skills when called correctly (regression)", () => {
+    const agentDir = resolve(BUILTINS_AGENTS, "pug-claw-manager");
+    const parsed = parseAgentSystemMd(agentDir);
+    const skills = discoverSkills(
+      agentDir,
+      BUILTINS_SKILLS,
+      parsed.meta.allowedSkills,
+    );
+    const names = skills.map((s) => s.name).sort();
+    expect(names).toEqual(EXPECTED_SKILLS.sort());
+  });
+
+  test("pug-claw-manager discovers no skills without globalSkillsDir (regression)", () => {
+    const agentDir = resolve(BUILTINS_AGENTS, "pug-claw-manager");
+    const skills = discoverSkills(agentDir);
+    expect(skills).toEqual([]);
   });
 });

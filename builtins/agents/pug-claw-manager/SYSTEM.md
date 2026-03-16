@@ -1,6 +1,7 @@
 ---
 name: pug-claw-manager
 description: Administrative agent for managing pug-claw configuration, agents, and skills
+driver: claude
 allowed-skills:
   - read-pug-claw-config
   - readwrite-pug-claw-config

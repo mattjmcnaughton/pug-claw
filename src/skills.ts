@@ -133,10 +133,16 @@ function buildSkillCatalog(skills: SkillSummary[]): string {
   return lines.join("\n");
 }
 
-export function buildFullSystemPrompt(
+export interface ResolvedAgent {
+  systemPrompt: string;
+  driver?: string;
+  model?: string;
+}
+
+export function resolveAgent(
   agentDir: string,
   globalSkillsDir?: string,
-): string {
+): ResolvedAgent {
   const parsed = parseAgentSystemMd(agentDir);
   let prompt = parsed.systemPrompt;
   const skills = discoverSkills(
@@ -154,5 +160,9 @@ export function buildFullSystemPrompt(
       catalog;
   }
 
-  return prompt;
+  return {
+    systemPrompt: prompt,
+    driver: parsed.meta.driver,
+    model: parsed.meta.model,
+  };
 }
