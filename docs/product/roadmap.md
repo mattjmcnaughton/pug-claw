@@ -83,6 +83,19 @@ Ability to restart the process cleanly, and to roll back to the last known good 
 - [ ] `pug-claw rollback` — restart using last-known-good config + binary
 - [ ] Automatic rollback on crash loop (N crashes in M minutes → revert)
 
+### Management Web UI
+
+Standalone web server (separate process) for managing pug-claw out-of-band. Critical for recovery when the main process crashes or a bad config/update breaks things.
+
+- [ ] Standalone HTTP server (`pug-claw admin`) — runs independently of the main process
+- [ ] Process monitor: show main process status (running, crashed, PID, uptime)
+- [ ] Log viewer: stream and search JSONL logs from the browser
+- [ ] Config viewer: display current config with validation status and diagnostics
+- [ ] Start / stop / restart controls for the main pug-claw process
+- [ ] Configurable process command (so the admin server knows how to launch pug-claw)
+- [ ] Last-known-good config display and one-click rollback
+- [ ] Auth: at minimum, bind to localhost only; optionally token-based access
+
 ### Deploy Pipeline
 
 - [ ] Deploy to VM (manual first run)
