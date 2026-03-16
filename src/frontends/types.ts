@@ -7,6 +7,10 @@ export interface FrontendContext {
   config: ResolvedConfig;
   buildSystemPrompt: (agentDir: string) => string;
   logger: Logger;
+  reloadConfig: () => Promise<{
+    config: ResolvedConfig;
+    buildSystemPrompt: (agentDir: string) => string;
+  }>;
 }
 
 export interface Frontend {

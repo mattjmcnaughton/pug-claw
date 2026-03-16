@@ -1,0 +1,28 @@
+{
+  "paths": {
+    "agents_dir": "agents",
+    "skills_dir": "skills",
+    "data_dir": "data"
+  },
+  "secrets": {
+    "provider": "env"
+  },
+  "discord": {
+    "guild_id": "123456789",
+    "owner_id": "987654321"
+  },
+  "default_agent": "test-agent",
+  "default_driver": "claude",
+  "drivers": {
+    "claude": {},
+    "pi": {
+      "default_model": "openrouter/minimax/minimax-m2.5"
+    }
+  },
+  "channels": {
+    "chan-1": {
+      "agent": "custom",
+      "driver": "pi"
+    }
+  }
+}
