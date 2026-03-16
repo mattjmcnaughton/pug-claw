@@ -54,6 +54,26 @@ Agents have zero awareness of who they're talking to. Needed by memory, permissi
 - [ ] Refine and extend `config.json` schema for new features
 - [ ] Config validation CLI command (`pug-claw check-config`)
 
+### Sessions & Threads
+
+Refine the "session" primitive — a context window with an agent, regardless of frontend (Discord, TUI, future frontends).
+
+- [ ] Session lifecycle: create, resume, expire, close
+- [ ] Session identity: tie sessions to a user + agent + channel
+- [ ] Thread support: threaded conversations within a frontend (Discord threads, etc.)
+- [ ] Session persistence: survive process restarts (ties into Safe Restart snapshot/restore)
+- [ ] Session API: unified interface that frontends implement
+
+### Storage & Persistence
+
+Pluggable backends for databases and file stores.
+
+- [ ] Storage provider interface: abstract over where data lives
+- [ ] Database backends: SQLite (default/local), PostgreSQL (production)
+- [ ] File store backends: local filesystem (default), S3-compatible
+- [ ] Prisma for schema management and migrations (introduce when DB schemas stabilize)
+- [ ] Configuration in `config.json` under a `[storage]` section
+
 ### Type Normalization
 
 - [ ] Audit and tighten core types (`DriverResponse`, `DriverOptions`, `FrontendContext`)
@@ -102,6 +122,13 @@ Standalone web server (separate process) for managing pug-claw out-of-band. Crit
 - [ ] Automated deploy script or CI job (build → scp/rsync → restart service)
 - [ ] Smoke test after deploy (health check passes before marking deploy as good)
 
+### Containerization
+
+- [ ] Dockerfile and docker-compose for local/dev deployment (get mounts right for `~/.pug-claw`)
+- [ ] Helm chart for Kubernetes deployment
+- [ ] Singleton enforcement: only one pug-claw instance should run at a time (shared filesystem lock, DynamoDB lease, or similar)
+- [ ] Document volume mount strategy for config, data, and logs
+
 ---
 
 ## Phase 2: Memory, Knowledge, and Cron
@@ -146,7 +173,11 @@ Agents can search and write to your personal knowledge base.
 - [ ] File watcher for live reindex during long-running processes
 - [ ] `pug-claw reindex` CLI command
 
-### Basic Cron / Scheduled Tasks
+### Jobs
+
+A job is anything running outside the main execution thread. Covers both timer-based scheduled work and agent-spawned background tasks.
+
+#### Cron Jobs
 
 Simple timer-based agent actions. Enables conversation capture, memory compaction, brain reindexing, and daily summaries without full workflow infrastructure.
 
@@ -156,6 +187,16 @@ Simple timer-based agent actions. Enables conversation capture, memory compactio
 - [ ] `!schedules` / `/schedules` command to list active jobs
 - [ ] Built-in jobs: brain reindex, memory compaction
 
+#### Agent-Spawned Jobs
+
+Background tasks kicked off by a main agent during a session.
+
+- [ ] Integration with Pi/Claude Agent SDK primitives (sub-agents, tool calls)
+- [ ] Job lifecycle: submit, running, completed, failed
+- [ ] Job monitoring: status, logs, cancellation
+- [ ] `job-management` skill for agents to create/monitor/cancel jobs
+- [ ] Notification when jobs complete (back to originating session/channel)
+
 ### Semantic Embeddings (optional, later)
 
 Optional layer on top of conversation logs and memory. Enables similarity search across all stored content.
@@ -164,6 +205,8 @@ Optional layer on top of conversation logs and memory. Enables similarity search
 - [ ] Vector storage in SQLite (sqlite-vec or similar — TBD)
 - [ ] Semantic search tool for agents ("find conversations/notes related to X")
 - [ ] Incremental embedding on new log entries / memory writes
+- [ ] Pluggable vector store backend (sqlite-vec, pgvector, Pinecone, etc.)
+- [ ] Vector store configuration in `config.json`
 
 ### Second Brain - Advanced (later)
 
@@ -220,6 +263,23 @@ Utility:
 - [ ] `delegate` tool: create temp session with target agent, send prompt, return result
 - [ ] Recursion depth limit
 - [ ] Context passing controls (full conversation vs. subtask only)
+
+### Additional Frontends
+
+- [ ] Slack frontend
+- [ ] Telegram frontend
+- [ ] Webhook / HTTP API frontend
+- [ ] Shared frontend logic extraction (reduce duplication between Discord/TUI/new frontends)
+
+### Admin Dashboard
+
+Broader web UI for managing pug-claw beyond process recovery (the Management Web UI in Phase 1 covers the standalone recovery server).
+
+- [ ] Agent management: view, configure, enable/disable agents
+- [ ] Session viewer: active sessions, history, replay
+- [ ] Job dashboard: running/completed/failed jobs, logs, retry
+- [ ] Config editor: edit config.json from the browser with validation
+- [ ] Metrics overview: message counts, token usage, error rates
 
 ### Message Routing
 
@@ -291,8 +351,6 @@ Utility:
 
 ## Future / Someday
 
-- [ ] Webhook / HTTP API frontend
-- [ ] Slack frontend
 - [ ] Multi-user permissions model
 - [ ] Cost / token tracking per user and per agent
 - [ ] Rate limiting and per-user quotas

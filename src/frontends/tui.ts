@@ -17,6 +17,7 @@ import {
 import chalk from "chalk";
 import { listAvailableAgents, resolveAgentDir } from "../agents.ts";
 import type { Driver } from "../drivers/types.ts";
+import { toError } from "../resources.ts";
 import { discoverSkills } from "../skills.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
 
@@ -174,7 +175,7 @@ export class TuiFrontend implements Frontend {
         }
 
         if (cmd === "restart") {
-          logger.info("tui_command_restart");
+          logger.info({}, "tui_command_restart");
           showInfo("Restarting...");
           tui.stop();
           process.exit(1);
@@ -189,11 +190,11 @@ export class TuiFrontend implements Frontend {
             await destroySession();
             updateHeader();
             showInfo("Config, agents, and skills reloaded. Session reset.");
-            logger.info("tui_command_reload");
+            logger.info({}, "tui_command_reload");
           } catch (err) {
-            showInfo(
-              `Reload failed: ${err instanceof Error ? err.message : String(err)}`,
-            );
+            const error = toError(err);
+            logger.error({ err: error }, "tui_reload_error");
+            showInfo(`Reload failed: ${error.message}`);
           }
           return;
         }
@@ -201,7 +202,7 @@ export class TuiFrontend implements Frontend {
         if (cmd === "new") {
           await destroySession();
           showInfo("Session reset. Next message starts a fresh conversation.");
-          logger.info("tui_command_new");
+          logger.info({}, "tui_command_new");
           return;
         }
 
@@ -321,7 +322,9 @@ export class TuiFrontend implements Frontend {
         const response = await getDriver().query(sessionId, trimmed);
         responseText = response.text;
       } catch (err) {
-        responseText = `Error: ${err instanceof Error ? err.message : String(err)}`;
+        const error = toError(err);
+        logger.error({ err: error }, "tui_query_error");
+        responseText = `Error: ${error.message}`;
       }
 
       // Remove loader

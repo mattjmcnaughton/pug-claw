@@ -1,20 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { homedir } from "node:os";
 import type { ZodError } from "zod";
-import { ConfigFileSchema } from "../resources.ts";
-
-function expandTilde(p: string): string {
-  if (p.startsWith("~/") || p === "~") {
-    return resolve(homedir(), p.slice(2));
-  }
-  return p;
-}
+import { Paths } from "../constants.ts";
+import { ConfigFileSchema, expandTilde } from "../resources.ts";
 
 export function runCheckConfig(path?: string): void {
   const configPath = path
     ? resolve(expandTilde(path))
-    : resolve(expandTilde("~/.pug-claw"), "config.json");
+    : resolve(expandTilde(Paths.DEFAULT_HOME), Paths.CONFIG_FILE);
 
   // Check file exists
   if (!existsSync(configPath)) {
@@ -28,9 +21,9 @@ export function runCheckConfig(path?: string): void {
     const content = readFileSync(configPath, "utf-8");
     parsed = JSON.parse(content);
   } catch (err) {
-    console.error(
-      `Error: Invalid JSON in ${configPath}: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    const error = err instanceof Error ? err : new Error(String(err));
+    console.error(`Error: Invalid JSON in ${configPath}: ${error.message}`);
+    console.error(error.stack);
     process.exit(1);
   }
 

@@ -10,6 +10,7 @@ import {
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 import { logger } from "../logger.ts";
+import { toError } from "../resources.ts";
 import type { Driver, DriverOptions, DriverResponse } from "./types.ts";
 
 interface PiSession {
@@ -147,7 +148,7 @@ export class PiDriver implements Driver {
       await piSession.session.prompt(prompt);
     } catch (err) {
       logger.error(
-        { session_id: sessionId, error: String(err) },
+        { err: toError(err), session_id: sessionId },
         "pi_query_error",
       );
       responseText = "Sorry, something went wrong.";

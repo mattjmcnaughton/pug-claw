@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { z } from "zod";
+import { Defaults, EnvVars, Paths, SecretsProviders } from "./constants.ts";
 import { logger } from "./logger.ts";
 
 // --- Zod Schemas ---
@@ -45,6 +46,7 @@ export const ConfigFileSchema = z.object({
 
 // --- Exported Types ---
 
+export type ConfigFile = z.infer<typeof ConfigFileSchema>;
 export type ChannelConfig = z.infer<typeof ChannelConfigSchema>;
 
 export interface SecretsProvider {
@@ -129,9 +131,15 @@ class DotenvSecretsProvider implements SecretsProvider {
   }
 }
 
+// --- Error Helpers ---
+
+export function toError(err: unknown): Error {
+  return err instanceof Error ? err : new Error(String(err));
+}
+
 // --- Path Resolution Helpers ---
 
-function expandTilde(p: string): string {
+export function expandTilde(p: string): string {
   if (p.startsWith("~/") || p === "~") {
     return resolve(homedir(), p.slice(2));
   }
@@ -187,8 +195,8 @@ function loadConfigWithFallback(
       // On success, save as last-good
       try {
         copyFileSync(configPath, fallbackPath);
-      } catch {
-        // Non-fatal if copy fails
+      } catch (err) {
+        logger.warn({ err: toError(err) }, "config_backup_failed");
       }
       return config;
     } catch (err) {
@@ -208,8 +216,8 @@ function loadConfigWithFallback(
         `Warning: config.json failed to load (${primaryError?.message}). Using config.last-good.json as fallback.`,
       );
       return config;
-    } catch {
-      // Fallback also failed, throw original error
+    } catch (err) {
+      logger.warn({ err: toError(err) }, "config_fallback_failed");
     }
   }
 
@@ -222,7 +230,7 @@ export async function resolveConfig(
   opts: ConfigOptions = {},
 ): Promise<ResolvedConfig> {
   // 1. Determine home dir
-  const rawHome = opts.home ?? process.env.PUG_CLAW_HOME ?? "~/.pug-claw";
+  const rawHome = opts.home ?? process.env[EnvVars.HOME] ?? Paths.DEFAULT_HOME;
   const homeDir = resolve(expandTilde(rawHome));
 
   // 2. Verify home dir and config.json exist
@@ -232,8 +240,8 @@ export async function resolveConfig(
     );
   }
 
-  const configPath = resolve(homeDir, "config.json");
-  const fallbackPath = resolve(homeDir, "config.last-good.json");
+  const configPath = resolve(homeDir, Paths.CONFIG_FILE);
+  const fallbackPath = resolve(homeDir, Paths.CONFIG_FALLBACK_FILE);
 
   // 3. Load and validate config.json (with fallback)
   const rawConfig = loadConfigWithFallback(configPath, fallbackPath);
@@ -241,33 +249,35 @@ export async function resolveConfig(
   // 4. Resolve paths
   const agentsDir = resolvePathWithOverrides(
     homeDir,
-    "agents",
+    Paths.AGENTS_DIR,
     rawConfig.paths?.agents_dir,
-    process.env.PUG_CLAW_AGENTS_DIR,
+    process.env[EnvVars.AGENTS_DIR],
     opts.agentsDir,
   );
 
   const skillsDir = resolvePathWithOverrides(
     homeDir,
-    "skills",
+    Paths.SKILLS_DIR,
     rawConfig.paths?.skills_dir,
-    process.env.PUG_CLAW_SKILLS_DIR,
+    process.env[EnvVars.SKILLS_DIR],
     opts.skillsDir,
   );
 
   const dataDir = resolvePathWithOverrides(
     homeDir,
-    "data",
+    Paths.DATA_DIR,
     rawConfig.paths?.data_dir,
-    process.env.PUG_CLAW_DATA_DIR,
+    process.env[EnvVars.DATA_DIR],
     opts.dataDir,
   );
 
   // 5. Create secrets provider
   const secretsConfig = rawConfig.secrets;
   let secrets: SecretsProvider;
-  if (secretsConfig?.provider === "dotenv") {
-    const rawDotenvPath = expandTilde(secretsConfig.dotenv_path ?? ".env");
+  if (secretsConfig?.provider === SecretsProviders.DOTENV) {
+    const rawDotenvPath = expandTilde(
+      secretsConfig.dotenv_path ?? Paths.DOT_ENV,
+    );
     const dotenvPath = rawDotenvPath.startsWith("/")
       ? rawDotenvPath
       : resolve(homeDir, rawDotenvPath);
@@ -304,8 +314,8 @@ export async function resolveConfig(
     agentsDir,
     skillsDir,
     dataDir,
-    defaultAgent: rawConfig.default_agent ?? "default",
-    defaultDriver: rawConfig.default_driver ?? "claude",
+    defaultAgent: rawConfig.default_agent ?? Defaults.AGENT,
+    defaultDriver: rawConfig.default_driver ?? Defaults.DRIVER,
     drivers,
     channels: rawConfig.channels ?? {},
     discord,

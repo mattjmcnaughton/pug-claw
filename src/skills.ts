@@ -1,7 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import yaml from "js-yaml";
+import { Paths } from "./constants.ts";
 import { logger } from "./logger.ts";
+import { toError } from "./resources.ts";
 
 interface SkillSummary {
   name: string;
@@ -13,8 +15,8 @@ function parseSkillFrontmatter(filePath: string): SkillSummary | null {
   let text: string;
   try {
     text = readFileSync(filePath, "utf-8");
-  } catch {
-    logger.warn({ path: filePath }, "skill_read_error");
+  } catch (err) {
+    logger.warn({ err: toError(err), path: filePath }, "skill_read_error");
     return null;
   }
 
@@ -32,8 +34,8 @@ function parseSkillFrontmatter(filePath: string): SkillSummary | null {
       return null;
     }
     meta = yaml.load(frontmatter);
-  } catch (e) {
-    logger.warn({ path: filePath, error: String(e) }, "skill_yaml_error");
+  } catch (err) {
+    logger.warn({ err: toError(err), path: filePath }, "skill_yaml_error");
     return null;
   }
 
@@ -66,7 +68,7 @@ function discoverSkillsFromDir(dir: string): SkillSummary[] {
   const skills: SkillSummary[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const skillMd = `${dir}/${entry.name}/SKILL.md`;
+    const skillMd = `${dir}/${entry.name}/${Paths.SKILL_MD}`;
     if (!existsSync(skillMd)) continue;
 
     const summary = parseSkillFrontmatter(skillMd);
@@ -117,7 +119,7 @@ function buildSkillCatalog(skills: SkillSummary[]): string {
 }
 
 function loadSystemPrompt(agentDir: string): string {
-  const systemMd = `${agentDir}/SYSTEM.md`;
+  const systemMd = `${agentDir}/${Paths.SYSTEM_MD}`;
   if (!existsSync(systemMd)) {
     throw new Error(`Missing SYSTEM.md in ${agentDir}`);
   }

@@ -30,16 +30,27 @@ This is a Bun + TypeScript project.
 - `bun run start` — Start with Discord frontend
 - `bun run tui` — Start with TUI frontend
 
-## Testing
+## Architecture
 
-- Framework: `bun:test` (built-in)
-- Tests live in `tests/` with `unit/`, `integration/`, `e2e/` subdirectories
-- Fixtures in `tests/fixtures/`
-- Use `test.skipIf()` for tests requiring external credentials (e.g. `DISCORD_BOT_TOKEN`)
+The codebase uses a plugin pattern with two extension points:
 
-## Code Style
+- **Drivers** (`src/drivers/`): AI backends (Claude, Pi). Implement the `Driver` interface from `src/drivers/types.ts`. Registered in `src/main.ts` `startFrontend()`.
+- **Frontends** (`src/frontends/`): User-facing interfaces (Discord, TUI). Implement the `Frontend` interface from `src/frontends/types.ts`.
+- **Commands** (`src/commands/`): CLI subcommands (init, check-config, init-service). Registered in `src/main.ts` via Commander.
 
-- Formatter/linter: Biome (config in `biome.json`)
-- 2-space indentation, double quotes
-- Use `import type` for type-only imports
-- Use `node:` protocol for Node.js builtin imports
+Config loading and resolution lives in `src/resources.ts`. Agent/skill discovery lives in `src/agents.ts` and `src/skills.ts`. The logger is a pino singleton from `src/logger.ts`.
+
+## Utilities
+
+- `expandTilde` is exported from `src/resources.ts` — do not duplicate it in other files
+- `toError(err)` is exported from `src/resources.ts` — normalizes `unknown` catch values into proper `Error` objects. Use it in all catch blocks.
+
+## Conventions
+
+Detailed rules with examples live in `docs/conventions/`. Read the relevant file when working in that area.
+
+- **Code Style**: Biome, 2-space indent, double quotes, `import type` for type-only imports, `catch (err)` in all catch blocks. See [`docs/conventions/code-style.md`](docs/conventions/code-style.md).
+- **Constants**: Shared strings live in `src/constants.ts` — never inline. See [`docs/conventions/constants.md`](docs/conventions/constants.md).
+- **Error Handling**: Preserve stack traces, use `toError()`, use pino's `err` key. Never use bare `catch {}`. See [`docs/conventions/error-handling.md`](docs/conventions/error-handling.md).
+- **Logging**: Pino structured, two-arg format: `logger.info({ ctx }, "snake_case_tag")`. See [`docs/conventions/logging.md`](docs/conventions/logging.md).
+- **Testing**: `bun:test`, fixtures in `tests/fixtures/`, `withEnv()` for env vars. See [`docs/conventions/testing.md`](docs/conventions/testing.md).
