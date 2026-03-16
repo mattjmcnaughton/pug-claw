@@ -49,6 +49,23 @@ agents/
 
 Each skill is a directory under `skills/` containing at minimum a `SKILL.md` file. You can include additional files (examples, templates, reference data) alongside `SKILL.md` — the AI can read them if instructed to in the skill definition.
 
+### Global skills
+
+Global skills live in the skills directory (`~/.pug-claw/skills/` by default) and are shared across agents:
+
+```
+~/.pug-claw/
+  skills/
+    read-pug-claw-config/
+      SKILL.md
+    read-discord/
+      SKILL.md
+      scripts/
+        discord.ts
+```
+
+Global skills are only available to agents that list them in `allowed-skills`. Agent-specific skills always take precedence over global skills with the same name.
+
 ## SKILL.md format
 
 ### Frontmatter
@@ -155,3 +172,27 @@ Skills are discovered once at session creation. To pick up new or modified skill
 ## Listing skills
 
 Use `!skills` (Discord) or `/skills` (TUI) to see all discovered skills for the current agent. The output shows each skill's name and description.
+
+## Built-in Skills
+
+Pug-claw ships with built-in skills that are installed to `~/.pug-claw/skills/` during `pug-claw init`. Built-in skills have `metadata.managed-by: pug-claw` in their frontmatter and are automatically updated when you run `pug-claw init --builtins-only`.
+
+| Skill | Description |
+|-------|-------------|
+| `read-pug-claw-config` | Read and inspect pug-claw configuration files and settings |
+| `readwrite-pug-claw-config` | Edit pug-claw configuration (add channels, change defaults, update paths) |
+| `read-discord` | Read Discord data (channels, messages, members) via discord.js |
+| `readwrite-discord` | Send messages, create channels, and manage Discord via discord.js |
+| `create-agent` | Create new pug-claw agent definitions with SYSTEM.md |
+| `create-skill` | Create new pug-claw skill definitions following agentskills.io format |
+| `read-pug-claw-codebase` | Read pug-claw source code via gh CLI for understanding internals |
+
+Built-in skills are not available to agents by default. An agent must explicitly list them in its `allowed-skills` frontmatter field. See [agents.md](./agents.md) for details.
+
+## Skill Format (agentskills.io)
+
+Skills follow the [agentskills.io](https://agentskills.io/specification) open standard. Each skill directory can optionally include:
+
+- `scripts/` — Executable scripts the AI can run
+- `references/` — Supplementary reference documents
+- `assets/` — Static files (images, data)

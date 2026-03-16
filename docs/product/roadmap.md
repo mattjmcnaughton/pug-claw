@@ -16,6 +16,10 @@
 - [x] Secrets provider abstraction (`env`, `dotenv`)
 - [x] Discord guild filtering and owner identity config
 - [x] Global CLI install via `bun link`
+- [x] Built-in skills (7 foundational skills) with agentskills.io format
+- [x] Built-in agents (default, pug-claw-manager)
+- [x] SYSTEM.md frontmatter with per-agent skill filtering (`allowed-skills`)
+- [x] `pug-claw init --builtins-only` for updating built-in content
 
 ---
 
@@ -242,6 +246,7 @@ Knowledge:
 - [ ] `recall` - search the brain for relevant knowledge
 - [ ] `remember` - save a fact or insight to the brain
 - [ ] `capture` - save a web page, PDF, or excerpt to the brain
+- [ ] `web-search` - search the web and return summarized results
 - [ ] `research` - web search + brain search, what do I know vs. what's new
 
 Content:

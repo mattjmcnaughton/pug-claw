@@ -2,7 +2,11 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, test } from "bun:test";
-import { resolveAgentDir, listAvailableAgents } from "../../src/agents.ts";
+import {
+  resolveAgentDir,
+  listAvailableAgents,
+  parseAgentSystemMd,
+} from "../../src/agents.ts";
 
 const FIXTURES = resolve(import.meta.dir, "../fixtures");
 const AGENTS_DIR = resolve(FIXTURES, "pug-claw-home/agents");
@@ -71,6 +75,93 @@ describe("listAvailableAgents", () => {
       expect(agents).not.toContain("no-system-agent");
     } finally {
       rmSync(tmpAgentsDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("parseAgentSystemMd", () => {
+  test("parses SYSTEM.md with full frontmatter", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-with-frontmatter");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.meta.name).toBe("test-agent-with-frontmatter");
+    expect(parsed.meta.description).toBe("A test agent with full frontmatter");
+    expect(parsed.meta.allowedSkills).toEqual([
+      "global-skill",
+      "another-skill",
+    ]);
+    expect(parsed.meta.metadata).toEqual({ "managed-by": "pug-claw" });
+  });
+
+  test("returns body only (frontmatter stripped) as systemPrompt", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-with-frontmatter");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.systemPrompt).toContain(
+      "You are a test agent with frontmatter.",
+    );
+    expect(parsed.systemPrompt).not.toContain("---");
+    expect(parsed.systemPrompt).not.toContain("allowed-skills");
+  });
+
+  test("handles SYSTEM.md without frontmatter", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-no-frontmatter");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.meta).toEqual({});
+    expect(parsed.systemPrompt).toContain(
+      "You are a test agent without frontmatter.",
+    );
+  });
+
+  test("handles empty allowed-skills array", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-empty-allowed");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.meta.allowedSkills).toEqual([]);
+  });
+
+  test("handles allowed-skills with single entry", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-partial-allowed");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.meta.allowedSkills).toEqual(["global-skill"]);
+  });
+
+  test("handles metadata field with managed-by key", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-with-frontmatter");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.meta.metadata?.["managed-by"]).toBe("pug-claw");
+  });
+
+  test("returns undefined for allowedSkills when field not present", () => {
+    const agentDir = resolve(FIXTURES, "agents/agent-no-frontmatter");
+    const parsed = parseAgentSystemMd(agentDir);
+    expect(parsed.meta.allowedSkills).toBeUndefined();
+  });
+
+  test("ignores unknown frontmatter fields gracefully", () => {
+    const tmpDir = makeTmpDir();
+    writeFileSync(
+      resolve(tmpDir, "SYSTEM.md"),
+      "---\nname: test\nunknown-field: value\ncustom: 123\n---\n\nPrompt here.\n",
+    );
+    try {
+      const parsed = parseAgentSystemMd(tmpDir);
+      expect(parsed.meta.name).toBe("test");
+      expect(parsed.systemPrompt).toContain("Prompt here.");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("handles SYSTEM.md with frontmatter but no body content", () => {
+    const tmpDir = makeTmpDir();
+    writeFileSync(
+      resolve(tmpDir, "SYSTEM.md"),
+      "---\nname: empty-body\ndescription: No body\n---\n",
+    );
+    try {
+      const parsed = parseAgentSystemMd(tmpDir);
+      expect(parsed.meta.name).toBe("empty-body");
+      expect(parsed.systemPrompt).toBe("");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 });

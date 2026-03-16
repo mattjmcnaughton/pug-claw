@@ -110,8 +110,9 @@ addSharedOptions(
 program
   .command("init")
   .description("Initialize pug-claw configuration")
-  .action(async () => {
-    await runInit();
+  .option("--builtins-only", "Only install/update built-in skills and agents")
+  .action(async (opts: { builtinsOnly?: boolean }) => {
+    await runInit(opts.builtinsOnly ?? false);
   });
 
 program

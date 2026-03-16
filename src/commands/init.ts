@@ -1,6 +1,14 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
 import { resolve } from "node:path";
 import * as p from "@clack/prompts";
+import yaml from "js-yaml";
 import {
   Defaults,
   Drivers,
@@ -8,10 +16,128 @@ import {
   Paths,
   SecretsProviders,
 } from "../constants.ts";
+import { logger } from "../logger.ts";
 import type { ConfigFile } from "../resources.ts";
 import { expandTilde } from "../resources.ts";
 
-export async function runInit(): Promise<void> {
+function isManagedByPugClaw(filePath: string): boolean {
+  try {
+    const text = readFileSync(filePath, "utf-8");
+    const parts = text.split("---", 3);
+    if (parts.length < 3 || parts[0]?.trim() !== "") return false;
+    const frontmatter = parts[1];
+    if (!frontmatter?.trim()) return false;
+    const meta = yaml.load(frontmatter);
+    if (typeof meta !== "object" || meta === null) return false;
+    const record = meta as Record<string, unknown>;
+    const metadata = record.metadata;
+    if (typeof metadata !== "object" || metadata === null) return false;
+    return (metadata as Record<string, unknown>)["managed-by"] === "pug-claw";
+  } catch {
+    return false;
+  }
+}
+
+function copyDirRecursive(src: string, dest: string): void {
+  mkdirSync(dest, { recursive: true });
+  for (const entry of readdirSync(src, { withFileTypes: true })) {
+    const srcPath = resolve(src, entry.name);
+    const destPath = resolve(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirRecursive(srcPath, destPath);
+    } else {
+      copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+export function installBuiltins(homeDir: string): {
+  installed: number;
+  updated: number;
+  skipped: number;
+} {
+  const builtinsDir = resolve(import.meta.dir, "../../builtins");
+  let installed = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  const categories = [
+    { src: "skills", dest: Paths.SKILLS_DIR, markerFile: Paths.SKILL_MD },
+    { src: "agents", dest: Paths.AGENTS_DIR, markerFile: Paths.SYSTEM_MD },
+  ];
+
+  for (const category of categories) {
+    const srcDir = resolve(builtinsDir, category.src);
+    const destDir = resolve(homeDir, category.dest);
+
+    if (!existsSync(srcDir)) continue;
+
+    for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+
+      const srcItemDir = resolve(srcDir, entry.name);
+      const destItemDir = resolve(destDir, entry.name);
+      const destMarker = resolve(destItemDir, category.markerFile);
+
+      if (existsSync(destMarker)) {
+        if (isManagedByPugClaw(destMarker)) {
+          copyDirRecursive(srcItemDir, destItemDir);
+          updated++;
+          logger.info(
+            { name: entry.name, type: category.src },
+            "builtin_updated",
+          );
+        } else {
+          skipped++;
+          logger.info(
+            { name: entry.name, type: category.src },
+            "builtin_skipped_user_owned",
+          );
+        }
+      } else {
+        copyDirRecursive(srcItemDir, destItemDir);
+        installed++;
+        logger.info(
+          { name: entry.name, type: category.src },
+          "builtin_installed",
+        );
+      }
+    }
+  }
+
+  return { installed, updated, skipped };
+}
+
+export async function runInit(builtinsOnly = false): Promise<void> {
+  if (builtinsOnly) {
+    p.intro("pug-claw init --builtins-only");
+    const envHome = process.env[EnvVars.HOME];
+    const rawHome = envHome ?? Paths.DEFAULT_HOME;
+    const resolvedHome = resolve(expandTilde(rawHome));
+
+    if (!existsSync(resolvedHome)) {
+      p.cancel(
+        `Home directory not found: ${resolvedHome}\nRun \`pug-claw init\` first.`,
+      );
+      process.exit(1);
+    }
+
+    mkdirSync(resolve(resolvedHome, Paths.SKILLS_DIR), { recursive: true });
+    mkdirSync(resolve(resolvedHome, Paths.AGENTS_DIR), { recursive: true });
+
+    const result = installBuiltins(resolvedHome);
+    p.note(
+      [
+        `Installed: ${result.installed}`,
+        `Updated:   ${result.updated}`,
+        `Skipped:   ${result.skipped}`,
+      ].join("\n"),
+      "Built-in skills and agents",
+    );
+    p.outro("Done!");
+    return;
+  }
+
   p.intro("pug-claw init");
 
   const envHome = process.env[EnvVars.HOME];
@@ -185,14 +311,8 @@ export async function runInit(): Promise<void> {
     `${JSON.stringify(config, null, 2)}\n`,
   );
 
-  // Write starter SYSTEM.md if it doesn't exist
-  const systemMd = resolve(agentDir, Paths.SYSTEM_MD);
-  if (!existsSync(systemMd)) {
-    writeFileSync(
-      systemMd,
-      "You are a helpful, versatile assistant. You can answer questions, have conversations, brainstorm ideas, help with writing, analyze information, and assist with a wide range of tasks.\n\nBe concise and direct in your responses. Adapt your tone and depth to the context of the conversation.\n",
-    );
-  }
+  // Install built-in skills and agents
+  installBuiltins(resolvedHome);
 
   // Write .env template if dotenv provider selected
   let resolvedDotenvPath: string | undefined;
