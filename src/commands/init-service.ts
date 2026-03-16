@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { userInfo } from "node:os";
 import * as p from "@clack/prompts";
+import { EnvVars, Paths } from "../constants.ts";
 
 export async function runInitService(): Promise<void> {
   p.intro("pug-claw init-service");
@@ -25,7 +26,7 @@ export async function runInitService(): Promise<void> {
 
   const home = await p.text({
     message: "pug-claw home directory?",
-    initialValue: "~/.pug-claw",
+    initialValue: Paths.DEFAULT_HOME,
     validate: (val) => {
       if (!val?.trim()) return "Path cannot be empty";
     },
@@ -87,7 +88,7 @@ WorkingDirectory=${workingDir}
 ExecStart=${bunPath} ${mainScript} start
 Restart=on-failure
 RestartSec=5
-Environment=PUG_CLAW_HOME=${home}
+Environment=${EnvVars.HOME}=${home}
 Environment=NODE_ENV=production
 
 [Install]

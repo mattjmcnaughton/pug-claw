@@ -1,23 +1,24 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { homedir } from "node:os";
 import * as p from "@clack/prompts";
-
-function expandTilde(path: string): string {
-  if (path.startsWith("~/") || path === "~") {
-    return resolve(homedir(), path.slice(2));
-  }
-  return path;
-}
+import {
+  Defaults,
+  Drivers,
+  EnvVars,
+  Paths,
+  SecretsProviders,
+} from "../constants.ts";
+import type { ConfigFile } from "../resources.ts";
+import { expandTilde } from "../resources.ts";
 
 export async function runInit(): Promise<void> {
   p.intro("pug-claw init");
 
-  const envHome = process.env.PUG_CLAW_HOME;
+  const envHome = process.env[EnvVars.HOME];
 
   const homeDir = await p.text({
     message: "Where should pug-claw live?",
-    initialValue: envHome ?? "~/.pug-claw",
+    initialValue: envHome ?? Paths.DEFAULT_HOME,
     validate: (val) => {
       if (!val?.trim()) return "Path cannot be empty";
     },
@@ -30,9 +31,9 @@ export async function runInit(): Promise<void> {
 
   const resolvedHome = resolve(expandTilde(homeDir));
 
-  if (existsSync(resolve(resolvedHome, "config.json"))) {
+  if (existsSync(resolve(resolvedHome, Paths.CONFIG_FILE))) {
     const overwrite = await p.confirm({
-      message: `${resolvedHome}/config.json already exists. Overwrite?`,
+      message: `${resolvedHome}/${Paths.CONFIG_FILE} already exists. Overwrite?`,
       initialValue: false,
     });
 
@@ -44,7 +45,7 @@ export async function runInit(): Promise<void> {
 
   const defaultAgent = await p.text({
     message: "Default agent name?",
-    initialValue: "default",
+    initialValue: Defaults.AGENT,
     validate: (val) => {
       if (!val?.trim()) return "Agent name cannot be empty";
       if (/[/\\]/.test(val ?? "")) return "Agent name cannot contain slashes";
@@ -59,10 +60,14 @@ export async function runInit(): Promise<void> {
   const defaultDriver = await p.select({
     message: "Default driver?",
     options: [
-      { value: "claude", label: "claude", hint: "Anthropic Claude" },
-      { value: "pi", label: "pi", hint: "Pi coding agent" },
+      {
+        value: Drivers.CLAUDE,
+        label: Drivers.CLAUDE,
+        hint: "Anthropic Claude",
+      },
+      { value: Drivers.PI, label: Drivers.PI, hint: "Pi coding agent" },
     ],
-    initialValue: "claude",
+    initialValue: Drivers.CLAUDE,
   });
 
   if (p.isCancel(defaultDriver)) {
@@ -74,17 +79,17 @@ export async function runInit(): Promise<void> {
     message: "Secrets provider?",
     options: [
       {
-        value: "env",
-        label: "env",
+        value: SecretsProviders.ENV,
+        label: SecretsProviders.ENV,
         hint: "Read secrets from environment variables",
       },
       {
-        value: "dotenv",
-        label: "dotenv",
+        value: SecretsProviders.DOTENV,
+        label: SecretsProviders.DOTENV,
         hint: "Read secrets from a .env file (env vars still override)",
       },
     ],
-    initialValue: "env",
+    initialValue: Defaults.SECRETS_PROVIDER,
   });
 
   if (p.isCancel(secretsProvider)) {
@@ -92,11 +97,11 @@ export async function runInit(): Promise<void> {
     process.exit(0);
   }
 
-  let dotenvPath = ".env";
-  if (secretsProvider === "dotenv") {
+  let dotenvPath: string = Paths.DOT_ENV;
+  if (secretsProvider === SecretsProviders.DOTENV) {
     const dotenvInput = await p.text({
       message: "Path to .env file (relative to home dir, or absolute)?",
-      initialValue: ".env",
+      initialValue: Paths.DOT_ENV,
       validate: (val) => {
         if (!val?.trim()) return "Path cannot be empty";
       },
@@ -134,50 +139,54 @@ export async function runInit(): Promise<void> {
   }
 
   // Build config
-  // biome-ignore lint/suspicious/noExplicitAny: building dynamic JSON
-  const config: Record<string, any> = {
+  const config: ConfigFile = {
     default_agent: defaultAgent,
     default_driver: defaultDriver,
     drivers: {
-      claude: {},
-      pi: {},
+      [Drivers.CLAUDE]: {},
+      [Drivers.PI]: {},
     },
     channels: {},
+    ...(secretsProvider === SecretsProviders.DOTENV
+      ? {
+          secrets: {
+            provider: SecretsProviders.DOTENV,
+            dotenv_path: dotenvPath,
+          },
+        }
+      : {}),
+    ...(guildId
+      ? {
+          discord: {
+            guild_id: guildId,
+            ...(ownerId ? { owner_id: ownerId } : {}),
+          },
+        }
+      : {}),
   };
-
-  if (secretsProvider === "dotenv") {
-    config.secrets = { provider: "dotenv", dotenv_path: dotenvPath };
-  }
-
-  if (guildId) {
-    config.discord = {
-      guild_id: guildId,
-      ...(ownerId ? { owner_id: ownerId } : {}),
-    };
-  }
 
   // Create directory structure
   const spinner = p.spinner();
   spinner.start("Creating directory structure");
 
-  const agentsDir = resolve(resolvedHome, "agents");
+  const agentsDir = resolve(resolvedHome, Paths.AGENTS_DIR);
   const agentDir = resolve(agentsDir, defaultAgent);
-  const skillsDir = resolve(resolvedHome, "skills");
-  const dataDir = resolve(resolvedHome, "data");
+  const skillsDir = resolve(resolvedHome, Paths.SKILLS_DIR);
+  const dataDir = resolve(resolvedHome, Paths.DATA_DIR);
 
   mkdirSync(agentDir, { recursive: true });
   mkdirSync(skillsDir, { recursive: true });
   mkdirSync(dataDir, { recursive: true });
-  mkdirSync(resolve(resolvedHome, "logs", "system"), { recursive: true });
+  mkdirSync(resolve(resolvedHome, Paths.LOG_DIR), { recursive: true });
 
   // Write config.json
   writeFileSync(
-    resolve(resolvedHome, "config.json"),
+    resolve(resolvedHome, Paths.CONFIG_FILE),
     `${JSON.stringify(config, null, 2)}\n`,
   );
 
   // Write starter SYSTEM.md if it doesn't exist
-  const systemMd = resolve(agentDir, "SYSTEM.md");
+  const systemMd = resolve(agentDir, Paths.SYSTEM_MD);
   if (!existsSync(systemMd)) {
     writeFileSync(
       systemMd,
@@ -187,7 +196,7 @@ export async function runInit(): Promise<void> {
 
   // Write .env template if dotenv provider selected
   let resolvedDotenvPath: string | undefined;
-  if (secretsProvider === "dotenv") {
+  if (secretsProvider === SecretsProviders.DOTENV) {
     const expanded = expandTilde(dotenvPath);
     resolvedDotenvPath = expanded.startsWith("/")
       ? expanded
@@ -205,11 +214,11 @@ export async function runInit(): Promise<void> {
   p.note(
     [
       `Home:     ${resolvedHome}`,
-      `Config:   ${resolve(resolvedHome, "config.json")}`,
+      `Config:   ${resolve(resolvedHome, Paths.CONFIG_FILE)}`,
       `Agents:   ${agentsDir}`,
       `Skills:   ${skillsDir}`,
       `Data:     ${dataDir}`,
-      `Agent:    ${agentDir}/SYSTEM.md`,
+      `Agent:    ${agentDir}/${Paths.SYSTEM_MD}`,
       ...(resolvedDotenvPath ? [`Secrets:  ${resolvedDotenvPath}`] : []),
     ].join("\n"),
     "Created files",

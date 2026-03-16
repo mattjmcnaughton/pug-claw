@@ -1,8 +1,9 @@
 import { resolve } from "node:path";
 import { Client, GatewayIntentBits, type Message } from "discord.js";
 import { listAvailableAgents, resolveAgentDir } from "../agents.ts";
+import { Limits } from "../constants.ts";
 import type { Driver } from "../drivers/types.ts";
-import { getChannelConfig } from "../resources.ts";
+import { getChannelConfig, toError } from "../resources.ts";
 import { discoverSkills } from "../skills.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
 
@@ -182,7 +183,7 @@ export class DiscordFrontend implements Frontend {
           );
           return true;
         }
-        logger.info("command_restart");
+        logger.info({ channel_id: channelId }, "command_restart");
         await message.channel.send("Restarting...");
         process.exit(1);
       } else if (cmd === "reload") {
@@ -205,11 +206,11 @@ export class DiscordFrontend implements Frontend {
           await message.channel.send(
             "Config, agents, and skills reloaded. All sessions reset.",
           );
-          logger.info("command_reload");
+          logger.info({ channel_id: channelId }, "command_reload");
         } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          logger.error({ error: errMsg }, "reload_error");
-          await message.channel.send(`Reload failed: ${errMsg}`);
+          const error = toError(err);
+          logger.error({ err: error }, "reload_error");
+          await message.channel.send(`Reload failed: ${error.message}`);
         }
       } else if (cmd === "help") {
         await message.channel.send(
@@ -292,12 +293,12 @@ export class DiscordFrontend implements Frontend {
           });
           channelSessions.set(channelId, sessionId);
         } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err);
+          const error = toError(err);
           logger.error(
-            { error: errMsg, channel_id: channelId },
+            { err: error, channel_id: channelId },
             "session_create_error",
           );
-          await message.channel.send(errMsg);
+          await message.channel.send(error.message);
           return;
         }
       }
@@ -311,9 +312,9 @@ export class DiscordFrontend implements Frontend {
         const response = await driver.query(sessionId, message.content);
         responseText = response.text;
       } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        logger.error({ error: errMsg, channel_id: channelId }, "query_error");
-        responseText = errMsg;
+        const error = toError(err);
+        logger.error({ err: error, channel_id: channelId }, "query_error");
+        responseText = error.message;
       }
 
       if (!responseText.trim()) {
@@ -330,9 +331,15 @@ export class DiscordFrontend implements Frontend {
         "response_sent",
       );
 
-      // Discord 2000-char limit
-      for (let i = 0; i < responseText.length; i += 2000) {
-        await message.channel.send(responseText.slice(i, i + 2000));
+      // Discord message length limit
+      for (
+        let i = 0;
+        i < responseText.length;
+        i += Limits.DISCORD_MESSAGE_LENGTH
+      ) {
+        await message.channel.send(
+          responseText.slice(i, i + Limits.DISCORD_MESSAGE_LENGTH),
+        );
       }
     });
 

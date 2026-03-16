@@ -7,7 +7,7 @@ A multi-driver AI agent bot with Discord and TUI frontends. Swap between **Claud
 - [Bun](https://bun.sh/) >= 1.0
 - [Node.js](https://nodejs.org/) >= 20 (required by some dependencies)
 - A [Discord bot token](https://discord.com/developers/applications) with the **Message Content** privileged intent enabled
-- An [Anthropic API key](https://console.anthropic.com/) (for the Claude driver)
+- An [Anthropic API key](https://console.anthropic.com/) (for the Claude driver) — **or** existing Claude Code credentials (`claude auth login`)
 - An [OpenRouter API key](https://openrouter.ai/) (for the Pi driver, optional)
 
 ## Installation
@@ -98,7 +98,7 @@ All configuration lives in `~/.pug-claw/config.json` (created by `pug-claw init`
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DISCORD_BOT_TOKEN` | Yes (Discord mode) | Bot token from the Discord Developer Portal |
-| `ANTHROPIC_API_KEY` | Yes (Claude driver) | Anthropic API key |
+| `ANTHROPIC_API_KEY` | No | Anthropic API key for the Claude driver. If not set, falls back to existing Claude Code credentials on the host (i.e. `claude auth login`) |
 | `OPENROUTER_API_KEY` | No | API key for OpenRouter-backed models (Pi driver) |
 | `LOG_LEVEL` | No | Logging level: `debug`, `info` (default), `warn`, `error`, `fatal` |
 | `NODE_ENV` | No | Set to `production` for JSON log output; otherwise uses pretty-printing |
