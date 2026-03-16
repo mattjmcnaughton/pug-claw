@@ -51,7 +51,7 @@ Both drivers grant filesystem and shell access by default. Any user who can mess
 - Execute arbitrary shell commands as the process user
 - Search the filesystem
 
-The Claude driver runs in `acceptEdits` permission mode, which requires approval for file modifications. You can restrict tools per-channel via `config.json`:
+The Claude driver runs in `bypassPermissions` mode — all tool calls (reads, writes, shell commands) are auto-approved without interactive prompts. This is required for headless operation (e.g., Discord frontend) where no human is present to approve. You can restrict tools per-channel via `config.json`:
 
 ```json
 {
@@ -77,6 +77,7 @@ The Pi driver does not currently support per-channel tool restriction.
 - Use systemd hardening directives (`ProtectSystem=strict`, `ProtectHome=read-only`, `NoNewPrivileges=true`) to limit what the process user can access
 - Restrict the bot to specific Discord channels using Discord's channel permissions
 - For the Claude driver, use per-channel `tools` config to remove `Bash` in channels where shell access isn't needed
+- Both drivers currently run with full permissions (`bypassPermissions` on Claude, unrestricted on Pi). OS-level isolation (dedicated user, systemd sandboxing) is the primary security boundary. Fine-grained per-agent permissions are on the [roadmap](./product/roadmap.md).
 
 ### Prompt injection
 
