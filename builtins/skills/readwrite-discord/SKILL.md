@@ -1,13 +1,13 @@
 ---
 name: readwrite-discord
-description: Send messages, create channels, and manage Discord via discord.js
+description: Send messages, create channels, and manage Discord via discord.py
 metadata:
   managed-by: pug-claw
 ---
 
 # Read/Write Discord
 
-Read and write Discord server data using the discord.js script.
+Read and write Discord server data using the discord.py script.
 
 ## Prerequisites
 
@@ -16,10 +16,10 @@ Read and write Discord server data using the discord.js script.
 
 ## Usage
 
-Run commands via `bun run` with the script at `./scripts/discord.ts`:
+Run commands via `uvx` with the script at `./scripts/discord.py`:
 
 ```bash
-bun run ./scripts/discord.ts <command> [options]
+uvx --with discord.py python ./scripts/discord.py <command> [options]
 ```
 
 ## Read Commands
@@ -27,31 +27,31 @@ bun run ./scripts/discord.ts <command> [options]
 ### list-channels
 
 ```bash
-bun run ./scripts/discord.ts list-channels --guild-id=<id>
+uvx --with discord.py python ./scripts/discord.py list-channels --guild-id=<id>
 ```
 
 ### read-messages
 
 ```bash
-bun run ./scripts/discord.ts read-messages --channel-id=<id> --limit=<n>
+uvx --with discord.py python ./scripts/discord.py read-messages --channel-id=<id> --limit=<n>
 ```
 
 ### list-members
 
 ```bash
-bun run ./scripts/discord.ts list-members --guild-id=<id> --limit=<n>
+uvx --with discord.py python ./scripts/discord.py list-members --guild-id=<id> --limit=<n>
 ```
 
 ### get-guild
 
 ```bash
-bun run ./scripts/discord.ts get-guild --guild-id=<id>
+uvx --with discord.py python ./scripts/discord.py get-guild --guild-id=<id>
 ```
 
 ### get-channel
 
 ```bash
-bun run ./scripts/discord.ts get-channel --channel-id=<id>
+uvx --with discord.py python ./scripts/discord.py get-channel --channel-id=<id>
 ```
 
 ## Write Commands
@@ -61,7 +61,7 @@ bun run ./scripts/discord.ts get-channel --channel-id=<id>
 Send a message to a channel.
 
 ```bash
-bun run ./scripts/discord.ts send-message --channel-id=<id> --content="Hello, world!"
+uvx --with discord.py python ./scripts/discord.py send-message --channel-id=<id> --content="Hello, world!"
 ```
 
 Note: Messages are limited to 2000 characters. For longer content, split into multiple messages.
@@ -71,7 +71,7 @@ Note: Messages are limited to 2000 characters. For longer content, split into mu
 Create a new text channel in a guild.
 
 ```bash
-bun run ./scripts/discord.ts create-channel --guild-id=<id> --name=<channel-name>
+uvx --with discord.py python ./scripts/discord.py create-channel --guild-id=<id> --name=<channel-name>
 ```
 
 Options:
@@ -83,7 +83,7 @@ Options:
 Modify an existing channel.
 
 ```bash
-bun run ./scripts/discord.ts modify-channel --channel-id=<id> --name=<new-name> --topic=<new-topic>
+uvx --with discord.py python ./scripts/discord.py modify-channel --channel-id=<id> --name=<new-name> --topic=<new-topic>
 ```
 
 ### delete-channel
@@ -91,7 +91,7 @@ bun run ./scripts/discord.ts modify-channel --channel-id=<id> --name=<new-name> 
 Delete a channel. Use with caution.
 
 ```bash
-bun run ./scripts/discord.ts delete-channel --channel-id=<id>
+uvx --with discord.py python ./scripts/discord.py delete-channel --channel-id=<id>
 ```
 
 ### add-reaction
@@ -99,7 +99,7 @@ bun run ./scripts/discord.ts delete-channel --channel-id=<id>
 Add a reaction to a message.
 
 ```bash
-bun run ./scripts/discord.ts add-reaction --channel-id=<id> --message-id=<id> --emoji=<emoji>
+uvx --with discord.py python ./scripts/discord.py add-reaction --channel-id=<id> --message-id=<id> --emoji=<emoji>
 ```
 
 ## Safety Notes

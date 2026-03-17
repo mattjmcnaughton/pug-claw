@@ -1,13 +1,13 @@
 ---
 name: read-discord
-description: Read Discord data (channels, messages, members) via discord.js
+description: Read Discord data (channels, messages, members) via discord.py
 metadata:
   managed-by: pug-claw
 ---
 
 # Read Discord
 
-Read Discord server data using the discord.js script.
+Read Discord server data using the discord.py script.
 
 ## Prerequisites
 
@@ -16,10 +16,10 @@ Read Discord server data using the discord.js script.
 
 ## Usage
 
-Run commands via `bun run` with the script at `./scripts/discord.ts`:
+Run commands via `uvx` with the script at `./scripts/discord.py`:
 
 ```bash
-bun run ./scripts/discord.ts <command> [options]
+uvx --with discord.py python ./scripts/discord.py <command> [options]
 ```
 
 ## Commands
@@ -29,7 +29,7 @@ bun run ./scripts/discord.ts <command> [options]
 List all channels in a guild.
 
 ```bash
-bun run ./scripts/discord.ts list-channels --guild-id=<id>
+uvx --with discord.py python ./scripts/discord.py list-channels --guild-id=<id>
 ```
 
 ### read-messages
@@ -37,7 +37,7 @@ bun run ./scripts/discord.ts list-channels --guild-id=<id>
 Read recent messages from a channel.
 
 ```bash
-bun run ./scripts/discord.ts read-messages --channel-id=<id> --limit=<n>
+uvx --with discord.py python ./scripts/discord.py read-messages --channel-id=<id> --limit=<n>
 ```
 
 Options:
@@ -49,7 +49,7 @@ Options:
 List members of a guild.
 
 ```bash
-bun run ./scripts/discord.ts list-members --guild-id=<id> --limit=<n>
+uvx --with discord.py python ./scripts/discord.py list-members --guild-id=<id> --limit=<n>
 ```
 
 ### get-guild
@@ -57,7 +57,7 @@ bun run ./scripts/discord.ts list-members --guild-id=<id> --limit=<n>
 Get guild (server) information.
 
 ```bash
-bun run ./scripts/discord.ts get-guild --guild-id=<id>
+uvx --with discord.py python ./scripts/discord.py get-guild --guild-id=<id>
 ```
 
 ### get-channel
@@ -65,7 +65,7 @@ bun run ./scripts/discord.ts get-guild --guild-id=<id>
 Get detailed channel information.
 
 ```bash
-bun run ./scripts/discord.ts get-channel --channel-id=<id>
+uvx --with discord.py python ./scripts/discord.py get-channel --channel-id=<id>
 ```
 
 ## Output
