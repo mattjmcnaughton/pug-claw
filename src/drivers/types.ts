@@ -12,11 +12,21 @@ export interface DriverOptions {
   cwd?: string;
 }
 
+export type DriverEvent =
+  | { type: "tool_use"; tool: string }
+  | { type: "status"; message: string };
+
+export type DriverEventCallback = (event: DriverEvent) => void;
+
 export interface Driver {
   readonly name: string;
   readonly availableModels: Record<string, string>;
   readonly defaultModel: string;
   createSession(options: DriverOptions): Promise<string>;
-  query(sessionId: string, prompt: string): Promise<DriverResponse>;
+  query(
+    sessionId: string,
+    prompt: string,
+    onEvent?: DriverEventCallback,
+  ): Promise<DriverResponse>;
   destroySession(sessionId: string): Promise<void>;
 }

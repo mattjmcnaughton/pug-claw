@@ -228,6 +228,30 @@ describe("discord !reload command", () => {
   });
 });
 
+describe("discord query event callback", () => {
+  test("driver.query is called with an onEvent callback", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("hello", OWNER_ID);
+    await handler(msg);
+
+    expect(ctx.driver.query).toHaveBeenCalledTimes(1);
+    const callArgs = ctx.driver.query.mock.calls[0] as unknown[];
+    expect(callArgs[0]).toBe("session-1");
+    expect(callArgs[1]).toBe("hello");
+    expect(typeof callArgs[2]).toBe("function");
+  });
+
+  test("sendTyping is called during query execution", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("hello", OWNER_ID);
+    await handler(msg);
+
+    expect(msg.channel.sendTyping).toHaveBeenCalled();
+  });
+});
+
 describe("discord help text", () => {
   test("includes reload and restart commands", async () => {
     const ctx = makeCtx();
