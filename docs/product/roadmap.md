@@ -56,13 +56,15 @@ Agents have zero awareness of who they're talking to. Needed by memory, permissi
 - [x] Zod-validated `config.json` with clear error messages on invalid data
 - [x] Hard-fail with actionable "Run `pug-claw init`" message when config missing
 - [ ] Refine and extend `config.json` schema for new features
-- [ ] Config validation CLI command (`pug-claw check-config`)
+- [x] Config validation CLI command (`pug-claw check-config`)
+- [ ] Toggle visibility of agent thinking (show/hide reasoning traces per agent or frontend)
+- [ ] Toggle visibility of agent tool calls (show/hide tool invocations and results per agent or frontend) — *partial: Discord shows tool events via `onEvent` callback; TUI does not; no per-agent/frontend config toggle*
 
 ### Sessions & Threads
 
 Refine the "session" primitive — a context window with an agent, regardless of frontend (Discord, TUI, future frontends).
 
-- [ ] Session lifecycle: create, resume, expire, close
+- [ ] Session lifecycle: create, resume, expire, close — *partial: create and close implemented; resume and expire not yet*
 - [ ] Session identity: tie sessions to a user + agent + channel
 - [ ] Thread support: threaded conversations within a frontend (Discord threads, etc.)
 - [ ] Session persistence: survive process restarts (ties into Safe Restart snapshot/restore)
@@ -78,10 +80,39 @@ Pluggable backends for databases and file stores.
 - [ ] Prisma for schema management and migrations (introduce when DB schemas stabilize)
 - [ ] Configuration in `config.json` under a `[storage]` section
 
+### Command Framework
+
+Extend the existing `!command` pattern into a general-purpose `!namespace:command` system. Users and skills can register custom commands as lightweight shortcuts for invoking skills or agents with preset prompts/config.
+
+- [ ] `!namespace:command` invocation pattern (e.g., `!brain:search`, `!ops:restart`, `!memory:forget`)
+- [ ] Command registration: skills and agents can declare commands they provide
+- [ ] Built-in commands ship with pug-claw (extend existing `!help`, `!agent`, etc.)
+- [ ] Top-level `!command` sugar for global/common commands (e.g., `!help` as shorthand for `!pug-claw:help`)
+- [ ] Command discovery: `!help` lists namespaces, `!help <namespace>` lists commands in that namespace
+- [ ] Per-agent command filtering (consistent with existing `allowed-skills` pattern)
+- [ ] User-defined commands via config (name, description, skill/agent to invoke, default prompt)
+
+### Streaming Responses
+
+Stream driver output to frontends incrementally instead of waiting for the full response.
+
+- [ ] Streaming interface in `Driver` (yield chunks as they arrive from the model) — *partial: `onEvent` callback emits tool-use events incrementally; text response is still buffered*
+- [ ] Frontend support for rendering incremental updates (Discord: edit message in place; TUI: live output) — *partial: Discord sends tool-use notifications via `onEvent`; TUI does not use the callback*
+- [ ] Graceful fallback for frontends that don't support streaming (buffer and send on completion)
+
+### Interactive Confirmation
+
+Allow agents to pause execution and ask the user for confirmation before taking destructive or high-stakes actions (e.g., "Are you sure you want to delete X?").
+
+- [ ] Confirmation primitive in the session/frontend interface (agent requests yes/no, frontend collects response)
+- [ ] Timeout and default behavior when the user doesn't respond
+- [ ] Driver integration: surface confirmation requests from underlying agent SDKs (Claude tool approval, etc.) — *partial: Claude driver detects elicitation messages but only logs them; not surfaced to user*
+- [ ] Configurable confirmation policies per agent (always confirm, never confirm, confirm destructive only)
+
 ### Type Normalization
 
 - [ ] Audit and tighten core types (`DriverResponse`, `DriverOptions`, `FrontendContext`)
-- [ ] Shared constants for driver names, tool names, command prefixes
+- [x] Shared constants for driver names, tool names, command prefixes
 
 ---
 
@@ -91,8 +122,8 @@ Get pug-claw running on a real server as early as possible. Everything else gets
 
 ### Process Management
 
-- [ ] SystemD unit file generation (`pug-claw init-service`)
-- [ ] Graceful shutdown: drain sessions, flush logs
+- [x] SystemD unit file generation (`pug-claw init-service`)
+- [ ] Graceful shutdown: drain sessions, flush logs — *partial: frontends call `destroySession()` on quit/Ctrl+C; no system-wide signal handlers or log flushing*
 - [ ] Health check endpoint (for systemd watchdog, uptime monitoring)
 - [ ] JSONL structured logs from all agent interactions (audit trail)
 
@@ -297,6 +328,8 @@ Broader web UI for managing pug-claw beyond process recovery (the Management Web
 ## Phase 4: Advanced Automation and Workflows
 
 ### Workflow Chaining
+
+Multi-step pipelines built on top of the Command Framework (Phase 0). Commands are single-action shortcuts; workflows chain multiple commands/agents together declaratively.
 
 - [ ] Workflow definitions (YAML): sequential steps with agent + input/output mapping
 - [ ] Trigger types: message, cron, webhook, agent output
