@@ -9,6 +9,7 @@ export interface DriverOptions {
   tools?: string[];
   skills?: import("../skills.ts").SkillSummary[];
   pluginDir?: string;
+  cwd?: string;
 }
 
 export interface Driver {

@@ -25,7 +25,7 @@ import {
   resolveDriverName as resolveDriverNameFromInputs,
   resolveModelName,
 } from "../resolve.ts";
-import { toError } from "../resources.ts";
+import { expandTilde, toError } from "../resources.ts";
 import { discoverSkills } from "../skills.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
 
@@ -107,11 +107,18 @@ export class TuiFrontend implements Frontend {
           driverDefault: driver.defaultModel,
         });
 
+        const driverName = getEffectiveDriverName();
+        const driverCwd = config.drivers[driverName]?.cwd;
+        const cwd = driverCwd
+          ? resolve(expandTilde(driverCwd))
+          : config.homeDir;
+
         currentSessionId = await driver.createSession({
           systemPrompt: resolved.systemPrompt,
           model: effectiveModel,
           skills: resolved.skills,
           pluginDir: pluginDirs.get(currentAgentName),
+          cwd,
         });
       }
       return currentSessionId;

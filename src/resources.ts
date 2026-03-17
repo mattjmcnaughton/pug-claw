@@ -9,6 +9,7 @@ import { logger } from "./logger.ts";
 
 const DriverConfigSchema = z.object({
   default_model: z.string().optional(),
+  cwd: z.string().optional(),
 });
 
 const ChannelConfigSchema = z.object({
@@ -67,7 +68,7 @@ export interface ResolvedConfig {
 
   defaultAgent: string;
   defaultDriver: string;
-  drivers: Record<string, { defaultModel?: string }>;
+  drivers: Record<string, { defaultModel?: string; cwd?: string }>;
   channels: Record<string, ChannelConfig>;
 
   discord?: DiscordIdentity;
@@ -310,10 +311,10 @@ export async function resolveConfig(
   }
 
   // 7. Build drivers map (convert from snake_case config to camelCase)
-  const drivers: Record<string, { defaultModel?: string }> = {};
+  const drivers: Record<string, { defaultModel?: string; cwd?: string }> = {};
   if (rawConfig.drivers) {
     for (const [name, dc] of Object.entries(rawConfig.drivers)) {
-      drivers[name] = { defaultModel: dc.default_model };
+      drivers[name] = { defaultModel: dc.default_model, cwd: dc.cwd };
     }
   }
 

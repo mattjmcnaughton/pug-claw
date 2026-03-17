@@ -23,6 +23,24 @@ You can also pass any valid Claude model ID directly via `!model <id>`.
 
 Claude sessions are created with these tools enabled: `Read`, `Glob`, `Grep`, `Bash`. Per-channel tool overrides can be configured in `config.json`.
 
+### Working directory
+
+The Claude agent session's working directory defaults to `~/.pug-claw` (the pug-claw home directory). This controls what files the agent considers "in scope" — it will self-restrict file access to paths within or near the `cwd`.
+
+To override, set `drivers.claude.cwd` in `config.json`:
+
+```json
+{
+  "drivers": {
+    "claude": {
+      "cwd": "/home/user/projects"
+    }
+  }
+}
+```
+
+To give the agent access to additional directories without changing the `cwd`, create symlinks inside the working directory.
+
 ### Session behavior
 
 - Each session starts with an initialization query to establish a session ID

@@ -8,7 +8,7 @@ import {
 import { Limits } from "../constants.ts";
 import type { Driver } from "../drivers/types.ts";
 import { resolveDriverName as resolveDriverNameFromInputs } from "../resolve.ts";
-import { getChannelConfig, toError } from "../resources.ts";
+import { expandTilde, getChannelConfig, toError } from "../resources.ts";
 import type { ResolvedAgent } from "../skills.ts";
 import { discoverSkills } from "../skills.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
@@ -311,12 +311,19 @@ export class DiscordFrontend implements Frontend {
 
         try {
           const agentName = resolveAgentName(channelId);
+          const driverName = resolveChannelDriverName(channelId);
+          const driverCwd = config.drivers[driverName]?.cwd;
+          const cwd = driverCwd
+            ? resolve(expandTilde(driverCwd))
+            : config.homeDir;
+
           const sessionId = await driver.createSession({
             systemPrompt: resolved.systemPrompt,
             model,
             tools,
             skills: resolved.skills,
             pluginDir: pluginDirs.get(agentName),
+            cwd,
           });
           channelSessions.set(channelId, sessionId);
         } catch (err) {
