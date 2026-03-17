@@ -47,6 +47,12 @@ async function startFrontend(
     process.exit(1);
   }
 
+  // Export resolved paths so skill scripts (via Bash) can access them
+  process.env[EnvVars.HOME] = config.homeDir;
+  process.env[EnvVars.DATA_DIR] = config.dataDir;
+  process.env[EnvVars.AGENTS_DIR] = config.agentsDir;
+  process.env[EnvVars.SKILLS_DIR] = config.skillsDir;
+
   const piDefaultModel = config.drivers.pi?.defaultModel;
 
   const drivers: Record<string, Driver> = {
