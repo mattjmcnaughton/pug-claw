@@ -171,8 +171,27 @@ export class PiDriver implements Driver {
         event.assistantMessageEvent.type === "text_delta"
       ) {
         responseText += event.assistantMessageEvent.delta;
-      } else if (event.type === "tool_execution_start" && "toolName" in event) {
-        onEvent?.({ type: "tool_use", tool: String(event.toolName) });
+      } else if (event.type === "tool_execution_start") {
+        logger.info(
+          {
+            session_id: sessionId,
+            tool: event.toolName,
+            tool_call_id: event.toolCallId,
+            args: event.args,
+          },
+          "pi_tool_call_start",
+        );
+        onEvent?.({ type: "tool_use", tool: event.toolName });
+      } else if (event.type === "tool_execution_end") {
+        logger.info(
+          {
+            session_id: sessionId,
+            tool: event.toolName,
+            tool_call_id: event.toolCallId,
+            is_error: event.isError,
+          },
+          "pi_tool_call_end",
+        );
       }
     });
 
