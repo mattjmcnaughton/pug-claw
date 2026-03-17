@@ -101,6 +101,8 @@ export class PiDriver implements Driver {
       ? appendSkillCatalog(options.systemPrompt, options.skills)
       : options.systemPrompt;
 
+    logger.info({ systemPrompt }, "pi_session_system_prompt");
+
     const settingsManager = SettingsManager.inMemory({
       compaction: { enabled: true },
       retry: { enabled: true, maxRetries: 2 },

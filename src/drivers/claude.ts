@@ -40,6 +40,8 @@ export class ClaudeDriver implements Driver {
       systemPrompt = appendSkillCatalog(options.systemPrompt, options.skills);
     }
 
+    logger.info({ systemPrompt }, "claude_session_system_prompt");
+
     let sessionId: string | undefined;
 
     // Send an initial no-op query to establish the session and capture the session ID.
