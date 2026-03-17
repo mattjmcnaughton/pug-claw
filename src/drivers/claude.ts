@@ -1,7 +1,12 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { logger } from "../logger.ts";
 import { appendSkillCatalog } from "../skills.ts";
-import type { Driver, DriverOptions, DriverResponse } from "./types.ts";
+import type {
+  Driver,
+  DriverEventCallback,
+  DriverOptions,
+  DriverResponse,
+} from "./types.ts";
 
 interface SessionState {
   sessionId: string;
@@ -72,7 +77,11 @@ export class ClaudeDriver implements Driver {
     return sessionId;
   }
 
-  async query(sessionId: string, prompt: string): Promise<DriverResponse> {
+  async query(
+    sessionId: string,
+    prompt: string,
+    onEvent?: DriverEventCallback,
+  ): Promise<DriverResponse> {
     const session = this.sessions.get(sessionId);
     if (!session) {
       throw new Error(`Unknown Claude session: ${sessionId}`);
@@ -95,8 +104,37 @@ export class ClaudeDriver implements Driver {
         cwd: options.cwd,
       },
     })) {
+      const msgType =
+        "type" in msg
+          ? String(msg.type)
+          : "result" in msg
+            ? "result"
+            : "unknown";
+      logger.debug({ msg_type: msgType }, "claude_sdk_message");
+
       if ("result" in msg) {
         responseText = msg.result;
+      } else if (
+        "type" in msg &&
+        msg.type === "tool_progress" &&
+        "tool_name" in msg
+      ) {
+        onEvent?.({ type: "tool_use", tool: String(msg.tool_name) });
+      } else if (
+        "type" in msg &&
+        msg.type === "system" &&
+        "subtype" in msg &&
+        msg.subtype === "status" &&
+        "status" in msg
+      ) {
+        onEvent?.({ type: "status", message: String(msg.status) });
+      } else if (
+        "type" in msg &&
+        msg.type === "system" &&
+        "subtype" in msg &&
+        String(msg.subtype) === "elicitation"
+      ) {
+        logger.warn({ msg_type: msgType }, "claude_elicitation_message");
       }
     }
 

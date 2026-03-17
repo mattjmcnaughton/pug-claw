@@ -300,6 +300,7 @@ export class DiscordFrontend implements Frontend {
       if (await handleCommand(message)) return;
       if (!("send" in message.channel)) return;
 
+      const channel = message.channel;
       const channelId = message.channelId;
       const driver = resolveDriver(channelId);
 
@@ -339,16 +340,33 @@ export class DiscordFrontend implements Frontend {
 
       const sessionId = channelSessions.get(channelId);
       if (!sessionId) return;
-      await message.channel.sendTyping();
+      await channel.sendTyping();
+
+      const typingInterval = setInterval(() => {
+        channel.sendTyping().catch(() => {});
+      }, 8_000);
 
       let responseText: string;
       try {
-        const response = await driver.query(sessionId, message.content);
+        const toolsSeen = new Set<string>();
+        const response = await driver.query(
+          sessionId,
+          message.content,
+          (event) => {
+            channel.sendTyping().catch(() => {});
+            if (event.type === "tool_use" && !toolsSeen.has(event.tool)) {
+              toolsSeen.add(event.tool);
+              channel.send(`Using ${event.tool}...`).catch(() => {});
+            }
+          },
+        );
         responseText = response.text;
       } catch (err) {
         const error = toError(err);
         logger.error({ err: error, channel_id: channelId }, "query_error");
         responseText = error.message;
+      } finally {
+        clearInterval(typingInterval);
       }
 
       if (!responseText.trim()) {

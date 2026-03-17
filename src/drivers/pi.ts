@@ -12,7 +12,12 @@ import {
 import { logger } from "../logger.ts";
 import { toError } from "../resources.ts";
 import { appendSkillCatalog } from "../skills.ts";
-import type { Driver, DriverOptions, DriverResponse } from "./types.ts";
+import type {
+  Driver,
+  DriverEventCallback,
+  DriverOptions,
+  DriverResponse,
+} from "./types.ts";
 
 interface PiSession {
   session: AgentSession;
@@ -133,7 +138,11 @@ export class PiDriver implements Driver {
     return sessionId;
   }
 
-  async query(sessionId: string, prompt: string): Promise<DriverResponse> {
+  async query(
+    sessionId: string,
+    prompt: string,
+    onEvent?: DriverEventCallback,
+  ): Promise<DriverResponse> {
     const piSession = this.sessions.get(sessionId);
     if (!piSession) {
       throw new Error(`Unknown Pi session: ${sessionId}`);
@@ -147,6 +156,8 @@ export class PiDriver implements Driver {
         event.assistantMessageEvent.type === "text_delta"
       ) {
         responseText += event.assistantMessageEvent.delta;
+      } else if (event.type === "tool_execution_start" && "toolName" in event) {
+        onEvent?.({ type: "tool_use", tool: String(event.toolName) });
       }
     });
 
