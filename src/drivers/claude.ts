@@ -31,7 +31,9 @@ export class ClaudeDriver implements Driver {
 
   private sessions = new Map<string, SessionState>();
 
-  private resolveSessionOptions(options: DriverOptions): ResolvedSessionOptions {
+  private resolveSessionOptions(
+    options: DriverOptions,
+  ): ResolvedSessionOptions {
     const model = options.model ?? this.defaultModel;
     const tools = options.tools ?? ["Read", "Glob", "Grep", "Bash"];
 
@@ -121,6 +123,7 @@ export class ClaudeDriver implements Driver {
     }
 
     let responseText = "";
+    const toolsSeen = new Set<string>();
 
     for await (const msg of query({
       prompt,
@@ -141,6 +144,18 @@ export class ClaudeDriver implements Driver {
         msg.type === "tool_progress" &&
         "tool_name" in msg
       ) {
+        const toolUseId = "tool_use_id" in msg ? String(msg.tool_use_id) : "";
+        if (toolUseId && !toolsSeen.has(toolUseId)) {
+          toolsSeen.add(toolUseId);
+          logger.info(
+            {
+              session_id: sessionId,
+              tool: String(msg.tool_name),
+              tool_use_id: toolUseId,
+            },
+            "claude_tool_call_start",
+          );
+        }
         onEvent?.({ type: "tool_use", tool: String(msg.tool_name) });
       } else if (
         "type" in msg &&
