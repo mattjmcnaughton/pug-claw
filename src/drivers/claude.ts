@@ -22,12 +22,18 @@ export class ClaudeDriver implements Driver {
     const model = options.model ?? this.defaultModel;
     const tools = options.tools ?? ["Read", "Glob", "Grep", "Bash"];
 
-    // If pluginDir is set, skills are injected natively via Claude Code SDK plugins.
-    // Otherwise, fall back to embedding the skill catalog in the system prompt.
-    const systemPrompt =
-      !options.pluginDir && options.skills
-        ? appendSkillCatalog(options.systemPrompt, options.skills)
-        : options.systemPrompt;
+    // Skills are injected differently depending on whether a pluginDir is set.
+    // With pluginDir: skills are loaded natively via Claude Code SDK plugins,
+    // and we append a hint so the agent knows to use them.
+    // Without: fall back to embedding the full skill catalog in the system prompt.
+    let systemPrompt = options.systemPrompt;
+    if (options.pluginDir && options.skills && options.skills.length > 0) {
+      systemPrompt +=
+        "\n\nYou have plugin skills loaded in this session. " +
+        "When a task matches a skill's description, read the skill's SKILL.md for detailed instructions and use it.";
+    } else if (options.skills) {
+      systemPrompt = appendSkillCatalog(options.systemPrompt, options.skills);
+    }
 
     let sessionId: string | undefined;
 
@@ -40,6 +46,7 @@ export class ClaudeDriver implements Driver {
         allowDangerouslySkipPermissions: true,
         model,
         systemPrompt,
+        cwd: options.cwd,
         plugins: options.pluginDir
           ? [{ type: "local" as const, path: options.pluginDir }]
           : undefined,
