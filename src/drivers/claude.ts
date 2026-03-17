@@ -78,11 +78,22 @@ export class ClaudeDriver implements Driver {
       throw new Error(`Unknown Claude session: ${sessionId}`);
     }
 
+    const { options } = session;
+    const model = options.model ?? this.defaultModel;
+    const tools = options.tools ?? ["Read", "Glob", "Grep", "Bash"];
+
     let responseText = "";
 
     for await (const msg of query({
       prompt,
-      options: { resume: sessionId },
+      options: {
+        resume: sessionId,
+        allowedTools: tools,
+        permissionMode: "bypassPermissions" as const,
+        allowDangerouslySkipPermissions: true,
+        model,
+        cwd: options.cwd,
+      },
     })) {
       if ("result" in msg) {
         responseText = msg.result;
