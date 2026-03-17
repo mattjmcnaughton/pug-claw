@@ -96,10 +96,23 @@ export class PiDriver implements Driver {
     const { model, provider } = this.resolveModel(modelStr);
     await this.checkCodexAuth(provider);
 
-    // Append skill catalog to system prompt for Pi (no native plugin support)
-    const systemPrompt = options.skills
+    // Append skill catalog to system prompt for Pi (no native plugin support).
+    // Pi agents have filesystem tools, so we must explicitly instruct them
+    // not to discover skills beyond the ones listed in their catalog.
+    let systemPrompt = options.skills
       ? appendSkillCatalog(options.systemPrompt, options.skills)
       : options.systemPrompt;
+
+    if (options.skills && options.skills.length > 0) {
+      systemPrompt +=
+        "\n\nIMPORTANT: Only use the skills listed above. " +
+        "Do not search the filesystem for additional skills or capabilities beyond what is listed.";
+    } else {
+      systemPrompt +=
+        "\n\nIMPORTANT: You have no skills loaded in this session. " +
+        "Do not search the filesystem for skills or capabilities. " +
+        "Respond using only your built-in knowledge and tools.";
+    }
 
     logger.info({ systemPrompt }, "pi_session_system_prompt");
 
