@@ -8,9 +8,17 @@ import type {
   DriverResponse,
 } from "./types.ts";
 
+interface ResolvedSessionOptions {
+  model: string;
+  tools: string[];
+  systemPrompt: string;
+  cwd?: string;
+  plugins?: { type: "local"; path: string }[];
+}
+
 interface SessionState {
   sessionId: string;
-  options: DriverOptions;
+  resolved: ResolvedSessionOptions;
 }
 
 export class ClaudeDriver implements Driver {
@@ -23,7 +31,7 @@ export class ClaudeDriver implements Driver {
 
   private sessions = new Map<string, SessionState>();
 
-  async createSession(options: DriverOptions): Promise<string> {
+  private resolveSessionOptions(options: DriverOptions): ResolvedSessionOptions {
     const model = options.model ?? this.defaultModel;
     const tools = options.tools ?? ["Read", "Glob", "Grep", "Bash"];
 
@@ -40,24 +48,44 @@ export class ClaudeDriver implements Driver {
       systemPrompt = appendSkillCatalog(options.systemPrompt, options.skills);
     }
 
-    logger.info({ systemPrompt }, "claude_session_system_prompt");
+    return {
+      model,
+      tools,
+      systemPrompt,
+      cwd: options.cwd,
+      plugins: options.pluginDir
+        ? [{ type: "local" as const, path: options.pluginDir }]
+        : undefined,
+    };
+  }
+
+  private buildSdkOptions(resolved: ResolvedSessionOptions, resume?: string) {
+    return {
+      ...(resume ? { resume } : {}),
+      allowedTools: resolved.tools,
+      permissionMode: "bypassPermissions" as const,
+      allowDangerouslySkipPermissions: true,
+      model: resolved.model,
+      systemPrompt: resolved.systemPrompt,
+      cwd: resolved.cwd,
+      plugins: resolved.plugins,
+    };
+  }
+
+  async createSession(options: DriverOptions): Promise<string> {
+    const resolved = this.resolveSessionOptions(options);
+
+    logger.info(
+      { systemPrompt: resolved.systemPrompt },
+      "claude_session_system_prompt",
+    );
 
     let sessionId: string | undefined;
 
     // Send an initial no-op query to establish the session and capture the session ID.
     for await (const msg of query({
       prompt: "Acknowledge you are ready. Respond with only: Ready.",
-      options: {
-        allowedTools: tools,
-        permissionMode: "bypassPermissions" as const,
-        allowDangerouslySkipPermissions: true,
-        model,
-        systemPrompt,
-        cwd: options.cwd,
-        plugins: options.pluginDir
-          ? [{ type: "local" as const, path: options.pluginDir }]
-          : undefined,
-      },
+      options: this.buildSdkOptions(resolved),
     })) {
       if (
         "type" in msg &&
@@ -74,8 +102,11 @@ export class ClaudeDriver implements Driver {
       throw new Error("Failed to obtain Claude session ID");
     }
 
-    this.sessions.set(sessionId, { sessionId, options });
-    logger.info({ session_id: sessionId, model }, "claude_session_created");
+    this.sessions.set(sessionId, { sessionId, resolved });
+    logger.info(
+      { session_id: sessionId, model: resolved.model },
+      "claude_session_created",
+    );
     return sessionId;
   }
 
@@ -89,22 +120,11 @@ export class ClaudeDriver implements Driver {
       throw new Error(`Unknown Claude session: ${sessionId}`);
     }
 
-    const { options } = session;
-    const model = options.model ?? this.defaultModel;
-    const tools = options.tools ?? ["Read", "Glob", "Grep", "Bash"];
-
     let responseText = "";
 
     for await (const msg of query({
       prompt,
-      options: {
-        resume: sessionId,
-        allowedTools: tools,
-        permissionMode: "bypassPermissions" as const,
-        allowDangerouslySkipPermissions: true,
-        model,
-        cwd: options.cwd,
-      },
+      options: this.buildSdkOptions(session.resolved, sessionId),
     })) {
       const msgType =
         "type" in msg
