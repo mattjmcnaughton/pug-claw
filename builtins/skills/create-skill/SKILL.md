@@ -76,7 +76,7 @@ Placed under an agent's `skills/` directory. Always available to that agent rega
 
 ### scripts/
 
-Executable scripts the AI can run via Bash. Use `bun run` for TypeScript, `python` for Python, etc.
+Executable scripts the AI can run via Bash. Use `uvx --with <package> python` for Python scripts with external dependencies, or plain `python` for scripts with no dependencies.
 
 ### references/
 
