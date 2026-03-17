@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
+import { execSync } from "node:child_process";
 import { resolve } from "node:path";
 import { Command } from "commander";
 import { runCheckConfig } from "./commands/check-config.ts";
 import { runInit } from "./commands/init.ts";
 import { runInitService } from "./commands/init-service.ts";
-import { Drivers, EnvVars, Paths } from "./constants.ts";
+import { Drivers, EnvVars, Paths, VERSION } from "./constants.ts";
 import { ClaudeDriver } from "./drivers/claude.ts";
 import { PiDriver } from "./drivers/pi.ts";
 import type { Driver } from "./drivers/types.ts";
@@ -17,6 +18,14 @@ import type { ConfigOptions, ResolvedConfig } from "./resources.ts";
 import { expandTilde, resolveConfig, toError } from "./resources.ts";
 import { resolveAgent } from "./skills.ts";
 
+function getGitCommit(): string {
+  try {
+    return execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
 async function startFrontend(
   frontend: Frontend,
   mode: "discord" | "tui",
@@ -26,6 +35,9 @@ async function startFrontend(
   const rawHome = opts.home ?? process.env[EnvVars.HOME] ?? Paths.DEFAULT_HOME;
   const homeDir = resolve(expandTilde(rawHome));
   configureLogger(mode, homeDir);
+
+  const commit = getGitCommit();
+  logger.info({ version: VERSION, commit }, "pug_claw_starting");
 
   let config: ResolvedConfig;
   try {
@@ -99,7 +111,7 @@ function optsToConfigOptions(
 
 const program = new Command();
 
-program.name("pug-claw").description("AI bot framework").version("0.1.0");
+program.name("pug-claw").description("AI bot framework").version(VERSION);
 
 addSharedOptions(
   program
