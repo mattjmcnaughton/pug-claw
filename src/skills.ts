@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import yaml from "js-yaml";
 import { parseAgentSystemMd } from "./agents.ts";
-import { Paths } from "./constants.ts";
+import { EnvVars, Paths } from "./constants.ts";
 import { logger } from "./logger.ts";
 import { toError } from "./resources.ts";
 
@@ -145,6 +145,17 @@ export function appendSkillCatalog(
     "The following skills are available. When a user's request matches a skill, " +
     "use the Read tool to read the full SKILL.md file at the given path for detailed instructions.\n\n" +
     catalog
+  );
+}
+
+export function buildEnvironmentBlock(): string {
+  return (
+    "\n\n# Environment\n\n" +
+    "The following environment variables are set and available in Bash commands and skill scripts:\n\n" +
+    `- \`${EnvVars.HOME}\` — pug-claw home directory (config, agents, skills, data)\n` +
+    `- \`${EnvVars.DATA_DIR}\` — data directory for persistent storage (databases, files)\n` +
+    `- \`${EnvVars.AGENTS_DIR}\` — agents directory\n` +
+    `- \`${EnvVars.SKILLS_DIR}\` — global skills directory\n`
   );
 }
 

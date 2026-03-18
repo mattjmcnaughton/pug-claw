@@ -11,7 +11,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { logger } from "../logger.ts";
 import { toError } from "../resources.ts";
-import { appendSkillCatalog } from "../skills.ts";
+import { appendSkillCatalog, buildEnvironmentBlock } from "../skills.ts";
 import type {
   Driver,
   DriverEventCallback,
@@ -113,6 +113,8 @@ export class PiDriver implements Driver {
         "Do not search the filesystem for skills or capabilities. " +
         "Respond using only your built-in knowledge and tools.";
     }
+
+    systemPrompt += buildEnvironmentBlock();
 
     logger.info({ systemPrompt }, "pi_session_system_prompt");
 
