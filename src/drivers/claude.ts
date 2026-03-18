@@ -1,6 +1,6 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { logger } from "../logger.ts";
-import { appendSkillCatalog } from "../skills.ts";
+import { appendSkillCatalog, buildEnvironmentBlock } from "../skills.ts";
 import type {
   Driver,
   DriverEventCallback,
@@ -49,6 +49,8 @@ export class ClaudeDriver implements Driver {
     } else if (options.skills) {
       systemPrompt = appendSkillCatalog(options.systemPrompt, options.skills);
     }
+
+    systemPrompt += buildEnvironmentBlock();
 
     return {
       model,
