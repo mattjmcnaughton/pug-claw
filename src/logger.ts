@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import pino from "pino";
-import { EnvVars, Paths } from "./constants.ts";
+import { EnvVars, Frontends, type FrontendName, Paths } from "./constants.ts";
 
 export type Logger = pino.Logger;
 
@@ -21,10 +21,7 @@ export const logger: Logger = new Proxy({} as Logger, {
   },
 });
 
-export function configureLogger(
-  mode: "discord" | "tui",
-  logsDir: string,
-): void {
+export function configureLogger(mode: FrontendName, logsDir: string): void {
   const systemLogDir = resolve(logsDir, Paths.SYSTEM_LOG_DIR);
   mkdirSync(systemLogDir, { recursive: true });
 
@@ -32,7 +29,7 @@ export function configureLogger(
   const fileStream = pino.destination(logFile);
   const level = process.env[EnvVars.LOG_LEVEL] ?? "info";
 
-  if (mode === "discord") {
+  if (mode === Frontends.DISCORD) {
     const stdoutStream = pino.destination(1);
     _backing = pino(
       { level },

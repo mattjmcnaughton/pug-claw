@@ -1,6 +1,7 @@
+import type { FrontendName } from "../constants.ts";
 import type { SkillSummary } from "../skills.ts";
 
-export type ChatCommandFrontend = "discord" | "tui";
+export type ChatCommandFrontend = FrontendName;
 export type ChatCommandAction = "quit" | "restart";
 
 export interface ChatCommandResult {

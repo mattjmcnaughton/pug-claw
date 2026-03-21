@@ -32,6 +32,15 @@ export const Drivers = {
   PI: "pi",
 } as const;
 
+export type DriverName = (typeof Drivers)[keyof typeof Drivers];
+
+export const Frontends = {
+  DISCORD: "discord",
+  TUI: "tui",
+} as const;
+
+export type FrontendName = (typeof Frontends)[keyof typeof Frontends];
+
 export const Defaults = {
   AGENT: "default",
   DRIVER: "claude",

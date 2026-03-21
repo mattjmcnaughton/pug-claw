@@ -5,7 +5,14 @@ import { Command } from "commander";
 import { runCheckConfig } from "./commands/check-config.ts";
 import { runInit } from "./commands/init.ts";
 import { runInitService } from "./commands/init-service.ts";
-import { Drivers, EnvVars, Paths, VERSION } from "./constants.ts";
+import {
+  Drivers,
+  EnvVars,
+  Frontends,
+  type FrontendName,
+  Paths,
+  VERSION,
+} from "./constants.ts";
 import { ClaudeDriver } from "./drivers/claude.ts";
 import { PiDriver } from "./drivers/pi.ts";
 import type { Driver } from "./drivers/types.ts";
@@ -33,7 +40,7 @@ function getGitCommit(): string {
 
 async function startFrontend(
   frontend: Frontend,
-  mode: "discord" | "tui",
+  mode: FrontendName,
   opts: ConfigOptions,
 ): Promise<void> {
   // Resolve homeDir early for logging setup
@@ -60,7 +67,7 @@ async function startFrontend(
   process.env[EnvVars.SKILLS_DIR] = config.skillsDir;
   process.env[EnvVars.LOGS_DIR] = config.logsDir;
 
-  const piDefaultModel = config.drivers.pi?.defaultModel;
+  const piDefaultModel = config.drivers[Drivers.PI]?.defaultModel;
 
   const drivers: Record<string, Driver> = {
     [Drivers.CLAUDE]: new ClaudeDriver(),
@@ -133,7 +140,7 @@ addSharedOptions(
     .action(async (opts) => {
       await startFrontend(
         new DiscordFrontend(),
-        "discord",
+        Frontends.DISCORD,
         optsToConfigOptions(opts),
       );
     }),
@@ -144,7 +151,11 @@ addSharedOptions(
     .command("tui")
     .description("Start with TUI frontend")
     .action(async (opts) => {
-      await startFrontend(new TuiFrontend(), "tui", optsToConfigOptions(opts));
+      await startFrontend(
+        new TuiFrontend(),
+        Frontends.TUI,
+        optsToConfigOptions(opts),
+      );
     }),
 );
 
