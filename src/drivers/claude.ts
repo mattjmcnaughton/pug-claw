@@ -8,7 +8,7 @@ import type {
   DriverResponse,
 } from "./types.ts";
 
-interface ResolvedSessionOptions {
+export interface ResolvedSessionOptions {
   model: string;
   tools: string[];
   systemPrompt: string;
@@ -21,87 +21,156 @@ interface SessionState {
   resolved: ResolvedSessionOptions;
 }
 
+const DEFAULT_MODEL = "claude-sonnet-4-6";
+const DEFAULT_TOOLS = ["Read", "Glob", "Grep", "Bash"];
+
+export function resolveClaudeSessionOptions(
+  options: DriverOptions,
+  defaultModel = DEFAULT_MODEL,
+): ResolvedSessionOptions {
+  const model = options.model ?? defaultModel;
+  const tools = options.tools ?? DEFAULT_TOOLS;
+
+  // Skills are injected differently depending on whether a pluginDir is set.
+  // With pluginDir: skills are loaded natively via Claude Code SDK plugins,
+  // and we append a hint so the agent knows to use them.
+  // Without: fall back to embedding the full skill catalog in the system prompt.
+  let systemPrompt = options.systemPrompt;
+  if (options.pluginDir && options.skills && options.skills.length > 0) {
+    systemPrompt +=
+      "\n\nYou have plugin skills loaded in this session. " +
+      "When a task matches a skill's description, read the skill's SKILL.md for detailed instructions and use it.";
+  } else if (options.skills) {
+    systemPrompt = appendSkillCatalog(options.systemPrompt, options.skills);
+  }
+
+  systemPrompt += buildEnvironmentBlock();
+
+  return {
+    model,
+    tools,
+    systemPrompt,
+    cwd: options.cwd,
+    plugins: options.pluginDir
+      ? [{ type: "local" as const, path: options.pluginDir }]
+      : undefined,
+  };
+}
+
+export function buildClaudeSdkOptions(
+  resolved: ResolvedSessionOptions,
+  resume?: string,
+) {
+  return {
+    ...(resume ? { resume } : {}),
+    allowedTools: resolved.tools,
+    permissionMode: "bypassPermissions" as const,
+    allowDangerouslySkipPermissions: true,
+    model: resolved.model,
+    systemPrompt: resolved.systemPrompt,
+    cwd: resolved.cwd,
+    plugins: resolved.plugins,
+  };
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: Claude SDK message types are untyped
+type SdkMessage = any;
+
+export interface ClaudeEventResult {
+  text: string;
+  sessionId?: string;
+}
+
+export async function processClaudeEvents(
+  messages: AsyncIterable<SdkMessage>,
+  sessionId: string,
+  onEvent?: DriverEventCallback,
+): Promise<ClaudeEventResult> {
+  let responseText = "";
+  let extractedSessionId: string | undefined;
+  const toolsSeen = new Set<string>();
+
+  for await (const msg of messages) {
+    const msgType =
+      "type" in msg ? String(msg.type) : "result" in msg ? "result" : "unknown";
+    logger.debug({ msg_type: msgType }, "claude_sdk_message");
+
+    if ("result" in msg) {
+      responseText = msg.result;
+    } else if (
+      "type" in msg &&
+      msg.type === "system" &&
+      "subtype" in msg &&
+      msg.subtype === "init" &&
+      "session_id" in msg
+    ) {
+      extractedSessionId = msg.session_id as string;
+    } else if (
+      "type" in msg &&
+      msg.type === "tool_progress" &&
+      "tool_name" in msg
+    ) {
+      const toolUseId = "tool_use_id" in msg ? String(msg.tool_use_id) : "";
+      if (toolUseId && !toolsSeen.has(toolUseId)) {
+        toolsSeen.add(toolUseId);
+        logger.info(
+          {
+            session_id: sessionId,
+            tool: String(msg.tool_name),
+            tool_use_id: toolUseId,
+          },
+          "claude_tool_call_start",
+        );
+      }
+      onEvent?.({ type: "tool_use", tool: String(msg.tool_name) });
+    } else if (
+      "type" in msg &&
+      msg.type === "system" &&
+      "subtype" in msg &&
+      msg.subtype === "status" &&
+      "status" in msg
+    ) {
+      onEvent?.({ type: "status", message: String(msg.status) });
+    } else if (
+      "type" in msg &&
+      msg.type === "system" &&
+      "subtype" in msg &&
+      String(msg.subtype) === "elicitation"
+    ) {
+      logger.warn({ msg_type: msgType }, "claude_elicitation_message");
+    }
+  }
+
+  return { text: responseText, sessionId: extractedSessionId };
+}
+
 export class ClaudeDriver implements Driver {
   readonly name = "claude";
   readonly availableModels: Record<string, string> = {
     sonnet: "claude-sonnet-4-6",
     opus: "claude-opus-4-6",
   };
-  readonly defaultModel = "claude-sonnet-4-6";
+  readonly defaultModel = DEFAULT_MODEL;
 
   private sessions = new Map<string, SessionState>();
 
-  private resolveSessionOptions(
-    options: DriverOptions,
-  ): ResolvedSessionOptions {
-    const model = options.model ?? this.defaultModel;
-    const tools = options.tools ?? ["Read", "Glob", "Grep", "Bash"];
-
-    // Skills are injected differently depending on whether a pluginDir is set.
-    // With pluginDir: skills are loaded natively via Claude Code SDK plugins,
-    // and we append a hint so the agent knows to use them.
-    // Without: fall back to embedding the full skill catalog in the system prompt.
-    let systemPrompt = options.systemPrompt;
-    if (options.pluginDir && options.skills && options.skills.length > 0) {
-      systemPrompt +=
-        "\n\nYou have plugin skills loaded in this session. " +
-        "When a task matches a skill's description, read the skill's SKILL.md for detailed instructions and use it.";
-    } else if (options.skills) {
-      systemPrompt = appendSkillCatalog(options.systemPrompt, options.skills);
-    }
-
-    systemPrompt += buildEnvironmentBlock();
-
-    return {
-      model,
-      tools,
-      systemPrompt,
-      cwd: options.cwd,
-      plugins: options.pluginDir
-        ? [{ type: "local" as const, path: options.pluginDir }]
-        : undefined,
-    };
-  }
-
-  private buildSdkOptions(resolved: ResolvedSessionOptions, resume?: string) {
-    return {
-      ...(resume ? { resume } : {}),
-      allowedTools: resolved.tools,
-      permissionMode: "bypassPermissions" as const,
-      allowDangerouslySkipPermissions: true,
-      model: resolved.model,
-      systemPrompt: resolved.systemPrompt,
-      cwd: resolved.cwd,
-      plugins: resolved.plugins,
-    };
-  }
-
   async createSession(options: DriverOptions): Promise<string> {
-    const resolved = this.resolveSessionOptions(options);
+    const resolved = resolveClaudeSessionOptions(options, this.defaultModel);
 
     logger.info(
       { systemPrompt: resolved.systemPrompt },
       "claude_session_system_prompt",
     );
 
-    let sessionId: string | undefined;
+    const result = await processClaudeEvents(
+      query({
+        prompt: "Acknowledge you are ready. Respond with only: Ready.",
+        options: buildClaudeSdkOptions(resolved),
+      }),
+      "",
+    );
 
-    // Send an initial no-op query to establish the session and capture the session ID.
-    for await (const msg of query({
-      prompt: "Acknowledge you are ready. Respond with only: Ready.",
-      options: this.buildSdkOptions(resolved),
-    })) {
-      if (
-        "type" in msg &&
-        msg.type === "system" &&
-        "subtype" in msg &&
-        msg.subtype === "init" &&
-        "session_id" in msg
-      ) {
-        sessionId = msg.session_id as string;
-      }
-    }
-
+    const sessionId = result.sessionId;
     if (!sessionId) {
       throw new Error("Failed to obtain Claude session ID");
     }
@@ -124,60 +193,16 @@ export class ClaudeDriver implements Driver {
       throw new Error(`Unknown Claude session: ${sessionId}`);
     }
 
-    let responseText = "";
-    const toolsSeen = new Set<string>();
+    const result = await processClaudeEvents(
+      query({
+        prompt,
+        options: buildClaudeSdkOptions(session.resolved, sessionId),
+      }),
+      sessionId,
+      onEvent,
+    );
 
-    for await (const msg of query({
-      prompt,
-      options: this.buildSdkOptions(session.resolved, sessionId),
-    })) {
-      const msgType =
-        "type" in msg
-          ? String(msg.type)
-          : "result" in msg
-            ? "result"
-            : "unknown";
-      logger.debug({ msg_type: msgType }, "claude_sdk_message");
-
-      if ("result" in msg) {
-        responseText = msg.result;
-      } else if (
-        "type" in msg &&
-        msg.type === "tool_progress" &&
-        "tool_name" in msg
-      ) {
-        const toolUseId = "tool_use_id" in msg ? String(msg.tool_use_id) : "";
-        if (toolUseId && !toolsSeen.has(toolUseId)) {
-          toolsSeen.add(toolUseId);
-          logger.info(
-            {
-              session_id: sessionId,
-              tool: String(msg.tool_name),
-              tool_use_id: toolUseId,
-            },
-            "claude_tool_call_start",
-          );
-        }
-        onEvent?.({ type: "tool_use", tool: String(msg.tool_name) });
-      } else if (
-        "type" in msg &&
-        msg.type === "system" &&
-        "subtype" in msg &&
-        msg.subtype === "status" &&
-        "status" in msg
-      ) {
-        onEvent?.({ type: "status", message: String(msg.status) });
-      } else if (
-        "type" in msg &&
-        msg.type === "system" &&
-        "subtype" in msg &&
-        String(msg.subtype) === "elicitation"
-      ) {
-        logger.warn({ msg_type: msgType }, "claude_elicitation_message");
-      }
-    }
-
-    return { text: responseText, sessionId };
+    return { text: result.text, sessionId };
   }
 
   async destroySession(sessionId: string): Promise<void> {
