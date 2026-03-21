@@ -93,6 +93,20 @@ export class ChatCommandRegistry {
     return `${env.commandPrefix}${path.join(" ")}`;
   }
 
+  listVisibleCommands(
+    env: ChatCommandEnvironment,
+    path: string[] = [],
+  ): Array<{ name: string; description: string }> {
+    const node = path.length === 0 ? this.root : this.findNode(path, env);
+    if (!node) {
+      return [];
+    }
+    return this.visibleChildren(node, env).map((child) => ({
+      name: child.name,
+      description: child.description,
+    }));
+  }
+
   findNode(
     path: string[],
     env?: ChatCommandEnvironment,
