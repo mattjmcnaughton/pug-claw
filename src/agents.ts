@@ -1,9 +1,21 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import yaml from "js-yaml";
+import { z } from "zod";
 import { Paths } from "./constants.ts";
 import { logger } from "./logger.ts";
 import { toError } from "./resources.ts";
+
+const AgentFrontmatterSchema = z
+  .object({
+    name: z.unknown().optional(),
+    description: z.unknown().optional(),
+    driver: z.unknown().optional(),
+    model: z.unknown().optional(),
+    "allowed-skills": z.array(z.unknown()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })
+  .passthrough();
 
 export interface AgentMeta {
   name?: string;
@@ -52,11 +64,12 @@ export function parseAgentSystemMd(agentDir: string): ParsedAgent {
     return { meta: {}, systemPrompt: text };
   }
 
-  if (typeof rawMeta !== "object" || rawMeta === null) {
+  const parsed = AgentFrontmatterSchema.safeParse(rawMeta);
+  if (!parsed.success) {
     return { meta: {}, systemPrompt: text };
   }
 
-  const record = rawMeta as Record<string, unknown>;
+  const record = parsed.data;
   const meta: AgentMeta = {};
 
   if (typeof record.name === "string") {
@@ -73,16 +86,14 @@ export function parseAgentSystemMd(agentDir: string): ParsedAgent {
   }
   if (Array.isArray(record["allowed-skills"])) {
     meta.allowedSkills = record["allowed-skills"].filter(
-      (s): s is string => typeof s === "string",
+      (skill): skill is string => typeof skill === "string",
     );
   }
-  if (typeof record.metadata === "object" && record.metadata !== null) {
-    meta.metadata = {} as Record<string, string>;
-    for (const [k, v] of Object.entries(
-      record.metadata as Record<string, unknown>,
-    )) {
-      if (typeof v === "string") {
-        meta.metadata[k] = v;
+  if (record.metadata) {
+    meta.metadata = {};
+    for (const [key, value] of Object.entries(record.metadata)) {
+      if (typeof value === "string") {
+        meta.metadata[key] = value;
       }
     }
   }

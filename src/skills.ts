@@ -1,10 +1,18 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import yaml from "js-yaml";
+import { z } from "zod";
 import { parseAgentSystemMd } from "./agents.ts";
 import { EnvVars, Paths } from "./constants.ts";
 import { logger } from "./logger.ts";
 import { toError } from "./resources.ts";
+
+const SkillFrontmatterSchema = z
+  .object({
+    name: z.unknown().optional(),
+    description: z.unknown().optional(),
+  })
+  .passthrough();
 
 export interface SkillSummary {
   name: string;
@@ -27,27 +35,26 @@ export function parseSkillFrontmatter(filePath: string): SkillSummary | null {
     return null;
   }
 
-  let meta: unknown;
+  let rawMeta: unknown;
   try {
     const frontmatter = parts[1];
     if (frontmatter === undefined) {
       logger.warn({ path: filePath }, "skill_no_frontmatter");
       return null;
     }
-    meta = yaml.load(frontmatter);
+    rawMeta = yaml.load(frontmatter);
   } catch (err) {
     logger.warn({ err: toError(err), path: filePath }, "skill_yaml_error");
     return null;
   }
 
-  if (typeof meta !== "object" || meta === null) {
+  const parsed = SkillFrontmatterSchema.safeParse(rawMeta);
+  if (!parsed.success) {
     logger.warn({ path: filePath }, "skill_invalid_frontmatter");
     return null;
   }
 
-  const record = meta as Record<string, unknown>;
-  const name = record.name;
-  const description = record.description;
+  const { name, description } = parsed.data;
   if (typeof name !== "string" || typeof description !== "string") {
     logger.warn(
       {
