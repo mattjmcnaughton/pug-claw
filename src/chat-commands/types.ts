@@ -35,7 +35,7 @@ export interface ChatCommandHandler {
 }
 
 export interface ChatCommandActions {
-  reload(): Promise<string | void>;
+  reload(): Promise<string | undefined>;
   listSchedules?(): Promise<string[]>;
   runSchedule?(name: string): Promise<string>;
 }

@@ -166,6 +166,7 @@ export class TuiFrontend implements Frontend {
                   pluginDirs = reloaded.pluginDirs;
                   await channelHandler.reload(config, pluginDirs, resolveAgent);
                   logger.info({}, "tui_command_reload");
+                  return undefined;
                 },
               },
             },

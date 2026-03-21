@@ -261,7 +261,9 @@ export function createChatCommandTree(): ChatCommandNode {
             execute: async (ctx, args) => {
               const scheduleName = args.join(" ").trim();
               if (!scheduleName) {
-                return text(`Usage: \`${ctx.commandPrefix}schedule run <name>\``);
+                return text(
+                  `Usage: \`${ctx.commandPrefix}schedule run <name>\``,
+                );
               }
               const runSchedule = ctx.actions.runSchedule;
               if (!runSchedule) {

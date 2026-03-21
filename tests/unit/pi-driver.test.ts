@@ -34,8 +34,8 @@ describe("parsePiModelString", () => {
 describe("PiDriver model alias resolution", () => {
   test("availableModels contains expected aliases", async () => {
     const driver = await PiDriver.create();
-    expect(driver.availableModels["gpt"]).toBe("openai-codex/gpt-5.4");
-    expect(driver.availableModels["minimax"]).toBe(
+    expect(driver.availableModels.gpt).toBe("openai-codex/gpt-5.4");
+    expect(driver.availableModels.minimax).toBe(
       "openrouter/minimax/minimax-m2.5",
     );
   });
