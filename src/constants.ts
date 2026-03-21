@@ -53,6 +53,14 @@ export const SecretsProviders = {
   DOTENV: "dotenv",
 } as const;
 
+export const FrontmatterMetadata = {
+  MANAGED_BY: "managed-by",
+} as const;
+
+export const ManagedBy = {
+  PUG_CLAW: "pug-claw",
+} as const;
+
 export const Limits = {
   DISCORD_MESSAGE_LENGTH: 2000,
 } as const;
