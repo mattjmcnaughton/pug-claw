@@ -37,7 +37,7 @@ function makeEnv(
     isOwner: true,
     handler: noopHandler,
     actions: {
-      reload: async () => {},
+      reload: async () => undefined,
     },
     ...overrides,
   };

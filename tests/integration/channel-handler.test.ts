@@ -101,7 +101,7 @@ function makeCommandEnv(
     isOwner: true,
     handler,
     actions: {
-      reload: async () => {},
+      reload: async () => undefined,
     },
     ...overrides,
   };
@@ -385,6 +385,7 @@ describe("chat commands", () => {
       actions: {
         reload: async () => {
           reloaded = true;
+          return undefined;
         },
       },
     });
