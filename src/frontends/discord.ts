@@ -1,5 +1,7 @@
 import { Client, GatewayIntentBits, type Message } from "discord.js";
 import { ChannelHandler } from "../channel-handler.ts";
+import { ChatCommandRegistry } from "../chat-commands/registry.ts";
+import { createChatCommandTree } from "../chat-commands/tree.ts";
 import { toError } from "../resources.ts";
 import { DiscordSchedulerOutputSink } from "../scheduler/discord-output.ts";
 import { chunkMessage } from "../scheduler/output.ts";
@@ -112,8 +114,8 @@ export class DiscordFrontend implements Frontend {
       pluginDirs,
       resolveAgent,
       logger,
-      "!",
     );
+    const commandRegistry = new ChatCommandRegistry(createChatCommandTree());
 
     const outputSink = new DiscordSchedulerOutputSink(client);
     let schedulerRuntime: SchedulerRuntime | undefined;
@@ -157,143 +159,88 @@ export class DiscordFrontend implements Frontend {
       schedulerRuntime.reload(config, pluginDirs, resolveAgent);
     }
 
-    async function handleSchedulesCommand(message: Message): Promise<boolean> {
-      const channel = message.channel as SendableChannel;
-      if (message.author.id !== config.discord?.ownerId) {
-        await channel.send("Only the bot owner can use this command.");
-        return true;
-      }
-
-      const timezone = config.scheduler?.timezone ?? "UTC";
-      const summaries = schedulerRuntime?.listSchedules() ?? [];
-      const messages = formatSchedulesMessages(
-        summaries,
-        timezone,
-        schedulerRuntime ? schedulerRuntime.isActive() : true,
-      );
-      for (const text of messages) {
-        await sendText(channel, text);
-      }
-      return true;
-    }
-
-    async function handleScheduleCommand(
-      message: Message,
-      arg: string,
-    ): Promise<boolean> {
-      const channel = message.channel as SendableChannel;
-      if (message.author.id !== config.discord?.ownerId) {
-        await channel.send("Only the bot owner can use this command.");
-        return true;
-      }
-
-      const parts = arg.split(/\s+/, 2);
-      const subcommand = parts[0]?.toLowerCase() ?? "";
-      const scheduleName = parts[1]?.trim() ?? "";
-
-      if (subcommand !== "run" || !scheduleName) {
-        await channel.send("Usage: `!schedule run <name>`");
-        return true;
-      }
-
-      if (!schedulerRuntime) {
-        await channel.send(`Unknown schedule "${scheduleName}".`);
-        return true;
-      }
-
-      const result = schedulerRuntime.runSchedule(scheduleName);
-      if (!result.ok) {
-        if (result.reason === "inactive") {
-          await channel.send("Scheduler is not active on this instance.");
-          return true;
-        }
-        if (result.reason === "already_running") {
-          await channel.send(`Schedule "${scheduleName}" is already running.`);
-          return true;
-        }
-        await channel.send(`Unknown schedule "${scheduleName}".`);
-        return true;
-      }
-
-      await channel.send(
-        `Triggered schedule "${scheduleName}". run_id: ${result.runId}`,
-      );
-      return true;
-    }
-
     async function handleCommand(message: Message): Promise<boolean> {
       const content = message.content.trim();
       if (!content.startsWith("!")) return false;
       if (!("send" in message.channel)) return false;
 
       const channel = message.channel as SendableChannel;
-      const spaceIdx = content.indexOf(" ");
-      const cmd = (
-        spaceIdx === -1 ? content.slice(1) : content.slice(1, spaceIdx)
-      ).toLowerCase();
-      const arg = spaceIdx === -1 ? "" : content.slice(spaceIdx + 1).trim();
       const channelId = message.channelId;
+      const raw = content.slice(1).trim();
+      const isOwner = message.author.id === config.discord?.ownerId;
 
-      if (cmd === "restart") {
-        if (message.author.id !== config.discord?.ownerId) {
-          await channel.send("Only the bot owner can use this command.");
+      try {
+        const result = await commandRegistry.execute(
+          {
+            channelId,
+            commandPrefix: "!",
+            frontend: "discord",
+            isOwner,
+            handler: channelHandler,
+            actions: {
+              reload: async () => {
+                const reloaded = await ctx.reloadConfig();
+                config = reloaded.config;
+                resolveAgent = reloaded.resolveAgent;
+                pluginDirs = reloaded.pluginDirs;
+                await channelHandler.reload(config, pluginDirs, resolveAgent);
+                syncSchedulerRuntime();
+                logger.info({ channel_id: channelId }, "command_reload");
+                return "Config, agents, skills, and schedules reloaded. All sessions reset.";
+              },
+              listSchedules: async () => {
+                const timezone = config.scheduler?.timezone ?? "UTC";
+                const summaries = schedulerRuntime?.listSchedules() ?? [];
+                return formatSchedulesMessages(
+                  summaries,
+                  timezone,
+                  schedulerRuntime ? schedulerRuntime.isActive() : true,
+                );
+              },
+              runSchedule: async (scheduleName: string) => {
+                if (!schedulerRuntime) {
+                  return `Unknown schedule "${scheduleName}".`;
+                }
+
+                const result = schedulerRuntime.runSchedule(scheduleName);
+                if (!result.ok) {
+                  if (result.reason === "inactive") {
+                    return "Scheduler is not active on this instance.";
+                  }
+                  if (result.reason === "already_running") {
+                    return `Schedule "${scheduleName}" is already running.`;
+                  }
+                  return `Unknown schedule "${scheduleName}".`;
+                }
+
+                return `Triggered schedule "${scheduleName}". run_id: ${result.runId}`;
+              },
+            },
+          },
+          raw,
+        );
+
+        if (result === null) {
+          await channel.send(`Unknown command: \`!${raw}\``);
           return true;
         }
-        logger.info({ channel_id: channelId }, "command_restart");
-        await channel.send("Restarting...");
-        process.exit(1);
-      }
 
-      if (cmd === "reload") {
-        if (message.author.id !== config.discord?.ownerId) {
-          await channel.send("Only the bot owner can use this command.");
-          return true;
+        const messages = result.messages ?? [result.message];
+        for (const text of messages) {
+          await sendText(channel, text);
         }
-        try {
-          const reloaded = await ctx.reloadConfig();
-          config = reloaded.config;
-          resolveAgent = reloaded.resolveAgent;
-          pluginDirs = reloaded.pluginDirs;
-          await channelHandler.reload(config, pluginDirs, resolveAgent);
-          syncSchedulerRuntime();
-          await channel.send(
-            "Config, agents, skills, and schedules reloaded. All sessions reset.",
-          );
-          logger.info({ channel_id: channelId }, "command_reload");
-        } catch (err) {
-          const error = toError(err);
-          logger.error({ err: error }, "reload_error");
-          await channel.send(`Reload failed: ${error.message}`);
+
+        if (result.action === "restart") {
+          logger.info({ channel_id: channelId }, "command_restart");
+          process.exit(1);
         }
         return true;
-      }
-
-      if (cmd === "schedules") {
-        return handleSchedulesCommand(message);
-      }
-
-      if (cmd === "schedule") {
-        return handleScheduleCommand(message, arg);
-      }
-
-      const result = await channelHandler.handleCommand(channelId, cmd, arg);
-      if (result !== null) {
-        if (cmd === "help") {
-          await channel.send(
-            result +
-              "\n" +
-              "`!schedules` — List configured schedules (owner only)\n" +
-              "`!schedule run <name>` — Manually run a schedule (owner only)\n" +
-              "`!reload` — Reload config, agents, skills, and schedules from disk\n" +
-              "`!restart` — Restart the process (requires systemd)",
-          );
-        } else {
-          await channel.send(result);
-        }
+      } catch (err) {
+        const error = toError(err);
+        logger.error({ err: error }, "command_error");
+        await channel.send(`Command failed: ${error.message}`);
         return true;
       }
-
-      return false;
     }
 
     client.on("ready", () => {

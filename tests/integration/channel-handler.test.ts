@@ -1,9 +1,16 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ChannelHandler } from "../../src/channel-handler.ts";
+import { Paths } from "../../src/constants.ts";
 import type { Logger } from "../../src/logger.ts";
+import { ChatCommandRegistry } from "../../src/chat-commands/registry.ts";
+import { createChatCommandTree } from "../../src/chat-commands/tree.ts";
+import type {
+  ChatCommandEnvironment,
+  ChatCommandResult,
+} from "../../src/chat-commands/types.ts";
 import type { ResolvedConfig } from "../../src/resources.ts";
 import type { ResolvedAgent } from "../../src/skills.ts";
 import { FakeDriver } from "../fakes/fake-driver.ts";
@@ -79,9 +86,34 @@ function makeHandler(
     new Map(),
     makeResolveAgent(resolveAgentOverrides),
     noopLogger,
-    "!",
   );
   return { handler, driver: d };
+}
+
+function makeCommandEnv(
+  handler: ChannelHandler,
+  overrides?: Partial<ChatCommandEnvironment>,
+): ChatCommandEnvironment {
+  return {
+    channelId: "chan-1",
+    commandPrefix: "!",
+    frontend: "discord",
+    isOwner: true,
+    handler,
+    actions: {
+      reload: async () => {},
+    },
+    ...overrides,
+  };
+}
+
+async function runCommand(
+  handler: ChannelHandler,
+  raw: string,
+  overrides?: Partial<ChatCommandEnvironment>,
+): Promise<ChatCommandResult | null> {
+  const registry = new ChatCommandRegistry(createChatCommandTree());
+  return registry.execute(makeCommandEnv(handler, overrides), raw);
 }
 
 // --- Tests ---
@@ -208,25 +240,16 @@ describe("resolution", () => {
   });
 });
 
-describe("handleCommand", () => {
-  test("!new destroys session and returns message", async () => {
-    const { handler, driver } = makeHandler();
-    await handler.ensureSession("chan-1");
-
-    const result = await handler.handleCommand("chan-1", "new", "");
-    expect(result).toContain("Session reset");
-    expect(driver.activeSessionCount).toBe(0);
-  });
-
-  test("!driver with no arg shows current driver", async () => {
+describe("chat commands", () => {
+  test("!driver show shows current driver", async () => {
     const { handler } = makeHandler();
-    const result = await handler.handleCommand("chan-1", "driver", "");
+    const result = await runCommand(handler, "driver show");
 
-    expect(result).toContain("Current driver:");
-    expect(result).toContain("`fake`");
+    expect(result?.message).toContain("Current driver:");
+    expect(result?.message).toContain("`fake`");
   });
 
-  test("!driver with valid arg switches driver", async () => {
+  test("!driver set switches driver", async () => {
     const alt = new FakeDriver({ name: "alt" });
     const config = makeConfig();
     const handler = new ChannelHandler(
@@ -235,101 +258,194 @@ describe("handleCommand", () => {
       new Map(),
       makeResolveAgent(),
       noopLogger,
-      "!",
     );
 
-    const result = await handler.handleCommand("chan-1", "driver", "alt");
-    expect(result).toContain("Driver switched to `alt`");
+    const result = await runCommand(handler, "driver set alt");
+    expect(result?.message).toContain("Driver switched to `alt`");
     expect(handler.resolveDriverName("chan-1")).toBe("alt");
   });
 
-  test("!driver with invalid arg returns error", async () => {
-    const { handler } = makeHandler();
-    const result = await handler.handleCommand("chan-1", "driver", "nope");
+  test("legacy !driver alt form is no longer supported", async () => {
+    const alt = new FakeDriver({ name: "alt" });
+    const config = makeConfig();
+    const handler = new ChannelHandler(
+      { fake: new FakeDriver(), alt },
+      config,
+      new Map(),
+      makeResolveAgent(),
+      noopLogger,
+    );
 
-    expect(result).toContain("Unknown driver");
+    const result = await runCommand(handler, "driver alt");
+    expect(result?.message).toBe("Unknown command `!driver alt`.");
+    expect(handler.resolveDriverName("chan-1")).toBe("fake");
   });
 
-  test("!model with no arg shows current model", async () => {
+  test("!driver set with invalid arg returns error", async () => {
     const { handler } = makeHandler();
-    const result = await handler.handleCommand("chan-1", "model", "");
+    const result = await runCommand(handler, "driver set nope");
 
-    expect(result).toContain("Current model:");
-    expect(result).toContain("`fake-model`");
+    expect(result?.message).toContain("Unknown driver");
   });
 
-  test("!model with arg switches model and resets session", async () => {
+  test("!model show shows current model", async () => {
+    const { handler } = makeHandler();
+    const result = await runCommand(handler, "model show");
+
+    expect(result?.message).toContain("Current model:");
+    expect(result?.message).toContain("`fake-model`");
+  });
+
+  test("!model set switches model and resets session", async () => {
     const { handler, driver } = makeHandler();
     await handler.ensureSession("chan-1");
 
-    const result = await handler.handleCommand("chan-1", "model", "gpt-5");
-    expect(result).toContain("Model switched to `gpt-5`");
+    const result = await runCommand(handler, "model set gpt-5");
+    expect(result?.message).toContain("Model switched to `gpt-5`");
     expect(driver.activeSessionCount).toBe(0);
     expect(handler.resolveModelName("chan-1")).toBe("gpt-5");
   });
 
-  test("!agent with no arg shows current agent", async () => {
+  test("!agent show shows current agent", async () => {
     const { handler } = makeHandler();
-    const result = await handler.handleCommand("chan-1", "agent", "");
+    const result = await runCommand(handler, "agent show");
 
-    expect(result).toContain("Current agent:");
-    expect(result).toContain("`default`");
+    expect(result?.message).toContain("Current agent:");
+    expect(result?.message).toContain("`default`");
   });
 
-  test("!agent with valid arg switches agent", async () => {
+  test("!agent set switches agent", async () => {
     createAgentDir("other");
     const { handler } = makeHandler();
 
-    const result = await handler.handleCommand("chan-1", "agent", "other");
-    expect(result).toContain("Agent switched to `other`");
+    const result = await runCommand(handler, "agent set other");
+    expect(result?.message).toContain("Agent switched to `other`");
     expect(handler.resolveAgentName("chan-1")).toBe("other");
   });
 
-  test("!agent with invalid arg returns error", async () => {
+  test("!agent set with invalid arg returns error", async () => {
     const { handler } = makeHandler();
-    const result = await handler.handleCommand(
-      "chan-1",
-      "agent",
-      "nonexistent",
+    const result = await runCommand(handler, "agent set nonexistent");
+
+    expect(result?.message).toContain("Unknown agent");
+  });
+
+  test("!agent skills lists current agent skills", async () => {
+    const skillDir = resolve(
+      tmpDir,
+      "agents",
+      "default",
+      "skills",
+      "local-skill",
     );
-
-    expect(result).toContain("Unknown agent");
-  });
-
-  test("!status returns driver, agent, model, session state", async () => {
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      resolve(skillDir, Paths.SKILL_MD),
+      "---\nname: local-skill\ndescription: Local skill\n---\nUse it.",
+    );
     const { handler } = makeHandler();
-    const result = await handler.handleCommand("chan-1", "status", "");
 
-    expect(result).toContain("Driver:");
-    expect(result).toContain("Agent:");
-    expect(result).toContain("Model:");
-    expect(result).toContain("Active session: `false`");
+    const result = await runCommand(handler, "agent skills");
+    expect(result?.message).toContain("Skills for agent `default`");
+    expect(result?.message).toContain("local-skill");
   });
 
-  test("!status shows active session after message", async () => {
+  test("!session status returns driver, agent, model, session state", async () => {
+    const { handler } = makeHandler();
+    const result = await runCommand(handler, "session status");
+
+    expect(result?.message).toContain("Driver:");
+    expect(result?.message).toContain("Agent:");
+    expect(result?.message).toContain("Model:");
+    expect(result?.message).toContain("Active session: `false`");
+  });
+
+  test("!session status shows active session after message", async () => {
     const { handler } = makeHandler();
     await handler.ensureSession("chan-1");
 
-    const result = await handler.handleCommand("chan-1", "status", "");
-    expect(result).toContain("Active session: `true`");
+    const result = await runCommand(handler, "session status");
+    expect(result?.message).toContain("Active session: `true`");
   });
 
-  test("!help returns command list", async () => {
-    const { handler } = makeHandler();
-    const result = await handler.handleCommand("chan-1", "help", "");
+  test("!session new resets the current session", async () => {
+    const { handler, driver } = makeHandler();
+    await handler.ensureSession("chan-1");
 
-    expect(result).toContain("!new");
-    expect(result).toContain("!driver");
-    expect(result).toContain("!model");
-    expect(result).toContain("!agent");
-    expect(result).toContain("!skills");
-    expect(result).toContain("!status");
-    expect(result).toContain("!help");
+    const result = await runCommand(handler, "session new");
+    expect(result?.message).toContain("Session reset");
+    expect(driver.activeSessionCount).toBe(0);
+  });
+
+  test("!system reload triggers frontend action", async () => {
+    const { handler } = makeHandler();
+    let reloaded = false;
+
+    const result = await runCommand(handler, "system reload", {
+      actions: {
+        reload: async () => {
+          reloaded = true;
+        },
+      },
+    });
+
+    expect(reloaded).toBe(true);
+    expect(result?.message).toContain("reloaded");
+  });
+
+  test("!system restart returns restart action", async () => {
+    const { handler } = makeHandler();
+    const result = await runCommand(handler, "system restart");
+
+    expect(result).toEqual({ message: "Restarting...", action: "restart" });
+  });
+
+  test("!system quit is only available in the TUI", async () => {
+    const { handler } = makeHandler();
+    const discordResult = await runCommand(handler, "system quit");
+    const tuiResult = await runCommand(handler, "system quit", {
+      commandPrefix: "/",
+      frontend: "tui",
+    });
+
+    expect(discordResult).toBeNull();
+    expect(tuiResult).toEqual({ message: "Quitting...", action: "quit" });
+  });
+
+  test("!system reload is blocked for non-owner discord users", async () => {
+    const { handler } = makeHandler();
+    const result = await runCommand(handler, "system reload", {
+      isOwner: false,
+    });
+
+    expect(result?.message).toBe("Only the bot owner can use this command.");
+  });
+
+  test("!help driver shows command-specific help", async () => {
+    const { handler } = makeHandler();
+    const result = await runCommand(handler, "help driver");
+
+    expect(result?.message).toContain("!driver");
+    expect(result?.message).toContain("!driver set <name>");
+    expect(result?.message).toContain("!driver show");
+  });
+
+  test("!help returns top-level command list", async () => {
+    const { handler } = makeHandler();
+    const result = await runCommand(handler, "help");
+
+    expect(result?.message).toContain("!agent");
+    expect(result?.message).toContain("!driver");
+    expect(result?.message).toContain("!model");
+    expect(result?.message).toContain("!session");
+    expect(result?.message).toContain("!system");
+    expect(result?.message).toContain("!help");
+    expect(result?.message).not.toContain("!new");
   });
 
   test("unknown command returns null", async () => {
     const { handler } = makeHandler();
-    const result = await handler.handleCommand("chan-1", "bogus", "");
+    const result = await runCommand(handler, "bogus");
 
     expect(result).toBeNull();
   });

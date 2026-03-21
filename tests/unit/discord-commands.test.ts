@@ -200,11 +200,11 @@ describe("discord message chunking", () => {
   });
 });
 
-describe("discord !restart command", () => {
+describe("discord !system restart command", () => {
   test("blocked for non-owner", async () => {
     const ctx = makeCtx();
     const handler = await startAndGetHandler(ctx);
-    const msg = makeMessage("!restart", NON_OWNER_ID);
+    const msg = makeMessage("!system restart", NON_OWNER_ID);
     await handler(msg);
 
     expect(msg.channel.send).toHaveBeenCalledTimes(1);
@@ -214,7 +214,7 @@ describe("discord !restart command", () => {
   test("allowed for owner", async () => {
     const ctx = makeCtx();
     const handler = await startAndGetHandler(ctx);
-    const msg = makeMessage("!restart", OWNER_ID);
+    const msg = makeMessage("!system restart", OWNER_ID);
 
     const originalExit = process.exit;
     let exitCode: number | undefined;
@@ -234,18 +234,18 @@ describe("discord !restart command", () => {
   test("blocked when ownerId is not configured", async () => {
     const ctx = makeCtx({ discord: undefined });
     const handler = await startAndGetHandler(ctx);
-    const msg = makeMessage("!restart", NON_OWNER_ID);
+    const msg = makeMessage("!system restart", NON_OWNER_ID);
     await handler(msg);
 
     expect(msg._sent[0]).toContain("Only the bot owner");
   });
 });
 
-describe("discord !reload command", () => {
+describe("discord !system reload command", () => {
   test("blocked for non-owner", async () => {
     const ctx = makeCtx();
     const handler = await startAndGetHandler(ctx);
-    const msg = makeMessage("!reload", NON_OWNER_ID);
+    const msg = makeMessage("!system reload", NON_OWNER_ID);
     await handler(msg);
 
     expect(msg.channel.send).toHaveBeenCalledTimes(1);
@@ -255,7 +255,7 @@ describe("discord !reload command", () => {
   test("allowed for owner and calls reloadConfig", async () => {
     const ctx = makeCtx();
     const handler = await startAndGetHandler(ctx);
-    const msg = makeMessage("!reload", OWNER_ID);
+    const msg = makeMessage("!system reload", OWNER_ID);
     await handler(msg);
 
     expect(ctx.reloadConfig).toHaveBeenCalledTimes(1);
@@ -272,7 +272,7 @@ describe("discord !reload command", () => {
     expect(ctx.driver.createSession).toHaveBeenCalledTimes(1);
 
     // Now reload
-    const reloadMsg = makeMessage("!reload", OWNER_ID);
+    const reloadMsg = makeMessage("!system reload", OWNER_ID);
     await handler(reloadMsg);
 
     expect(ctx.driver.destroySession).toHaveBeenCalled();
@@ -289,10 +289,10 @@ describe("discord !reload command", () => {
       throw new Error("bad config");
     });
     const handler = await startAndGetHandler(ctx);
-    const msg = makeMessage("!reload", OWNER_ID);
+    const msg = makeMessage("!system reload", OWNER_ID);
     await handler(msg);
 
-    expect(msg._sent[0]).toContain("Reload failed");
+    expect(msg._sent[0]).toContain("Command failed");
     expect(msg._sent[0]).toContain("bad config");
   });
 });
@@ -369,15 +369,48 @@ describe("discord !schedule command", () => {
   });
 });
 
+describe("discord unknown commands", () => {
+  test("legacy !reload form is treated as an unknown command", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("!reload", OWNER_ID);
+    await handler(msg);
+
+    expect(msg._sent[0]).toContain("Unknown command");
+    expect(ctx.driver.query).not.toHaveBeenCalled();
+  });
+
+  test("legacy !schedules form is treated as an unknown command", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("!schedules", OWNER_ID);
+    await handler(msg);
+
+    expect(msg._sent[0]).toContain("Unknown command");
+    expect(ctx.driver.query).not.toHaveBeenCalled();
+  });
+});
+
 describe("discord help text", () => {
-  test("includes reload and restart commands", async () => {
+  test("root help includes the system command namespace", async () => {
     const ctx = makeCtx();
     const handler = await startAndGetHandler(ctx);
     const msg = makeMessage("!help", OWNER_ID);
     await handler(msg);
 
     const helpText = msg._sent[0];
-    expect(helpText).toContain("!reload");
-    expect(helpText).toContain("!restart");
+    expect(helpText).toContain("!system");
+    expect(helpText).not.toContain("!reload");
+  });
+
+  test("command-specific help shows system subcommands", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("!help system", OWNER_ID);
+    await handler(msg);
+
+    const helpText = msg._sent[0];
+    expect(helpText).toContain("!system reload");
+    expect(helpText).toContain("!system restart");
   });
 });

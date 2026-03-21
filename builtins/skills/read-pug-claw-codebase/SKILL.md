@@ -37,6 +37,7 @@ curl -s https://api.github.com/repos/mattjmcnaughton/pug-claw/contents/{path} | 
 | `src/drivers/` | AI backend drivers (Claude, Pi) |
 | `src/frontends/` | User-facing interfaces (Discord, TUI) |
 | `src/commands/` | CLI subcommands |
+| `src/chat-commands/` | Shared Discord/TUI chat command tree |
 | `src/scheduler/` | Cron scheduler runtime, store, audit log, and lock code |
 | `builtins/` | Built-in skills and agents |
 | `tests/` | Test suite |
@@ -57,6 +58,8 @@ pug-claw uses a plugin architecture with two main extension points:
 | `src/resources.ts` | Config loading, path resolution, secrets |
 | `src/agents.ts` | Agent discovery and SYSTEM.md parsing |
 | `src/skills.ts` | Skill discovery, frontmatter parsing, prompt building |
+| `src/chat-commands/tree.ts` | Shared chat command definitions |
+| `src/chat-commands/registry.ts` | Chat command parsing, dispatch, help rendering |
 | `src/constants.ts` | Shared constants (paths, env vars, defaults) |
 | `src/logger.ts` | Pino structured logger |
 

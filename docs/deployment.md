@@ -143,7 +143,7 @@ Scheduler runtime state lives under `${PUG_CLAW_DATA_DIR:-<home>/data}` and incl
 
 The scheduler uses a single-host lock. If multiple Discord bot processes run on the same host and share the same `data/` directory, only one will execute schedules. Other instances still run the bot, but `!schedule run <name>` will be refused on those inactive instances.
 
-Use `!schedules` in Discord to verify whether the current bot process is the active scheduler.
+Use `!schedule list` in Discord to verify whether the current bot process is the active scheduler.
 
 ## Updating
 

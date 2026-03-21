@@ -142,23 +142,32 @@ bun run tui
 
 ### Commands
 
-**Discord** (`!` prefix) / **TUI** (`/` prefix):
+**Discord** (`!` prefix) / **TUI** (`/` prefix) use the same hierarchical command tree:
 
 | Command | Description |
 |---------|-------------|
-| `new` | Start a fresh conversation |
-| `driver [name]` | Show or switch AI driver (resets session) |
-| `model [name]` | Show or switch model (resets session) |
-| `agent [name]` | Show or switch agent persona (resets session) |
-| `skills` | List available skills for the current agent |
-| `status` | Show current driver, agent, model, and session state |
-| `help` | Show available commands |
+| `help [command]` | Show top-level commands or subcommands for a namespace |
+| `agent show\|set <name>\|list\|skills` | Inspect or change the active agent |
+| `driver show\|set <name>\|list` | Inspect or change the active driver |
+| `model show\|set <name>\|list` | Inspect or change the active model |
+| `session status\|new` | Inspect or reset the current session |
+| `system reload\|restart` | Reload config/agents/skills/schedules or restart the process |
+| `system quit` | Quit the TUI frontend |
+
+Examples:
+
+- Discord: `!driver set pi`
+- Discord: `!session new`
+- TUI: `/agent skills`
+- TUI: `/system reload`
+
+There are **no legacy flat aliases** like `!new` or `!reload`. Use the full tree form. See [`docs/commands.md`](docs/commands.md) for details.
 
 **Discord owner-only scheduler commands:**
 
 | Command | Description |
 |---------|-------------|
-| `!schedules` | List configured schedules, status, and next run |
+| `!schedule list` | List configured schedules, status, and next run |
 | `!schedule run <name>` | Trigger a manual run of a schedule |
 
 Scheduler notes:
@@ -187,6 +196,9 @@ src/
     types.ts           # Frontend interface
     discord.ts         # Discord.js frontend with per-channel state
     tui.ts             # Terminal UI frontend (pi-tui)
+  chat-commands/
+    tree.ts            # Shared Discord/TUI command tree
+    registry.ts        # Command parsing, dispatch, and help rendering
 
 ~/.pug-claw/           # User home directory (created by `pug-claw init`)
   config.json          # Consolidated configuration

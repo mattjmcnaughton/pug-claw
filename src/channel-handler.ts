@@ -12,7 +12,7 @@ import {
 } from "./resolve.ts";
 import { expandTilde, getChannelConfig, toError } from "./resources.ts";
 import type { ResolvedConfig } from "./resources.ts";
-import type { ResolvedAgent } from "./skills.ts";
+import type { ResolvedAgent, SkillSummary } from "./skills.ts";
 import { discoverSkills } from "./skills.ts";
 
 export interface ChannelState {
@@ -32,7 +32,6 @@ export class ChannelHandler {
     private pluginDirs: Map<string, string>,
     private resolveAgentFn: (agentDir: string) => ResolvedAgent,
     private logger: Logger,
-    private commandPrefix: string,
   ) {}
 
   private getState(channelId: string): ChannelState {
@@ -69,6 +68,20 @@ export class ChannelHandler {
     const driver = this.drivers[name];
     if (!driver) throw new Error(`Unknown driver: ${name}`);
     return driver;
+  }
+
+  getAvailableDriverNames(): string[] {
+    return Object.keys(this.drivers).sort((left, right) =>
+      left.localeCompare(right),
+    );
+  }
+
+  getAvailableModelAliases(channelId: string): Record<string, string> {
+    return this.resolveDriver(channelId).availableModels;
+  }
+
+  getAvailableAgentNames(): string[] {
+    return listAvailableAgents(this.config.agentsDir);
   }
 
   resolveAgentName(channelId: string): string {
@@ -148,123 +161,90 @@ export class ChannelHandler {
     await this.destroyAllSessions();
   }
 
-  async handleCommand(
+  async resetSession(channelId: string): Promise<void> {
+    await this.destroySession(channelId);
+    this.logger.info({ channel_id: channelId }, "command_new");
+  }
+
+  async setDriverOverride(
     channelId: string,
-    cmd: string,
-    arg: string,
-  ): Promise<string | null> {
-    const p = this.commandPrefix;
-
-    if (cmd === "new") {
-      await this.destroySession(channelId);
-      this.logger.info({ channel_id: channelId }, "command_new");
-      return "Session reset. Next message starts a fresh conversation.";
+    driverName: string,
+  ): Promise<boolean> {
+    if (!this.drivers[driverName]) {
+      return false;
     }
+    const state = this.getState(channelId);
+    state.driverOverride = driverName;
+    state.modelOverride = undefined;
+    state.resolvedAgent = undefined;
+    await this.destroySession(channelId);
+    this.logger.info(
+      { channel_id: channelId, driver: driverName },
+      "command_driver",
+    );
+    return true;
+  }
 
-    if (cmd === "driver") {
-      if (!arg) {
-        const current = this.resolveDriverName(channelId);
-        const available = Object.keys(this.drivers)
-          .map((k) => `\`${k}\``)
-          .join(", ");
-        return `Current driver: \`${current}\`\nAvailable: ${available}`;
-      }
-      if (!this.drivers[arg]) {
-        const available = Object.keys(this.drivers)
-          .map((k) => `\`${k}\``)
-          .join(", ");
-        return `Unknown driver \`${arg}\`. Available: ${available}`;
-      }
-      const state = this.getState(channelId);
-      state.driverOverride = arg;
-      state.modelOverride = undefined;
-      state.resolvedAgent = undefined;
-      await this.destroySession(channelId);
-      this.logger.info(
-        { channel_id: channelId, driver: arg },
-        "command_driver",
-      );
-      return `Driver switched to \`${arg}\`. Session reset.`;
+  async setModelOverride(
+    channelId: string,
+    modelInput: string,
+  ): Promise<string> {
+    const driver = this.resolveDriver(channelId);
+    const model =
+      driver.availableModels[modelInput.toLowerCase()] ?? modelInput;
+    const state = this.getState(channelId);
+    state.modelOverride = model;
+    await this.destroySession(channelId);
+    this.logger.info({ channel_id: channelId, model }, "command_model");
+    return model;
+  }
+
+  async setAgentOverride(
+    channelId: string,
+    agentName: string,
+  ): Promise<boolean> {
+    const agentDir = resolveAgentDir(this.config.agentsDir, agentName);
+    if (!agentDir) {
+      return false;
     }
+    const state = this.getState(channelId);
+    state.agentOverride = agentName;
+    state.resolvedAgent = undefined;
+    await this.destroySession(channelId);
+    this.logger.info(
+      { channel_id: channelId, agent: agentName },
+      "command_agent",
+    );
+    return true;
+  }
 
-    if (cmd === "model") {
-      const driver = this.resolveDriver(channelId);
-      if (!arg) {
-        const current = this.resolveModelName(channelId);
-        const aliases = Object.entries(driver.availableModels)
-          .map(([k, v]) => `\`${k}\` → ${v}`)
-          .join("\n");
-        return `Current model: \`${current}\`\nAvailable aliases:\n${aliases}\n\nOr use a raw model ID.`;
-      }
-      const model = driver.availableModels[arg.toLowerCase()] ?? arg;
-      const state = this.getState(channelId);
-      state.modelOverride = model;
-      await this.destroySession(channelId);
-      this.logger.info({ channel_id: channelId, model }, "command_model");
-      return `Model switched to \`${model}\`. Session reset.`;
-    }
+  getAgentSkills(channelId: string): {
+    agentName: string;
+    skills: SkillSummary[];
+  } {
+    const agentName = this.resolveAgentName(channelId);
+    const agentDir = resolve(this.config.agentsDir, agentName);
+    const parsed = parseAgentSystemMd(agentDir);
+    const skills = discoverSkills(
+      agentDir,
+      this.config.skillsDir,
+      parsed.meta.allowedSkills,
+    );
+    return { agentName, skills };
+  }
 
-    if (cmd === "agent") {
-      if (!arg) {
-        const current = this.resolveAgentName(channelId);
-        const available = listAvailableAgents(this.config.agentsDir)
-          .map((name) => `\`${name}\``)
-          .join(", ");
-        return `Current agent: \`${current}\`\nAvailable: ${available}`;
-      }
-      const agentDir = resolveAgentDir(this.config.agentsDir, arg);
-      if (!agentDir) {
-        return `Unknown agent \`${arg}\`. No agent with SYSTEM.md found at \`agents/${arg}/\`.`;
-      }
-      const state = this.getState(channelId);
-      state.agentOverride = arg;
-      state.resolvedAgent = undefined;
-      await this.destroySession(channelId);
-      this.logger.info({ channel_id: channelId, agent: arg }, "command_agent");
-      return `Agent switched to \`${arg}\`. Session reset.`;
-    }
-
-    if (cmd === "skills") {
-      const agentName = this.resolveAgentName(channelId);
-      const agentDir = resolve(this.config.agentsDir, agentName);
-      const parsed = parseAgentSystemMd(agentDir);
-      const skills = discoverSkills(
-        agentDir,
-        this.config.skillsDir,
-        parsed.meta.allowedSkills,
-      );
-      if (skills.length === 0) {
-        return `No skills found for agent \`${agentName}\`.`;
-      }
-      const lines = [`**Skills for agent \`${agentName}\`:**`];
-      for (const s of skills) {
-        lines.push(`- **${s.name}**: ${s.description}`);
-      }
-      return lines.join("\n");
-    }
-
-    if (cmd === "status") {
-      const driverName = this.resolveDriverName(channelId);
-      const model = this.resolveModelName(channelId);
-      const agentName = this.resolveAgentName(channelId);
-      const hasSession = !!this.getState(channelId).sessionId;
-      return `Driver: \`${driverName}\`\nAgent: \`${agentName}\`\nModel: \`${model}\`\nActive session: \`${hasSession}\``;
-    }
-
-    if (cmd === "help") {
-      return (
-        "**Commands:**\n" +
-        `\`${p}new\` — Start a fresh conversation\n` +
-        `\`${p}driver [name]\` — Show/switch driver (resets session)\n` +
-        `\`${p}model [name]\` — Show/switch model (resets session)\n` +
-        `\`${p}agent [name]\` — Show/switch agent (resets session)\n` +
-        `\`${p}skills\` — List skills for the current agent\n` +
-        `\`${p}status\` — Show current driver, agent, model, and session state\n` +
-        `\`${p}help\` — Show this message`
-      );
-    }
-
-    return null;
+  getStatus(channelId: string): {
+    driverName: string;
+    model: string;
+    agentName: string;
+    hasSession: boolean;
+  } {
+    return {
+      driverName: this.resolveDriverName(channelId),
+      model: this.resolveModelName(channelId),
+      agentName: this.resolveAgentName(channelId),
+      hasSession: !!this.getState(channelId).sessionId,
+    };
   }
 
   async handleMessage(

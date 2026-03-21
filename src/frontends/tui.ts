@@ -16,6 +16,8 @@ import {
 import chalk from "chalk";
 import { ChannelHandler } from "../channel-handler.ts";
 import { toError } from "../resources.ts";
+import { ChatCommandRegistry } from "../chat-commands/registry.ts";
+import { createChatCommandTree } from "../chat-commands/tree.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
 
 const TUI_CHANNEL_ID = "tui";
@@ -61,8 +63,8 @@ export class TuiFrontend implements Frontend {
       pluginDirs,
       resolveAgent,
       logger,
-      "/",
     );
+    const commandRegistry = new ChatCommandRegistry(createChatCommandTree());
 
     // --- TUI setup ---
     const terminal = new ProcessTerminal();
@@ -104,15 +106,21 @@ export class TuiFrontend implements Frontend {
 
     const autocompleteProvider = new CombinedAutocompleteProvider(
       [
-        { name: "new", description: "Start a fresh conversation" },
-        { name: "driver", description: "Show/switch driver" },
-        { name: "model", description: "Show/switch model" },
-        { name: "agent", description: "Show/switch agent" },
-        { name: "skills", description: "List skills for current agent" },
-        { name: "status", description: "Show current state" },
-        { name: "reload", description: "Reload config, agents, and skills" },
-        { name: "restart", description: "Restart the process" },
-        { name: "quit", description: "Exit" },
+        { name: "help", description: "Show available commands" },
+        { name: "agent", description: "Inspect and change the active agent" },
+        {
+          name: "driver",
+          description: "Inspect and change the active driver",
+        },
+        { name: "model", description: "Inspect and change the active model" },
+        {
+          name: "session",
+          description: "Inspect or reset the current session",
+        },
+        {
+          name: "system",
+          description: "Reload, restart, or quit the frontend",
+        },
       ],
       process.cwd(),
     );
@@ -140,56 +148,56 @@ export class TuiFrontend implements Frontend {
 
       // Handle slash commands
       if (trimmed.startsWith("/")) {
-        const parts = trimmed.slice(1).split(/\s+/, 2);
-        const cmd = parts[0]?.toLowerCase() ?? "";
-        const arg = parts[1]?.trim() ?? "";
+        const raw = trimmed.slice(1).trim();
 
-        // Frontend-specific commands
-        if (cmd === "quit" || cmd === "exit") {
-          await channelHandler.destroySession(TUI_CHANNEL_ID);
-          tui.stop();
-          process.exit(0);
-        }
+        try {
+          const result = await commandRegistry.execute(
+            {
+              channelId: TUI_CHANNEL_ID,
+              commandPrefix: "/",
+              frontend: "tui",
+              isOwner: true,
+              handler: channelHandler,
+              actions: {
+                reload: async () => {
+                  const reloaded = await ctx.reloadConfig();
+                  config = reloaded.config;
+                  resolveAgent = reloaded.resolveAgent;
+                  pluginDirs = reloaded.pluginDirs;
+                  await channelHandler.reload(config, pluginDirs, resolveAgent);
+                  logger.info({}, "tui_command_reload");
+                },
+              },
+            },
+            raw,
+          );
 
-        if (cmd === "restart") {
-          logger.info({}, "tui_command_restart");
-          showInfo("Restarting...");
-          tui.stop();
-          process.exit(1);
-        }
+          if (result === null) {
+            showInfo(`Unknown command: \`/${raw}\``);
+            return;
+          }
 
-        if (cmd === "reload") {
-          try {
-            const reloaded = await ctx.reloadConfig();
-            config = reloaded.config;
-            resolveAgent = reloaded.resolveAgent;
-            pluginDirs = reloaded.pluginDirs;
-            await channelHandler.reload(config, pluginDirs, resolveAgent);
-            updateHeader();
-            showInfo("Config, agents, and skills reloaded. Session reset.");
-            logger.info({}, "tui_command_reload");
-          } catch (err) {
-            const error = toError(err);
-            logger.error({ err: error }, "tui_reload_error");
-            showInfo(`Reload failed: ${error.message}`);
+          showInfo(result.message);
+          updateHeader();
+
+          if (result.action === "quit") {
+            await channelHandler.destroySession(TUI_CHANNEL_ID);
+            tui.stop();
+            process.exit(0);
+          }
+
+          if (result.action === "restart") {
+            logger.info({}, "tui_command_restart");
+            tui.stop();
+            process.exit(1);
           }
           return;
-        }
-
-        // Delegate to ChannelHandler for shared commands
-        const result = await channelHandler.handleCommand(
-          TUI_CHANNEL_ID,
-          cmd,
-          arg,
-        );
-        if (result !== null) {
-          showInfo(result);
-          updateHeader();
+        } catch (err) {
+          const error = toError(err);
+          logger.error({ err: error }, "tui_command_error");
+          showInfo(`Command failed: ${error.message}`);
           return;
         }
-
-        showInfo(`Unknown command: /${cmd}`);
-        return;
       }
 
       // Show user message
