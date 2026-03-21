@@ -208,7 +208,7 @@ The bot user ID is fetched from `client.user.id` at runtime and does not need to
 
 For each runtime setting, pug-claw resolves in this order:
 
-1. Runtime override (via `!driver`, `!model`, `!agent` commands)
+1. Runtime override (via `!driver set`, `!model set`, `!agent set` commands)
 2. Channel-specific config from `config.json`
 3. Top-level default from `config.json`
 4. Driver built-in default

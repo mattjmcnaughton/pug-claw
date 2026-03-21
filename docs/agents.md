@@ -2,6 +2,8 @@
 
 Agents define the personality and capabilities of your bot. Each agent is a directory under `agents/` containing a system prompt and optional skills.
 
+For the full chat command tree used in examples below, see [commands.md](./commands.md).
+
 ## Directory structure
 
 ```
@@ -38,7 +40,7 @@ Keep responses well-sourced and balanced. When uncertain, say so.
 
 The entire contents of `SYSTEM.md` are passed as the system prompt to the underlying driver.
 
-3. Switch to your agent via `!agent my-agent` (Discord) or `/agent my-agent` (TUI).
+3. Switch to your agent via `!agent set my-agent` (Discord) or `/agent set my-agent` (TUI).
 
 ## SYSTEM.md Frontmatter
 
@@ -75,7 +77,7 @@ You are a specialized research assistant...
 
 When determining which driver and model to use, the following precedence applies (highest to lowest):
 
-1. **Runtime command** — `!driver`/`!model` (Discord) or `/driver`/`/model` (TUI)
+1. **Runtime command** — `!driver set`/`!model set` (Discord) or `/driver set`/`/model set` (TUI)
 2. **Channel config** — `channels[id].driver`/`channels[id].model` in `config.json`
 3. **Agent frontmatter** — `driver`/`model` fields in `SYSTEM.md`
 4. **Global default** — `default_driver` in `config.json` / driver's `defaultModel`
@@ -149,4 +151,4 @@ The AI backend sees the skill names and descriptions and can read the full `SKIL
 
 ### Listing skills
 
-Use `!skills` (Discord) or `/skills` (TUI) to see all skills available for the current agent.
+Use `!agent skills` (Discord) or `/agent skills` (TUI) to see all skills available for the current agent.

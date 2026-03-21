@@ -66,10 +66,10 @@ Notes:
 
 Discord owner-only commands:
 
-- `!schedules`
+- `!schedule list`
 - `!schedule run <name>`
 
-`!schedules` shows:
+`!schedule list` shows:
 
 - enabled/disabled state
 - cron expression and timezone
@@ -118,4 +118,4 @@ System logs continue to live under:
 - only one scheduler instance is active per host at a time
 - if the lock is already held, the bot still runs but scheduler execution is disabled on that instance
 - on startup, previously running schedule rows are marked `interrupted`
-- `!reload` reloads schedule definitions live
+- `!system reload` reloads schedule definitions live

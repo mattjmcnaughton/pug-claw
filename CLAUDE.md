@@ -37,6 +37,7 @@ The codebase uses a plugin pattern with two extension points:
 - **Drivers** (`src/drivers/`): AI backends (Claude, Pi). Implement the `Driver` interface from `src/drivers/types.ts`. Registered in `src/main.ts` `startFrontend()`.
 - **Frontends** (`src/frontends/`): User-facing interfaces (Discord, TUI). Implement the `Frontend` interface from `src/frontends/types.ts`.
 - **Commands** (`src/commands/`): CLI subcommands (init, check-config, init-service). Registered in `src/main.ts` via Commander.
+- **Chat commands** (`src/chat-commands/`): Shared Discord/TUI command tree. Definitions live in `tree.ts`; parsing/dispatch/help live in `registry.ts`.
 
 Config loading and resolution lives in `src/resources.ts`. Agent/skill discovery lives in `src/agents.ts` and `src/skills.ts`. The logger is a pino singleton from `src/logger.ts`.
 
@@ -54,3 +55,4 @@ Detailed rules with examples live in `docs/conventions/`. Read the relevant file
 - **Error Handling**: Preserve stack traces, use `toError()`, use pino's `err` key. Never use bare `catch {}`. See [`docs/conventions/error-handling.md`](docs/conventions/error-handling.md).
 - **Logging**: Pino structured, two-arg format: `logger.info({ ctx }, "snake_case_tag")`. See [`docs/conventions/logging.md`](docs/conventions/logging.md).
 - **Testing**: `bun:test`, fixtures in `tests/fixtures/`, `withEnv()` for env vars. See [`docs/conventions/testing.md`](docs/conventions/testing.md).
+- **Chat Command Pattern**: Read [`docs/commands.md`](docs/commands.md) before changing Discord/TUI commands. Add new user-facing commands in `src/chat-commands/tree.ts`, keep them hierarchical (`session new`, `driver set`, `system reload`), avoid legacy shorthand aliases, and update command docs/built-in instructions when the surface area changes.

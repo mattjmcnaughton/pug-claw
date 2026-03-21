@@ -26,7 +26,7 @@ For the Claude driver, we generate per-agent plugin directories at `~/.pug-claw/
 **Why symlinks, not copies:**
 - Skills may contain large supporting files (scripts, references, assets)
 - Symlinks stay in sync with the source — no stale-copy bugs
-- The plugins directory is wiped and regenerated on every startup and `!reload`, so broken symlinks are self-healing
+- The plugins directory is wiped and regenerated on every startup and `system reload`, so broken symlinks are self-healing
 
 **Why per-agent directories, not one shared directory:**
 - Agents have different `allowed-skills` lists — skill A might be allowed for agent X but not agent Y
@@ -56,12 +56,12 @@ We could have kept the original "catalog in prompt" approach and just fixed Clau
 
 ### Copying skill directories instead of symlinking
 
-Copies would avoid any risk of broken symlinks but would be slower, use more disk, and require careful cache invalidation. Since we wipe and regenerate the plugins directory on every startup/reload, symlinks are simpler and always fresh.
+Copies would avoid any risk of broken symlinks but would be slower, use more disk, and require careful cache invalidation. Since we wipe and regenerate the plugins directory on every startup and `system reload`, symlinks are simpler and always fresh.
 
 ## Consequences
 
 - `ResolvedAgent.systemPrompt` no longer contains the skill catalog. Any code that checked for `<available-skills>` in the prompt needs updating (tests were updated).
-- A new `~/.pug-claw/plugins/` directory is created during `init` and regenerated on startup/reload.
+- A new `~/.pug-claw/plugins/` directory is created during `init` and regenerated on startup and `system reload`.
 - The `DriverOptions` interface now has optional `skills` and `pluginDir` fields — drivers that don't need them can ignore them.
 - `DotenvSecretsProvider` has a side-effect on `process.env`. This is intentional but worth knowing — secrets from the dotenv file are now globally visible within the process.
 

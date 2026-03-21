@@ -87,7 +87,7 @@ Users can attempt to manipulate the AI via crafted messages. The system prompt i
 
 - Keep system prompts clear and directive
 - Monitor bot responses for unexpected behavior
-- Use the `!new` command to reset sessions if the bot starts behaving oddly
+- Use the `!session new` command to reset sessions if the bot starts behaving oddly
 
 ## Discord permissions
 

@@ -17,7 +17,7 @@ Set the `ANTHROPIC_API_KEY` environment variable (used automatically by the SDK)
 | `sonnet` | `claude-sonnet-4-6` |
 | `opus` | `claude-opus-4-6` |
 
-You can also pass any valid Claude model ID directly via `!model <id>`.
+You can also pass any valid Claude model ID directly via `!model set <id>`.
 
 ### Default tools
 
@@ -46,7 +46,7 @@ To give the agent access to additional directories without changing the `cwd`, c
 - Interactive channel sessions are reused until reset
 - Each session starts with an initialization query to establish a session ID
 - Subsequent queries resume the same session, preserving conversation context
-- `!new` destroys the session and starts fresh
+- `!session new` destroys the session and starts fresh
 - Scheduled runs do **not** reuse interactive sessions; every scheduler run uses a fresh session
 
 ## Pi driver
@@ -96,7 +96,7 @@ openai-codex/gpt-5.4
 
 ## Switching drivers
 
-Use `!driver <name>` (Discord) or `/driver <name>` (TUI) to switch. Switching drivers resets the current session. Use `!driver` with no argument to see the current driver and available options.
+Use `!driver set <name>` (Discord) or `/driver set <name>` (TUI) to switch. Switching drivers resets the current session. Use `!driver show` or `/driver show` to see the current driver and available options.
 
 ## Per-channel driver configuration
 

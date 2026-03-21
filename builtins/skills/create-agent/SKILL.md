@@ -82,6 +82,6 @@ SYSTEM.md without frontmatter works as before — the entire file is the system 
 
 ## Activating the Agent
 
-- Discord: `!agent {name}`
-- TUI: `/agent {name}`
+- Discord: `!agent set {name}`
+- TUI: `/agent set {name}`
 - Set as default: update `default_agent` in `config.json`
