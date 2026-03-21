@@ -24,6 +24,94 @@ interface PiSession {
   unsubscribe: () => void;
 }
 
+export function parsePiModelString(modelStr: string): {
+  provider: string;
+  modelId: string;
+} {
+  const slashIdx = modelStr.indexOf("/");
+  if (slashIdx === -1) {
+    throw new Error(
+      `Pi model must be in "provider/model-id" format, got: "${modelStr}"`,
+    );
+  }
+  return {
+    provider: modelStr.slice(0, slashIdx),
+    modelId: modelStr.slice(slashIdx + 1),
+  };
+}
+
+export function buildPiSystemPrompt(
+  basePrompt: string,
+  skills?: DriverOptions["skills"],
+): string {
+  let systemPrompt = skills
+    ? appendSkillCatalog(basePrompt, skills)
+    : basePrompt;
+
+  if (skills && skills.length > 0) {
+    systemPrompt +=
+      "\n\nIMPORTANT: Only use the skills listed above. " +
+      "Do not search the filesystem for additional skills or capabilities beyond what is listed.";
+  } else {
+    systemPrompt +=
+      "\n\nIMPORTANT: You have no skills loaded in this session. " +
+      "Do not search the filesystem for skills or capabilities. " +
+      "Respond using only your built-in knowledge and tools.";
+  }
+
+  systemPrompt += buildEnvironmentBlock();
+  return systemPrompt;
+}
+
+export interface PiEventHandlerResult {
+  getText: () => string;
+  handleEvent: (event: { type: string; [key: string]: unknown }) => void;
+}
+
+export function createPiEventHandler(
+  sessionId: string,
+  onEvent?: DriverEventCallback,
+): PiEventHandlerResult {
+  let responseText = "";
+
+  function handleEvent(event: { type: string; [key: string]: unknown }): void {
+    if (
+      event.type === "message_update" &&
+      (event.assistantMessageEvent as { type: string } | undefined)?.type ===
+        "text_delta"
+    ) {
+      responseText +=
+        (event.assistantMessageEvent as { delta: string }).delta ?? "";
+    } else if (event.type === "tool_execution_start") {
+      logger.info(
+        {
+          session_id: sessionId,
+          tool: event.toolName,
+          tool_call_id: event.toolCallId,
+          args: event.args,
+        },
+        "pi_tool_call_start",
+      );
+      onEvent?.({ type: "tool_use", tool: String(event.toolName) });
+    } else if (event.type === "tool_execution_end") {
+      logger.info(
+        {
+          session_id: sessionId,
+          tool: event.toolName,
+          tool_call_id: event.toolCallId,
+          is_error: event.isError,
+        },
+        "pi_tool_call_end",
+      );
+    }
+  }
+
+  return {
+    getText: () => responseText,
+    handleEvent,
+  };
+}
+
 export class PiDriver implements Driver {
   readonly name = "pi";
   readonly availableModels: Record<string, string> = {
@@ -37,6 +125,8 @@ export class PiDriver implements Driver {
   private sessions = new Map<string, PiSession>();
   private sessionCounter = 0;
 
+  private static readonly CODEX_PROVIDERS = new Set(["openai-codex"]);
+
   private constructor(defaultModel: string) {
     this.defaultModel = defaultModel;
     this.authStorage = AuthStorage.create();
@@ -48,21 +138,11 @@ export class PiDriver implements Driver {
     return new PiDriver(model);
   }
 
-  private static readonly CODEX_PROVIDERS = new Set(["openai-codex"]);
-
   private resolveModel(modelStr: string): {
     model: Model<Api>;
     provider: string;
   } {
-    const slashIdx = modelStr.indexOf("/");
-    if (slashIdx === -1) {
-      throw new Error(
-        `Pi model must be in "provider/model-id" format, got: "${modelStr}"`,
-      );
-    }
-
-    const provider = modelStr.slice(0, slashIdx);
-    const modelId = modelStr.slice(slashIdx + 1);
+    const { provider, modelId } = parsePiModelString(modelStr);
     // biome-ignore lint/suspicious/noExplicitAny: pi-ai uses narrow union types for provider/model params
     const model = getModel(provider as any, modelId as any);
     if (!model) {
@@ -96,25 +176,10 @@ export class PiDriver implements Driver {
     const { model, provider } = this.resolveModel(modelStr);
     await this.checkCodexAuth(provider);
 
-    // Append skill catalog to system prompt for Pi (no native plugin support).
-    // Pi agents have filesystem tools, so we must explicitly instruct them
-    // not to discover skills beyond the ones listed in their catalog.
-    let systemPrompt = options.skills
-      ? appendSkillCatalog(options.systemPrompt, options.skills)
-      : options.systemPrompt;
-
-    if (options.skills && options.skills.length > 0) {
-      systemPrompt +=
-        "\n\nIMPORTANT: Only use the skills listed above. " +
-        "Do not search the filesystem for additional skills or capabilities beyond what is listed.";
-    } else {
-      systemPrompt +=
-        "\n\nIMPORTANT: You have no skills loaded in this session. " +
-        "Do not search the filesystem for skills or capabilities. " +
-        "Respond using only your built-in knowledge and tools.";
-    }
-
-    systemPrompt += buildEnvironmentBlock();
+    const systemPrompt = buildPiSystemPrompt(
+      options.systemPrompt,
+      options.skills,
+    );
 
     logger.info({ systemPrompt }, "pi_session_system_prompt");
 
@@ -165,37 +230,12 @@ export class PiDriver implements Driver {
       throw new Error(`Unknown Pi session: ${sessionId}`);
     }
 
-    let responseText = "";
+    const handler = createPiEventHandler(sessionId, onEvent);
 
-    const unsubscribe = piSession.session.subscribe((event) => {
-      if (
-        event.type === "message_update" &&
-        event.assistantMessageEvent.type === "text_delta"
-      ) {
-        responseText += event.assistantMessageEvent.delta;
-      } else if (event.type === "tool_execution_start") {
-        logger.info(
-          {
-            session_id: sessionId,
-            tool: event.toolName,
-            tool_call_id: event.toolCallId,
-            args: event.args,
-          },
-          "pi_tool_call_start",
-        );
-        onEvent?.({ type: "tool_use", tool: event.toolName });
-      } else if (event.type === "tool_execution_end") {
-        logger.info(
-          {
-            session_id: sessionId,
-            tool: event.toolName,
-            tool_call_id: event.toolCallId,
-            is_error: event.isError,
-          },
-          "pi_tool_call_end",
-        );
-      }
-    });
+    const unsubscribe = piSession.session.subscribe(
+      // biome-ignore lint/suspicious/noExplicitAny: Pi session event types are complex internal types
+      handler.handleEvent as any,
+    );
 
     try {
       await piSession.session.prompt(prompt);
@@ -204,12 +244,12 @@ export class PiDriver implements Driver {
         { err: toError(err), session_id: sessionId },
         "pi_query_error",
       );
-      responseText = "Sorry, something went wrong.";
+      return { text: "Sorry, something went wrong.", sessionId };
     }
 
     unsubscribe();
 
-    return { text: responseText, sessionId };
+    return { text: handler.getText(), sessionId };
   }
 
   async destroySession(sessionId: string): Promise<void> {
