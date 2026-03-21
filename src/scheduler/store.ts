@@ -2,12 +2,15 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
 import type { Logger } from "../logger.ts";
-import type {
-  ScheduleDeliveryStatus,
-  ScheduleExecutionStatus,
-  ScheduleRunRecord,
-  ScheduleRunStatus,
-  ScheduleTriggerSource,
+import {
+  ScheduleExecutionStatuses,
+  type ScheduleDeliveryStatus,
+  type ScheduleExecutionStatus,
+  type ScheduleOutputType,
+  type ScheduleRunRecord,
+  ScheduleRunStatuses,
+  type ScheduleRunStatus,
+  type ScheduleTriggerSource,
 } from "./types.ts";
 
 interface ScheduleRunRow {
@@ -20,7 +23,7 @@ interface ScheduleRunRow {
   model: string | null;
   cron_expression: string;
   timezone: string;
-  output_type: string | null;
+  output_type: ScheduleOutputType | null;
   output_target: string | null;
   execution_status: ScheduleExecutionStatus | null;
   delivery_status: ScheduleDeliveryStatus;
@@ -209,11 +212,11 @@ export class SchedulerStore {
       .query(
         `
           UPDATE schedule_runs
-          SET status = 'interrupted',
-              execution_status = 'interrupted',
+          SET status = '${ScheduleRunStatuses.INTERRUPTED}',
+              execution_status = '${ScheduleExecutionStatuses.INTERRUPTED}',
               finished_at = ?,
               error_message = COALESCE(error_message, 'Process exited before run completed.')
-          WHERE status = 'running'
+          WHERE status = '${ScheduleRunStatuses.RUNNING}'
         `,
       )
       .run(nowIso) as { changes?: number };

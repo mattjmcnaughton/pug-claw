@@ -1,26 +1,68 @@
-export type ScheduleTriggerSource = "cron" | "manual";
+export const ScheduleTriggerSources = {
+  CRON: "cron",
+  MANUAL: "manual",
+} as const;
+
+export type ScheduleTriggerSource =
+  (typeof ScheduleTriggerSources)[keyof typeof ScheduleTriggerSources];
+
+export const ScheduleRunStatuses = {
+  RUNNING: "running",
+  SUCCEEDED: "succeeded",
+  FAILED: "failed",
+  SKIPPED: "skipped",
+  INTERRUPTED: "interrupted",
+} as const;
 
 export type ScheduleRunStatus =
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "skipped"
-  | "interrupted";
+  (typeof ScheduleRunStatuses)[keyof typeof ScheduleRunStatuses];
+
+export const ScheduleExecutionStatuses = {
+  RUNNING: "running",
+  SUCCEEDED: "succeeded",
+  FAILED: "failed",
+  INTERRUPTED: "interrupted",
+} as const;
 
 export type ScheduleExecutionStatus =
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "interrupted";
+  (typeof ScheduleExecutionStatuses)[keyof typeof ScheduleExecutionStatuses];
+
+export const ScheduleDeliveryStatuses = {
+  PENDING: "pending",
+  SUCCEEDED: "succeeded",
+  FAILED: "failed",
+  NOT_APPLICABLE: "not_applicable",
+} as const;
 
 export type ScheduleDeliveryStatus =
-  | "pending"
-  | "succeeded"
-  | "failed"
-  | "not_applicable";
+  (typeof ScheduleDeliveryStatuses)[keyof typeof ScheduleDeliveryStatuses];
+
+export const ScheduleOutputTypes = {
+  DISCORD_CHANNEL: "discord_channel",
+} as const;
+
+export type ScheduleOutputType =
+  (typeof ScheduleOutputTypes)[keyof typeof ScheduleOutputTypes];
+
+export const SchedulerAuditEvents = {
+  SCHEDULE_RUN_STARTED: "schedule_run_started",
+  SCHEDULE_RUN_SKIPPED_OVERLAP: "schedule_run_skipped_overlap",
+  SCHEDULE_RUN_COMPLETED: "schedule_run_completed",
+  SCHEDULE_RUN_FAILED: "schedule_run_failed",
+  SCHEDULE_RUN_OUTPUT: "schedule_run_output",
+  SCHEDULE_RUN_DELIVERY_STARTED: "schedule_run_delivery_started",
+  SCHEDULE_RUN_DELIVERY_SUCCEEDED: "schedule_run_delivery_succeeded",
+  SCHEDULE_RUN_DELIVERY_FAILED: "schedule_run_delivery_failed",
+  SCHEDULER_LOCK_ACQUIRED: "scheduler_lock_acquired",
+  SCHEDULER_LOCK_NOT_ACQUIRED: "scheduler_lock_not_acquired",
+  SCHEDULER_LOCK_RECLAIMED_STALE: "scheduler_lock_reclaimed_stale",
+} as const;
+
+export type SchedulerAuditEventName =
+  (typeof SchedulerAuditEvents)[keyof typeof SchedulerAuditEvents];
 
 export interface ScheduleOutput {
-  type: "discord_channel";
+  type: ScheduleOutputType;
   channelId: string;
 }
 
@@ -46,7 +88,7 @@ export interface ScheduleRunRecord {
   model?: string;
   cronExpression: string;
   timezone: string;
-  outputType?: string;
+  outputType?: ScheduleOutputType;
   outputTarget?: string;
   executionStatus?: ScheduleExecutionStatus;
   deliveryStatus: ScheduleDeliveryStatus;
@@ -57,18 +99,7 @@ export interface ScheduleRunRecord {
 
 export interface SchedulerAuditEvent {
   ts: string;
-  event:
-    | "schedule_run_started"
-    | "schedule_run_skipped_overlap"
-    | "schedule_run_completed"
-    | "schedule_run_failed"
-    | "schedule_run_output"
-    | "schedule_run_delivery_started"
-    | "schedule_run_delivery_succeeded"
-    | "schedule_run_delivery_failed"
-    | "scheduler_lock_acquired"
-    | "scheduler_lock_not_acquired"
-    | "scheduler_lock_reclaimed_stale";
+  event: SchedulerAuditEventName;
   run_id?: string;
   schedule_name?: string;
   trigger_source?: ScheduleTriggerSource;
@@ -78,7 +109,7 @@ export interface SchedulerAuditEvent {
   cron_expression?: string;
   timezone?: string;
   output?: {
-    type: string;
+    type: ScheduleOutputType;
     channel_id?: string;
   } | null;
   status?: ScheduleRunStatus;

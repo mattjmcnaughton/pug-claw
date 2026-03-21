@@ -6,15 +6,19 @@ import { expandTilde, toError, type ResolvedConfig } from "../resources.ts";
 import { resolveDriverName, resolveModelName } from "../resolve.ts";
 import type { ResolvedAgent } from "../skills.ts";
 import type { SchedulerAuditLog } from "./audit-log.ts";
-import type { SchedulerStore } from "./store.ts";
 import type { SchedulerOutputSink } from "./output.ts";
-import type {
-  ResolvedSchedule,
-  ScheduleDeliveryStatus,
-  ScheduleExecutionStatus,
-  ScheduleRunRecord,
-  ScheduleRunStatus,
-  ScheduleTriggerSource,
+import type { SchedulerStore } from "./store.ts";
+import {
+  SchedulerAuditEvents,
+  ScheduleDeliveryStatuses,
+  type ScheduleDeliveryStatus,
+  ScheduleExecutionStatuses,
+  type ScheduleExecutionStatus,
+  type ResolvedSchedule,
+  type ScheduleRunRecord,
+  ScheduleRunStatuses,
+  type ScheduleRunStatus,
+  type ScheduleTriggerSource,
 } from "./types.ts";
 
 export interface SchedulerRunnerContext {
@@ -44,6 +48,14 @@ function buildFailureMessage(scheduleName: string, runId: string): string {
 
 function makeNowIso(): string {
   return new Date().toISOString();
+}
+
+function getInitialDeliveryStatus(
+  schedule: ResolvedSchedule,
+): ScheduleDeliveryStatus {
+  return schedule.output
+    ? ScheduleDeliveryStatuses.PENDING
+    : ScheduleDeliveryStatuses.NOT_APPLICABLE;
 }
 
 export class SchedulerRunner {
@@ -104,7 +116,7 @@ export class SchedulerRunner {
       runId,
       scheduleName: schedule.name,
       triggerSource,
-      status: "skipped",
+      status: ScheduleRunStatuses.SKIPPED,
       agent: schedule.agent,
       driver: schedule.driver,
       model: schedule.model,
@@ -112,7 +124,7 @@ export class SchedulerRunner {
       timezone,
       outputType: schedule.output?.type,
       outputTarget: schedule.output?.channelId,
-      deliveryStatus: schedule.output ? "pending" : "not_applicable",
+      deliveryStatus: getInitialDeliveryStatus(schedule),
       startedAt: nowIso,
       finishedAt: nowIso,
       errorMessage: "Skipped because the previous run was still in progress.",
@@ -121,7 +133,7 @@ export class SchedulerRunner {
     this.ctx.store.insertRun(record);
     this.ctx.auditLog.append({
       ts: nowIso,
-      event: "schedule_run_skipped_overlap",
+      event: SchedulerAuditEvents.SCHEDULE_RUN_SKIPPED_OVERLAP,
       run_id: runId,
       schedule_name: schedule.name,
       trigger_source: triggerSource,
@@ -136,7 +148,7 @@ export class SchedulerRunner {
             channel_id: schedule.output.channelId,
           }
         : null,
-      status: "skipped",
+      status: ScheduleRunStatuses.SKIPPED,
       message: "Skipped due to overlapping run.",
     });
     return runId;
@@ -178,7 +190,7 @@ export class SchedulerRunner {
       runId,
       scheduleName: schedule.name,
       triggerSource,
-      status: "running",
+      status: ScheduleRunStatuses.RUNNING,
       agent: schedule.agent,
       driver: driverName,
       model: modelName,
@@ -186,15 +198,15 @@ export class SchedulerRunner {
       timezone,
       outputType,
       outputTarget,
-      executionStatus: "running",
-      deliveryStatus: schedule.output ? "pending" : "not_applicable",
+      executionStatus: ScheduleExecutionStatuses.RUNNING,
+      deliveryStatus: getInitialDeliveryStatus(schedule),
       startedAt,
     };
     this.ctx.store.insertRun(initialRecord);
 
     this.ctx.auditLog.append({
       ts: startedAt,
-      event: "schedule_run_started",
+      event: SchedulerAuditEvents.SCHEDULE_RUN_STARTED,
       run_id: runId,
       schedule_name: schedule.name,
       trigger_source: triggerSource,
@@ -209,17 +221,17 @@ export class SchedulerRunner {
             channel_id: schedule.output.channelId,
           }
         : null,
-      status: "running",
+      status: ScheduleRunStatuses.RUNNING,
       message: "Schedule run started.",
     });
 
     let sessionId: string | undefined;
     let responseText = "";
-    let executionStatus: ScheduleExecutionStatus = "running";
-    let deliveryStatus: ScheduleDeliveryStatus = schedule.output
-      ? "pending"
-      : "not_applicable";
-    let overallStatus: ScheduleRunStatus = "running";
+    let executionStatus: ScheduleExecutionStatus =
+      ScheduleExecutionStatuses.RUNNING;
+    let deliveryStatus: ScheduleDeliveryStatus =
+      getInitialDeliveryStatus(schedule);
+    let overallStatus: ScheduleRunStatus = ScheduleRunStatuses.RUNNING;
     let errorMessage: string | undefined;
 
     try {
@@ -243,7 +255,7 @@ export class SchedulerRunner {
           if (event.type === "tool_use") {
             this.ctx.auditLog.append({
               ts: makeNowIso(),
-              event: "schedule_run_output",
+              event: SchedulerAuditEvents.SCHEDULE_RUN_OUTPUT,
               run_id: runId,
               schedule_name: schedule.name,
               trigger_source: triggerSource,
@@ -264,11 +276,11 @@ export class SchedulerRunner {
         },
       );
       responseText = response.text.trim() ? response.text : "(no response)";
-      executionStatus = "succeeded";
+      executionStatus = ScheduleExecutionStatuses.SUCCEEDED;
 
       this.ctx.auditLog.append({
         ts: makeNowIso(),
-        event: "schedule_run_output",
+        event: SchedulerAuditEvents.SCHEDULE_RUN_OUTPUT,
         run_id: runId,
         schedule_name: schedule.name,
         trigger_source: triggerSource,
@@ -288,7 +300,7 @@ export class SchedulerRunner {
       });
     } catch (err) {
       const error = toError(err);
-      executionStatus = "failed";
+      executionStatus = ScheduleExecutionStatuses.FAILED;
       errorMessage = error.message;
       this.ctx.logger.error(
         { err: error, run_id: runId, schedule_name: schedule.name },
@@ -296,7 +308,7 @@ export class SchedulerRunner {
       );
       this.ctx.auditLog.append({
         ts: makeNowIso(),
-        event: "schedule_run_failed",
+        event: SchedulerAuditEvents.SCHEDULE_RUN_FAILED,
         run_id: runId,
         schedule_name: schedule.name,
         trigger_source: triggerSource,
@@ -311,7 +323,7 @@ export class SchedulerRunner {
               channel_id: schedule.output.channelId,
             }
           : null,
-        status: "failed",
+        status: ScheduleRunStatuses.FAILED,
         error: error.message,
         message: "Schedule run failed during execution.",
       });
@@ -325,12 +337,12 @@ export class SchedulerRunner {
             { err: error, run_id: runId, schedule_name: schedule.name },
             "schedule_run_destroy_session_error",
           );
-          if (executionStatus === "succeeded") {
-            executionStatus = "failed";
+          if (executionStatus === ScheduleExecutionStatuses.SUCCEEDED) {
+            executionStatus = ScheduleExecutionStatuses.FAILED;
             errorMessage = error.message;
             this.ctx.auditLog.append({
               ts: makeNowIso(),
-              event: "schedule_run_failed",
+              event: SchedulerAuditEvents.SCHEDULE_RUN_FAILED,
               run_id: runId,
               schedule_name: schedule.name,
               trigger_source: triggerSource,
@@ -345,7 +357,7 @@ export class SchedulerRunner {
                     channel_id: schedule.output.channelId,
                   }
                 : null,
-              status: "failed",
+              status: ScheduleRunStatuses.FAILED,
               error: error.message,
               message: "Schedule run failed while destroying session.",
             });
@@ -356,13 +368,13 @@ export class SchedulerRunner {
 
     if (schedule.output) {
       const messageToSend =
-        executionStatus === "succeeded"
+        executionStatus === ScheduleExecutionStatuses.SUCCEEDED
           ? responseText
           : buildFailureMessage(schedule.name, runId);
 
       this.ctx.auditLog.append({
         ts: makeNowIso(),
-        event: "schedule_run_delivery_started",
+        event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_STARTED,
         run_id: runId,
         schedule_name: schedule.name,
         trigger_source: triggerSource,
@@ -375,7 +387,7 @@ export class SchedulerRunner {
           type: schedule.output.type,
           channel_id: schedule.output.channelId,
         },
-        delivery_status: "pending",
+        delivery_status: ScheduleDeliveryStatuses.PENDING,
         channel_id: schedule.output.channelId,
         message: "Schedule run delivery started.",
       });
@@ -385,10 +397,10 @@ export class SchedulerRunner {
           schedule.output.channelId,
           messageToSend,
         );
-        deliveryStatus = "succeeded";
+        deliveryStatus = ScheduleDeliveryStatuses.SUCCEEDED;
         this.ctx.auditLog.append({
           ts: makeNowIso(),
-          event: "schedule_run_delivery_succeeded",
+          event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_SUCCEEDED,
           run_id: runId,
           schedule_name: schedule.name,
           trigger_source: triggerSource,
@@ -401,14 +413,14 @@ export class SchedulerRunner {
             type: schedule.output.type,
             channel_id: schedule.output.channelId,
           },
-          delivery_status: "succeeded",
+          delivery_status: ScheduleDeliveryStatuses.SUCCEEDED,
           channel_id: schedule.output.channelId,
           message: "Schedule run delivery succeeded.",
         });
       } catch (err) {
         const error = toError(err);
-        deliveryStatus = "failed";
-        if (executionStatus === "succeeded") {
+        deliveryStatus = ScheduleDeliveryStatuses.FAILED;
+        if (executionStatus === ScheduleExecutionStatuses.SUCCEEDED) {
           errorMessage = error.message;
         }
         this.ctx.logger.error(
@@ -417,7 +429,7 @@ export class SchedulerRunner {
         );
         this.ctx.auditLog.append({
           ts: makeNowIso(),
-          event: "schedule_run_delivery_failed",
+          event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_FAILED,
           run_id: runId,
           schedule_name: schedule.name,
           trigger_source: triggerSource,
@@ -430,7 +442,7 @@ export class SchedulerRunner {
             type: schedule.output.type,
             channel_id: schedule.output.channelId,
           },
-          delivery_status: "failed",
+          delivery_status: ScheduleDeliveryStatuses.FAILED,
           channel_id: schedule.output.channelId,
           error: error.message,
           message: "Schedule run delivery failed.",
@@ -439,9 +451,10 @@ export class SchedulerRunner {
     }
 
     overallStatus =
-      executionStatus === "succeeded" && deliveryStatus !== "failed"
-        ? "succeeded"
-        : "failed";
+      executionStatus === ScheduleExecutionStatuses.SUCCEEDED &&
+      deliveryStatus !== ScheduleDeliveryStatuses.FAILED
+        ? ScheduleRunStatuses.SUCCEEDED
+        : ScheduleRunStatuses.FAILED;
 
     const finishedAt = makeNowIso();
     this.ctx.store.updateRun(runId, {
@@ -455,9 +468,9 @@ export class SchedulerRunner {
     this.ctx.auditLog.append({
       ts: finishedAt,
       event:
-        overallStatus === "succeeded"
-          ? "schedule_run_completed"
-          : "schedule_run_failed",
+        overallStatus === ScheduleRunStatuses.SUCCEEDED
+          ? SchedulerAuditEvents.SCHEDULE_RUN_COMPLETED
+          : SchedulerAuditEvents.SCHEDULE_RUN_FAILED,
       run_id: runId,
       schedule_name: schedule.name,
       trigger_source: triggerSource,
@@ -476,7 +489,7 @@ export class SchedulerRunner {
       delivery_status: deliveryStatus,
       error: errorMessage,
       message:
-        overallStatus === "succeeded"
+        overallStatus === ScheduleRunStatuses.SUCCEEDED
           ? "Schedule run completed successfully."
           : "Schedule run finished with failure.",
     });

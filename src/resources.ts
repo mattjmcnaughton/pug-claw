@@ -11,6 +11,7 @@ import {
   SecretsProviders,
 } from "./constants.ts";
 import { logger } from "./logger.ts";
+import { ScheduleOutputTypes } from "./scheduler/types.ts";
 
 const SCHEDULE_NAME_REGEX = /^[a-z0-9][a-z0-9_-]*$/;
 
@@ -52,7 +53,7 @@ const SchedulerConfigSchema = z
 
 const ScheduleOutputConfigSchema = z
   .object({
-    type: z.literal("discord_channel"),
+    type: z.literal(ScheduleOutputTypes.DISCORD_CHANNEL),
     channel_id: z.string().min(1),
   })
   .strict();
@@ -118,7 +119,7 @@ export interface ResolvedSchedulerConfig {
 }
 
 export interface ResolvedScheduleOutput {
-  type: "discord_channel";
+  type: typeof ScheduleOutputTypes.DISCORD_CHANNEL;
   channelId: string;
 }
 
