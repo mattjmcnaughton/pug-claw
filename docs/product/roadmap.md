@@ -387,6 +387,12 @@ Multi-step pipelines built on top of the Command Framework (Phase 0). Commands a
 
 ---
 
+## Known Bugs
+
+- [ ] Claude driver `tool_progress` events never fire in `bypassPermissions` mode — `onEvent` callback receives no tool-use events, so Discord tool-use notifications and structured logging of tool calls are silently broken. Discovered during e2e testing. Likely an SDK limitation or missing event subscription.
+
+---
+
 ## Future / Someday
 
 - [ ] Fine-grained agent permissions (per-agent permission modes, tool allow/deny lists, filesystem sandboxing). Currently all agents run with full permissions (`bypassPermissions` on Claude, unrestricted on Pi).
