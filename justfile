@@ -1,5 +1,5 @@
-# Run all static checks (lint, format check, typecheck)
-gate: lint fmt-check typecheck
+# Run all checks (lint, format check, typecheck, tests)
+gate: lint fmt-check typecheck test
 
 # Lint source code
 lint:
