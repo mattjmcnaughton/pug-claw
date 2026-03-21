@@ -13,6 +13,8 @@ import {
   Defaults,
   Drivers,
   EnvVars,
+  FrontmatterMetadata,
+  ManagedBy,
   Paths,
   SecretsProviders,
 } from "../constants.ts";
@@ -32,7 +34,10 @@ function isManagedByPugClaw(filePath: string): boolean {
     const record = meta as Record<string, unknown>;
     const metadata = record.metadata;
     if (typeof metadata !== "object" || metadata === null) return false;
-    return (metadata as Record<string, unknown>)["managed-by"] === "pug-claw";
+    return (
+      (metadata as Record<string, unknown>)[FrontmatterMetadata.MANAGED_BY] ===
+      ManagedBy.PUG_CLAW
+    );
   } catch {
     return false;
   }
