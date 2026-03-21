@@ -19,6 +19,7 @@ import { ChannelHandler } from "../channel-handler.ts";
 import { toError } from "../resources.ts";
 import { ChatCommandRegistry } from "../chat-commands/registry.ts";
 import { createChatCommandTree } from "../chat-commands/tree.ts";
+import type { ChatCommandEnvironment } from "../chat-commands/types.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
 
 const TUI_CHANNEL_ID = "tui";
@@ -105,24 +106,29 @@ export class TuiFrontend implements Frontend {
       tui.requestRender();
     }
 
+    function makeCommandEnvironment(): ChatCommandEnvironment {
+      return {
+        channelId: TUI_CHANNEL_ID,
+        commandPrefix: "/",
+        frontend: Frontends.TUI,
+        isOwner: true,
+        handler: channelHandler,
+        actions: {
+          reload: async () => {
+            const reloaded = await ctx.reloadConfig();
+            config = reloaded.config;
+            resolveAgent = reloaded.resolveAgent;
+            pluginDirs = reloaded.pluginDirs;
+            await channelHandler.reload(config, pluginDirs, resolveAgent);
+            logger.info({}, "tui_command_reload");
+            return undefined;
+          },
+        },
+      };
+    }
+
     const autocompleteProvider = new CombinedAutocompleteProvider(
-      [
-        { name: "help", description: "Show available commands" },
-        { name: "agent", description: "Inspect and change the active agent" },
-        {
-          name: "driver",
-          description: "Inspect and change the active driver",
-        },
-        { name: "model", description: "Inspect and change the active model" },
-        {
-          name: "session",
-          description: "Inspect or reset the current session",
-        },
-        {
-          name: "system",
-          description: "Reload, restart, or quit the frontend",
-        },
-      ],
+      commandRegistry.listVisibleCommands(makeCommandEnvironment()),
       process.cwd(),
     );
 
@@ -153,24 +159,7 @@ export class TuiFrontend implements Frontend {
 
         try {
           const result = await commandRegistry.execute(
-            {
-              channelId: TUI_CHANNEL_ID,
-              commandPrefix: "/",
-              frontend: Frontends.TUI,
-              isOwner: true,
-              handler: channelHandler,
-              actions: {
-                reload: async () => {
-                  const reloaded = await ctx.reloadConfig();
-                  config = reloaded.config;
-                  resolveAgent = reloaded.resolveAgent;
-                  pluginDirs = reloaded.pluginDirs;
-                  await channelHandler.reload(config, pluginDirs, resolveAgent);
-                  logger.info({}, "tui_command_reload");
-                  return undefined;
-                },
-              },
-            },
+            makeCommandEnvironment(),
             raw,
           );
 

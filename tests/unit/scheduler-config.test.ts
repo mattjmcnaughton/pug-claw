@@ -132,6 +132,27 @@ describe("scheduler config validation", () => {
     }
   });
 
+  test("rejects channels with unknown drivers", async () => {
+    const homeDir = makeTmpDir();
+    try {
+      writeHomeConfig(homeDir, {
+        default_agent: "writer",
+        default_driver: "claude",
+        channels: {
+          "channel-1": {
+            driver: "unknown-driver",
+          },
+        },
+      });
+
+      await expect(resolveConfig({ home: homeDir })).rejects.toThrow(
+        'Channel "channel-1" references unknown driver "unknown-driver"',
+      );
+    } finally {
+      rmSync(homeDir, { recursive: true, force: true });
+    }
+  });
+
   test("rejects schedules with invalid cron expressions", async () => {
     const homeDir = makeTmpDir();
     try {

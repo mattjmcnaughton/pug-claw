@@ -140,8 +140,8 @@ export interface SecretsProvider {
 }
 
 export interface DiscordIdentity {
-  guildId: string;
-  ownerId: string;
+  guildId?: string;
+  ownerId?: string;
 }
 
 export interface ResolvedConfig {
@@ -362,6 +362,14 @@ export function validateConfigSemantics(
     validateTimezone(timezone);
   }
 
+  for (const [channelId, channel] of Object.entries(rawConfig.channels ?? {})) {
+    if (channel.driver && !isKnownDriverName(channel.driver)) {
+      throw new Error(
+        `Channel "${channelId}" references unknown driver "${channel.driver}"`,
+      );
+    }
+  }
+
   for (const [name, schedule] of Object.entries(rawConfig.schedules ?? {})) {
     if (!timezone) {
       throw new Error(
@@ -517,15 +525,10 @@ export async function resolveConfig(
   }
 
   let discord: DiscordIdentity | undefined;
-  if (rawConfig.discord?.guild_id && rawConfig.discord?.owner_id) {
+  if (rawConfig.discord?.guild_id || rawConfig.discord?.owner_id) {
     discord = {
       guildId: rawConfig.discord.guild_id,
       ownerId: rawConfig.discord.owner_id,
-    };
-  } else if (rawConfig.discord?.guild_id || rawConfig.discord?.owner_id) {
-    discord = {
-      guildId: rawConfig.discord.guild_id ?? "",
-      ownerId: rawConfig.discord.owner_id ?? "",
     };
   }
 
