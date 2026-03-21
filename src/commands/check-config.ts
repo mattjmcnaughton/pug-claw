@@ -1,8 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import type { ZodError } from "zod";
 import { Paths } from "../constants.ts";
-import { ConfigFileSchema, expandTilde } from "../resources.ts";
+import {
+  type ConfigFile,
+  ConfigFileSchema,
+  expandTilde,
+  resolveConfigPaths,
+  validateConfigSemantics,
+} from "../resources.ts";
 
 export function runCheckConfig(path?: string): void {
   const configPath = path
@@ -38,13 +44,26 @@ export function runCheckConfig(path?: string): void {
     process.exit(1);
   }
 
+  const data = result.data as ConfigFile;
+
+  try {
+    const homeDir = dirname(configPath);
+    const paths = resolveConfigPaths(homeDir, data);
+    validateConfigSemantics(data, homeDir, paths);
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    console.error(`Error: Config validation failed for ${configPath}:`);
+    console.error(`  - ${error.message}`);
+    process.exit(1);
+  }
+
   console.log(`Config OK: ${configPath}`);
-  const data = result.data;
   const summary = [
     `  default_agent: ${data.default_agent ?? "(not set)"}`,
     `  default_driver: ${data.default_driver ?? "(not set)"}`,
     `  drivers: ${data.drivers ? Object.keys(data.drivers).join(", ") : "(none)"}`,
     `  channels: ${data.channels ? Object.keys(data.channels).length : 0}`,
+    `  schedules: ${data.schedules ? Object.keys(data.schedules).length : 0}`,
   ];
   console.log(summary.join("\n"));
 }

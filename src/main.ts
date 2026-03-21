@@ -15,7 +15,12 @@ import type { Frontend } from "./frontends/types.ts";
 import { configureLogger, logger } from "./logger.ts";
 import { generateAgentPlugins } from "./plugins.ts";
 import type { ConfigOptions, ResolvedConfig } from "./resources.ts";
-import { expandTilde, resolveConfig, toError } from "./resources.ts";
+import {
+  expandTilde,
+  resolveConfig,
+  resolveLogsDir,
+  toError,
+} from "./resources.ts";
 import { resolveAgent } from "./skills.ts";
 
 function getGitCommit(): string {
@@ -34,7 +39,8 @@ async function startFrontend(
   // Resolve homeDir early for logging setup
   const rawHome = opts.home ?? process.env[EnvVars.HOME] ?? Paths.DEFAULT_HOME;
   const homeDir = resolve(expandTilde(rawHome));
-  configureLogger(mode, homeDir);
+  const logsDir = resolveLogsDir(homeDir);
+  configureLogger(mode, logsDir);
 
   const commit = getGitCommit();
   logger.info({ version: VERSION, commit }, "pug_claw_starting");
@@ -52,6 +58,7 @@ async function startFrontend(
   process.env[EnvVars.DATA_DIR] = config.dataDir;
   process.env[EnvVars.AGENTS_DIR] = config.agentsDir;
   process.env[EnvVars.SKILLS_DIR] = config.skillsDir;
+  process.env[EnvVars.LOGS_DIR] = config.logsDir;
 
   const piDefaultModel = config.drivers.pi?.defaultModel;
 

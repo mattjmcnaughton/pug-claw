@@ -1,6 +1,6 @@
 ---
 name: readwrite-pug-claw-config
-description: Edit pug-claw configuration (add channels, change defaults, update paths)
+description: Edit pug-claw configuration (add channels, schedules, change defaults, update paths)
 metadata:
   managed-by: pug-claw
 ---
@@ -71,9 +71,41 @@ Set `default_driver` to `"claude"` or `"pi"`.
 }
 ```
 
+### Add a schedule
+
+```json
+{
+  "scheduler": {
+    "timezone": "America/New_York"
+  },
+  "schedules": {
+    "daily-summary": {
+      "description": "Post a morning summary to Discord",
+      "cron": "0 9 * * *",
+      "agent": "writer",
+      "prompt": "Summarize yesterday's important activity.",
+      "output": {
+        "type": "discord_channel",
+        "channel_id": "123456789"
+      }
+    }
+  }
+}
+```
+
+When editing schedules:
+
+- use standard 5-field cron syntax
+- keep schedule names slug-like, e.g. `daily-summary`
+- ensure the referenced agent already exists
+- set `enabled: false` if the user wants the schedule defined but not automatically active
+- remember that scheduled runs always use a fresh session and do not inherit channel config
+- if the user wants Discord delivery, use `output.type = "discord_channel"`
+
 ## Important Notes
 
 - Always preserve existing fields when editing — read first, modify, then write
-- The config is validated by Zod on load — invalid JSON will prevent startup
+- The config is validated on load — invalid JSON, invalid cron expressions, unknown schedule agents, or invalid scheduler timezones will prevent startup
 - After editing, remind the user to `!reload` or `/reload` to pick up changes
+- Scheduler control commands are Discord owner-only: `!schedules` and `!schedule run <name>`
 - Back up the config before making major changes

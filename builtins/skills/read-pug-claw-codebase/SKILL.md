@@ -37,6 +37,7 @@ curl -s https://api.github.com/repos/mattjmcnaughton/pug-claw/contents/{path} | 
 | `src/drivers/` | AI backend drivers (Claude, Pi) |
 | `src/frontends/` | User-facing interfaces (Discord, TUI) |
 | `src/commands/` | CLI subcommands |
+| `src/scheduler/` | Cron scheduler runtime, store, audit log, and lock code |
 | `builtins/` | Built-in skills and agents |
 | `tests/` | Test suite |
 | `docs/` | Documentation |

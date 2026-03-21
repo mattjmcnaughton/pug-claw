@@ -9,7 +9,13 @@ export const Paths = {
   SKILLS_DIR: "skills",
   PLUGINS_DIR: "plugins",
   DATA_DIR: "data",
-  LOG_DIR: "logs/system",
+  LOGS_DIR: "logs",
+  SYSTEM_LOG_DIR: "system",
+  SCHEDULES_LOG_DIR: "schedules",
+  LOCKS_DIR: "locks",
+  SCHEDULER_LOCK_DIR: "scheduler.lock",
+  SCHEDULER_LOCK_OWNER_FILE: "owner.json",
+  RUNTIME_DB_FILE: "pug-claw.sqlite",
 } as const;
 
 export const EnvVars = {
@@ -17,6 +23,7 @@ export const EnvVars = {
   AGENTS_DIR: "PUG_CLAW_AGENTS_DIR",
   SKILLS_DIR: "PUG_CLAW_SKILLS_DIR",
   DATA_DIR: "PUG_CLAW_DATA_DIR",
+  LOGS_DIR: "PUG_CLAW_LOGS_DIR",
   LOG_LEVEL: "LOG_LEVEL",
 } as const;
 
@@ -29,6 +36,7 @@ export const Defaults = {
   AGENT: "default",
   DRIVER: "claude",
   SECRETS_PROVIDER: "env",
+  SCHEDULER_POLL_INTERVAL_MS: 15_000,
 } as const;
 
 export const SecretsProviders = {

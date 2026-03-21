@@ -43,9 +43,11 @@ To give the agent access to additional directories without changing the `cwd`, c
 
 ### Session behavior
 
+- Interactive channel sessions are reused until reset
 - Each session starts with an initialization query to establish a session ID
 - Subsequent queries resume the same session, preserving conversation context
 - `!new` destroys the session and starts fresh
+- Scheduled runs do **not** reuse interactive sessions; every scheduler run uses a fresh session
 
 ## Pi driver
 
@@ -87,9 +89,10 @@ openai-codex/gpt-5.4
 
 ### Session behavior
 
-- Sessions run in-memory with compaction and retry enabled
+- Interactive sessions run in-memory with compaction and retry enabled
 - The system prompt is injected via a resource loader override
 - Full coding tools are available by default
+- Scheduled runs use a fresh session for each execution
 
 ## Switching drivers
 

@@ -34,6 +34,7 @@ bun run init
 | `OPENROUTER_API_KEY` | No | OpenRouter API key (Pi driver) |
 | `LOG_LEVEL` | No | `debug`, `info` (default), `warn`, `error`, `fatal` |
 | `NODE_ENV` | No | Set to `production` for JSON logs |
+| `PUG_CLAW_LOGS_DIR` | No | Override the logs directory (default: `<home>/logs`) |
 
 ## Running directly
 
@@ -44,6 +45,11 @@ bun run start
 # TUI mode (for testing)
 bun run tui
 ```
+
+Scheduler note:
+
+- the cron scheduler runs only in Discord mode
+- `bun run tui` never starts the scheduler
 
 ## systemd service
 
@@ -69,12 +75,14 @@ Restart=on-failure
 RestartSec=5
 
 EnvironmentFile=/opt/pug-claw/.env
+Environment=PUG_CLAW_HOME=/var/lib/pug-claw
+Environment=PUG_CLAW_LOGS_DIR=/var/log/pug-claw
 
 # Hardening
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/opt/pug-claw
+ReadWritePaths=/opt/pug-claw /var/lib/pug-claw /var/log/pug-claw
 PrivateTmp=true
 
 [Install]
@@ -87,7 +95,8 @@ WantedBy=multi-user.target
 
 ```bash
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin pug-claw
-sudo chown -R pug-claw:pug-claw /opt/pug-claw
+sudo mkdir -p /var/lib/pug-claw /var/log/pug-claw
+sudo chown -R pug-claw:pug-claw /opt/pug-claw /var/lib/pug-claw /var/log/pug-claw
 ```
 
 ### Enable and start
@@ -119,6 +128,22 @@ sudo systemctl stop pug-claw
 In production, set `NODE_ENV=production` in your `.env` file. This outputs structured JSON logs (one JSON object per line), which integrates well with `journalctl` and log aggregation tools.
 
 For development or debugging, omit `NODE_ENV` to get colorized pretty-printed output via `pino-pretty`.
+
+Log locations:
+
+- system logs: `${PUG_CLAW_LOGS_DIR:-<home>/logs}/system/`
+- scheduler audit logs: `${PUG_CLAW_LOGS_DIR:-<home>/logs}/schedules/`
+
+Scheduler runtime state lives under `${PUG_CLAW_DATA_DIR:-<home>/data}` and includes:
+
+- `pug-claw.sqlite`
+- `locks/scheduler.lock/owner.json`
+
+## Scheduler operations
+
+The scheduler uses a single-host lock. If multiple Discord bot processes run on the same host and share the same `data/` directory, only one will execute schedules. Other instances still run the bot, but `!schedule run <name>` will be refused on those inactive instances.
+
+Use `!schedules` in Discord to verify whether the current bot process is the active scheduler.
 
 ## Updating
 
