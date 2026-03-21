@@ -41,10 +41,12 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     agentsDir: "/tmp/test/agents",
     skillsDir: "/tmp/test/skills",
     dataDir: "/tmp/test/data",
+    logsDir: "/tmp/test/logs",
     defaultAgent: "default",
     defaultDriver: "mock",
     drivers: {},
     channels: {},
+    schedules: {},
     discord: { guildId: "guild-1", ownerId: OWNER_ID },
     secrets: {
       get: () => undefined,

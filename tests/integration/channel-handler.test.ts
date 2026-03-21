@@ -35,10 +35,12 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     agentsDir: resolve(tmpDir, "agents"),
     skillsDir: resolve(tmpDir, "skills"),
     dataDir: "/tmp/test/data",
+    logsDir: "/tmp/test/logs",
     defaultAgent: "default",
     defaultDriver: "fake",
     drivers: {},
     channels: {},
+    schedules: {},
     secrets: {
       get: () => undefined,
       require: (k: string) => k,

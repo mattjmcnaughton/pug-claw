@@ -23,6 +23,8 @@ The config file is a JSON object with these top-level fields:
 | `default_driver` | string | Default AI driver (e.g., "claude") |
 | `drivers` | object | Per-driver config (each key is a driver name, value has optional `default_model`) |
 | `channels` | object | Per-channel overrides (each key is a channel ID, value has optional `agent`, `driver`, `model`, `tools`) |
+| `scheduler` | object | Scheduler config, currently `timezone` |
+| `schedules` | object | Scheduled jobs keyed by schedule name |
 | `paths` | object | Optional path overrides: `agents_dir`, `skills_dir`, `data_dir` |
 | `secrets` | object | Secrets provider config: `provider` ("env" or "dotenv"), optional `dotenv_path` |
 | `discord` | object | Discord config: `guild_id`, `owner_id` |
@@ -30,6 +32,37 @@ The config file is a JSON object with these top-level fields:
 ## How to Read
 
 Use the Read tool to read `$PUG_CLAW_HOME/config.json`. If `PUG_CLAW_HOME` is not set, use `~/.pug-claw/config.json`.
+
+## Scheduler Fields
+
+`config.json` can define scheduled jobs like this:
+
+```json
+{
+  "scheduler": {
+    "timezone": "America/New_York"
+  },
+  "schedules": {
+    "daily-summary": {
+      "cron": "0 9 * * *",
+      "agent": "writer",
+      "prompt": "Post today's summary.",
+      "output": {
+        "type": "discord_channel",
+        "channel_id": "123456789"
+      }
+    }
+  }
+}
+```
+
+Schedule notes:
+
+- `scheduler.timezone` is required when `schedules` is present
+- each schedule needs `cron`, `agent`, and `prompt`
+- optional fields include `description`, `enabled`, `driver`, `model`, and `output`
+- schedules do not inherit channel-specific config
+- successful scheduled Discord output contains only the final response text
 
 ## Directory Structure
 
@@ -39,8 +72,10 @@ Use the Read tool to read `$PUG_CLAW_HOME/config.json`. If `PUG_CLAW_HOME` is no
   agents/              # Agent definitions
     default/SYSTEM.md
   skills/              # Global skills
-  data/                # Runtime data
-  logs/system/         # Log files
+  data/                # Runtime data, SQLite DB, locks
+  logs/
+    system/            # Application logs
+    schedules/         # Scheduler audit logs
 ```
 
 ## Inspecting Agents and Skills

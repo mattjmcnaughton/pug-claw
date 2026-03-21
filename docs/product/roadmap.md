@@ -20,6 +20,7 @@
 - [x] Built-in agents (default, pug-claw-manager)
 - [x] SYSTEM.md frontmatter with per-agent skill filtering (`allowed-skills`)
 - [x] `pug-claw init --builtins-only` for updating built-in content
+- [x] Cron / scheduler v1 for Discord-hosted recurring agent jobs
 
 ---
 
@@ -55,7 +56,7 @@ Agents have zero awareness of who they're talking to. Needed by memory, permissi
 
 - [x] Zod-validated `config.json` with clear error messages on invalid data
 - [x] Hard-fail with actionable "Run `pug-claw init`" message when config missing
-- [ ] Refine and extend `config.json` schema for new features
+- [x] Refine and extend `config.json` schema for new features — *partial: scheduler config and schedules added; broader future config areas still remain*
 - [x] Config validation CLI command (`pug-claw check-config`)
 - [ ] Toggle visibility of agent thinking (show/hide reasoning traces per agent or frontend)
 - [ ] Toggle visibility of agent tool calls (show/hide tool invocations and results per agent or frontend) — *partial: Discord shows tool events via `onEvent` callback; TUI does not; no per-agent/frontend config toggle*
@@ -75,7 +76,7 @@ Refine the "session" primitive — a context window with an agent, regardless of
 Pluggable backends for databases and file stores.
 
 - [ ] Storage provider interface: abstract over where data lives
-- [ ] Database backends: SQLite (default/local), PostgreSQL (production)
+- [ ] Database backends: SQLite (default/local), PostgreSQL (production) — *partial: SQLite runtime DB added for scheduler metadata only*
 - [ ] File store backends: local filesystem (default), S3-compatible
 - [ ] Prisma for schema management and migrations (introduce when DB schemas stabilize)
 - [ ] Configuration in `config.json` under a `[storage]` section
@@ -125,7 +126,7 @@ Get pug-claw running on a real server as early as possible. Everything else gets
 - [x] SystemD unit file generation (`pug-claw init-service`)
 - [ ] Graceful shutdown: drain sessions, flush logs — *partial: frontends call `destroySession()` on quit/Ctrl+C; no system-wide signal handlers or log flushing*
 - [ ] Health check endpoint (for systemd watchdog, uptime monitoring)
-- [ ] JSONL structured logs from all agent interactions (audit trail)
+- [ ] JSONL structured logs from all agent interactions (audit trail) — *partial: scheduler JSONL audit logs implemented; full conversation audit trail still pending*
 
 ### Safe Restart
 
@@ -216,10 +217,10 @@ A job is anything running outside the main execution thread. Covers both timer-b
 
 Simple timer-based agent actions. Enables conversation capture, memory compaction, brain reindexing, and daily summaries without full workflow infrastructure.
 
-- [ ] Schedule config in `config.json` or `schedules.yaml`
-- [ ] Timer runtime (`setInterval`-based, runs inside the main process)
-- [ ] Each job: agent + prompt + output target (Discord channel, brain, log only)
-- [ ] `!schedules` / `/schedules` command to list active jobs
+- [x] Schedule config in `config.json`
+- [x] Timer runtime (polling loop + cron parsing, runs inside the main Discord process)
+- [ ] Each job: agent + prompt + output target (Discord channel, brain, log only) — *partial: Discord channel output + built-in logging implemented*
+- [x] `!schedules` command to list active jobs — *TUI command intentionally out of scope for v1*
 - [ ] Built-in jobs: brain reindex, memory compaction
 
 #### Agent-Spawned Jobs

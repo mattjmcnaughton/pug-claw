@@ -1,8 +1,97 @@
 import { Client, GatewayIntentBits, type Message } from "discord.js";
 import { ChannelHandler } from "../channel-handler.ts";
-import { Limits } from "../constants.ts";
 import { toError } from "../resources.ts";
+import { DiscordSchedulerOutputSink } from "../scheduler/discord-output.ts";
+import { chunkMessage } from "../scheduler/output.ts";
+import { SchedulerRuntime } from "../scheduler/runtime.ts";
+import type { ScheduleSummary } from "../scheduler/types.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
+
+interface SendableChannel {
+  send(text: string): Promise<unknown>;
+}
+
+function formatDateTime(date: Date, timezone: string): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZoneName: "short",
+  });
+
+  const parts = formatter.formatToParts(date);
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+  return `${values.get("year")}-${values.get("month")}-${values.get("day")} ${values.get("hour")}:${values.get("minute")} ${values.get("timeZoneName")}`;
+}
+
+function formatSchedulesMessages(
+  summaries: ScheduleSummary[],
+  timezone: string,
+  schedulerActive: boolean,
+): string[] {
+  const blocks: string[] = [];
+
+  if (!schedulerActive) {
+    blocks.push(
+      "Scheduler is disabled on this instance (lock not acquired).\n",
+    );
+  }
+
+  if (summaries.length === 0) {
+    blocks.push("**Schedules**\n(none configured)");
+    return blocks;
+  }
+
+  const lines = ["**Schedules**"];
+  for (const summary of summaries) {
+    const schedule = summary.schedule;
+    const enabledText = schedule.enabled ? "enabled" : "disabled";
+    const stateText = summary.currentlyRunning ? "running" : "idle";
+    const outputText = schedule.output
+      ? `<#${schedule.output.channelId}>`
+      : "none";
+    const nextText =
+      schedule.enabled && summary.nextRunAt
+        ? formatDateTime(summary.nextRunAt, timezone)
+        : "disabled";
+    const lastText = summary.lastRun
+      ? `${summary.lastRun.status} at ${formatDateTime(new Date(summary.lastRun.startedAt), timezone)}`
+      : "never";
+
+    lines.push(`- \`${schedule.name}\` — ${enabledText}, ${stateText}`);
+    lines.push(`  cron: \`${schedule.cron}\` (\`${timezone}\`)`);
+    lines.push(`  agent: \`${schedule.agent}\``);
+    lines.push(`  output: ${outputText}`);
+    lines.push(`  next: \`${nextText}\``);
+    lines.push(`  last: \`${lastText}\``);
+  }
+
+  let current = "";
+  for (const line of lines) {
+    const candidate = current ? `${current}\n${line}` : line;
+    if (candidate.length > 1900 && current) {
+      blocks.push(current);
+      current = line;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) {
+    blocks.push(current);
+  }
+
+  return blocks;
+}
+
+async function sendText(channel: SendableChannel, text: string): Promise<void> {
+  for (const chunk of chunkMessage(text)) {
+    await channel.send(chunk);
+  }
+}
 
 export class DiscordFrontend implements Frontend {
   async start(ctx: FrontendContext): Promise<void> {
@@ -26,34 +115,136 @@ export class DiscordFrontend implements Frontend {
       "!",
     );
 
+    const outputSink = new DiscordSchedulerOutputSink(client);
+    let schedulerRuntime: SchedulerRuntime | undefined;
+
+    function hasSchedules(): boolean {
+      return Object.keys(config.schedules).length > 0;
+    }
+
+    function ensureSchedulerRuntime(): void {
+      if (!hasSchedules()) {
+        return;
+      }
+      if (schedulerRuntime) {
+        return;
+      }
+      schedulerRuntime = new SchedulerRuntime({
+        drivers,
+        config,
+        pluginDirs,
+        resolveAgent,
+        logger,
+        outputSink,
+      });
+      schedulerRuntime.initialize();
+    }
+
+    function syncSchedulerRuntime(): void {
+      if (!hasSchedules()) {
+        if (schedulerRuntime) {
+          schedulerRuntime.stop();
+          schedulerRuntime = undefined;
+        }
+        return;
+      }
+
+      if (!schedulerRuntime) {
+        ensureSchedulerRuntime();
+        return;
+      }
+
+      schedulerRuntime.reload(config, pluginDirs, resolveAgent);
+    }
+
+    async function handleSchedulesCommand(message: Message): Promise<boolean> {
+      const channel = message.channel as SendableChannel;
+      if (message.author.id !== config.discord?.ownerId) {
+        await channel.send("Only the bot owner can use this command.");
+        return true;
+      }
+
+      const timezone = config.scheduler?.timezone ?? "UTC";
+      const summaries = schedulerRuntime?.listSchedules() ?? [];
+      const messages = formatSchedulesMessages(
+        summaries,
+        timezone,
+        schedulerRuntime ? schedulerRuntime.isActive() : true,
+      );
+      for (const text of messages) {
+        await sendText(channel, text);
+      }
+      return true;
+    }
+
+    async function handleScheduleCommand(
+      message: Message,
+      arg: string,
+    ): Promise<boolean> {
+      const channel = message.channel as SendableChannel;
+      if (message.author.id !== config.discord?.ownerId) {
+        await channel.send("Only the bot owner can use this command.");
+        return true;
+      }
+
+      const parts = arg.split(/\s+/, 2);
+      const subcommand = parts[0]?.toLowerCase() ?? "";
+      const scheduleName = parts[1]?.trim() ?? "";
+
+      if (subcommand !== "run" || !scheduleName) {
+        await channel.send("Usage: `!schedule run <name>`");
+        return true;
+      }
+
+      if (!schedulerRuntime) {
+        await channel.send(`Unknown schedule "${scheduleName}".`);
+        return true;
+      }
+
+      const result = schedulerRuntime.runSchedule(scheduleName);
+      if (!result.ok) {
+        if (result.reason === "inactive") {
+          await channel.send("Scheduler is not active on this instance.");
+          return true;
+        }
+        if (result.reason === "already_running") {
+          await channel.send(`Schedule "${scheduleName}" is already running.`);
+          return true;
+        }
+        await channel.send(`Unknown schedule "${scheduleName}".`);
+        return true;
+      }
+
+      await channel.send(
+        `Triggered schedule "${scheduleName}". run_id: ${result.runId}`,
+      );
+      return true;
+    }
+
     async function handleCommand(message: Message): Promise<boolean> {
       const content = message.content.trim();
       if (!content.startsWith("!")) return false;
       if (!("send" in message.channel)) return false;
 
+      const channel = message.channel as SendableChannel;
       const parts = content.slice(1).split(/\s+/, 2);
       const cmd = parts[0]?.toLowerCase() ?? "";
       const arg = parts[1]?.trim() ?? "";
       const channelId = message.channelId;
 
-      // Owner-only commands stay in the frontend
       if (cmd === "restart") {
         if (message.author.id !== config.discord?.ownerId) {
-          await message.channel.send(
-            "Only the bot owner can use this command.",
-          );
+          await channel.send("Only the bot owner can use this command.");
           return true;
         }
         logger.info({ channel_id: channelId }, "command_restart");
-        await message.channel.send("Restarting...");
+        await channel.send("Restarting...");
         process.exit(1);
       }
 
       if (cmd === "reload") {
         if (message.author.id !== config.discord?.ownerId) {
-          await message.channel.send(
-            "Only the bot owner can use this command.",
-          );
+          await channel.send("Only the bot owner can use this command.");
           return true;
         }
         try {
@@ -62,31 +253,40 @@ export class DiscordFrontend implements Frontend {
           resolveAgent = reloaded.resolveAgent;
           pluginDirs = reloaded.pluginDirs;
           await channelHandler.reload(config, pluginDirs, resolveAgent);
-          await message.channel.send(
-            "Config, agents, and skills reloaded. All sessions reset.",
+          syncSchedulerRuntime();
+          await channel.send(
+            "Config, agents, skills, and schedules reloaded. All sessions reset.",
           );
           logger.info({ channel_id: channelId }, "command_reload");
         } catch (err) {
           const error = toError(err);
           logger.error({ err: error }, "reload_error");
-          await message.channel.send(`Reload failed: ${error.message}`);
+          await channel.send(`Reload failed: ${error.message}`);
         }
         return true;
       }
 
-      // Delegate to ChannelHandler for shared commands
+      if (cmd === "schedules") {
+        return handleSchedulesCommand(message);
+      }
+
+      if (cmd === "schedule") {
+        return handleScheduleCommand(message, arg);
+      }
+
       const result = await channelHandler.handleCommand(channelId, cmd, arg);
       if (result !== null) {
-        // Append frontend-specific commands to help text
         if (cmd === "help") {
-          await message.channel.send(
+          await channel.send(
             result +
               "\n" +
-              "`!reload` — Reload config, agents, and skills from disk\n" +
+              "`!schedules` — List configured schedules (owner only)\n" +
+              "`!schedule run <name>` — Manually run a schedule (owner only)\n" +
+              "`!reload` — Reload config, agents, skills, and schedules from disk\n" +
               "`!restart` — Restart the process (requires systemd)",
           );
         } else {
-          await message.channel.send(result);
+          await channel.send(result);
         }
         return true;
       }
@@ -171,12 +371,10 @@ export class DiscordFrontend implements Frontend {
         "response_sent",
       );
 
-      for (let i = 0; i < text.length; i += Limits.DISCORD_MESSAGE_LENGTH) {
-        await message.channel.send(
-          text.slice(i, i + Limits.DISCORD_MESSAGE_LENGTH),
-        );
-      }
+      await sendText(message.channel, text);
     });
+
+    ensureSchedulerRuntime();
 
     const token = config.secrets.require("DISCORD_BOT_TOKEN");
     await client.login(token);

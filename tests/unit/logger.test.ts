@@ -34,9 +34,10 @@ describe("configureLogger", () => {
     const tmpDir = makeTmpDir();
     tmpDirs.push(tmpDir);
 
-    configureLogger("tui", tmpDir);
+    const logsDir = resolve(tmpDir, "logs");
+    configureLogger("tui", logsDir);
 
-    const logDir = resolve(tmpDir, "logs", "system");
+    const logDir = resolve(logsDir, "system");
     expect(existsSync(logDir)).toBe(true);
   });
 
@@ -44,9 +45,10 @@ describe("configureLogger", () => {
     const tmpDir = makeTmpDir();
     tmpDirs.push(tmpDir);
 
-    configureLogger("discord", tmpDir);
+    const logsDir = resolve(tmpDir, "logs");
+    configureLogger("discord", logsDir);
 
-    const logDir = resolve(tmpDir, "logs", "system");
+    const logDir = resolve(logsDir, "system");
     expect(existsSync(logDir)).toBe(true);
   });
 });

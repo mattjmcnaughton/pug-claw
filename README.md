@@ -1,6 +1,6 @@
 # pug-claw
 
-A multi-driver AI agent bot with Discord and TUI frontends. Swap between **Claude** (via Agent SDK) and **Pi** (via OpenRouter/Codex) backends on the fly, with per-channel configuration and a pluggable agent/skills system.
+A multi-driver AI agent bot with Discord and TUI frontends. Swap between **Claude** (via Agent SDK) and **Pi** (via OpenRouter/Codex) backends on the fly, with per-channel configuration, a pluggable agent/skills system, and a Discord-hosted cron scheduler for recurring agent jobs.
 
 ## Prerequisites
 
@@ -65,12 +65,20 @@ PUG_CLAW_HOME=/opt/pug-claw bun run init
 
 ### Config file
 
-All configuration lives in `~/.pug-claw/config.json` (created by `pug-claw init`):
+All configuration lives in `~/.pug-claw/config.json` (created by `pug-claw init`). See also:
+
+- [docs/configuration.md](docs/configuration.md)
+- [docs/scheduler.md](docs/scheduler.md)
+
+Example:
 
 ```json
 {
   "default_agent": "default",
   "default_driver": "claude",
+  "scheduler": {
+    "timezone": "America/New_York"
+  },
   "drivers": {
     "claude": {},
     "pi": {
@@ -81,6 +89,17 @@ All configuration lives in `~/.pug-claw/config.json` (created by `pug-claw init`
     "123456789": {
       "driver": "pi",
       "model": "openrouter/openai/gpt-4o"
+    }
+  },
+  "schedules": {
+    "daily-summary": {
+      "cron": "0 9 * * *",
+      "agent": "default",
+      "prompt": "Post today's summary.",
+      "output": {
+        "type": "discord_channel",
+        "channel_id": "123456789"
+      }
     }
   },
   "secrets": {
@@ -103,6 +122,7 @@ All configuration lives in `~/.pug-claw/config.json` (created by `pug-claw init`
 | `LOG_LEVEL` | No | Logging level: `debug`, `info` (default), `warn`, `error`, `fatal` |
 | `NODE_ENV` | No | Set to `production` for JSON log output; otherwise uses pretty-printing |
 | `PUG_CLAW_HOME` | No | Override the home directory (default: `~/.pug-claw`) |
+| `PUG_CLAW_LOGS_DIR` | No | Override the logs directory (default: `<home>/logs`) |
 
 Secrets can be provided via environment variables directly, or via a `.env` file when `"secrets": {"provider": "dotenv"}` is set in `config.json`.
 
@@ -134,6 +154,20 @@ bun run tui
 | `status` | Show current driver, agent, model, and session state |
 | `help` | Show available commands |
 
+**Discord owner-only scheduler commands:**
+
+| Command | Description |
+|---------|-------------|
+| `!schedules` | List configured schedules, status, and next run |
+| `!schedule run <name>` | Trigger a manual run of a schedule |
+
+Scheduler notes:
+
+- The scheduler runs only in Discord mode (`pug-claw start`)
+- Every scheduled run uses a fresh agent session
+- Successful scheduled output posts only the final response text
+- Failures post a short message with a searchable `run_id`
+
 ## Architecture
 
 ```
@@ -161,7 +195,10 @@ src/
       SYSTEM.md        # Default agent system prompt
       skills/          # Agent-specific skills
   skills/              # Global skills (available to all agents)
-  data/                # Runtime data
+  data/                # Runtime data (SQLite runtime DB, locks)
+  logs/
+    system/            # General application logs
+    schedules/         # Scheduler audit logs (JSONL)
   .env                 # Optional dotenv secrets file
 ```
 
@@ -169,6 +206,8 @@ src/
 
 - **claude** — Uses `@anthropic-ai/claude-agent-sdk`. Model aliases: `sonnet` (claude-sonnet-4-6), `opus` (claude-opus-4-6).
 - **pi** — Uses `@mariozechner/pi-coding-agent`. Supports any model via OpenRouter, OpenAI Codex OAuth, or other providers. Default: `openrouter/minimax/minimax-m2.5`.
+
+See [docs/drivers.md](docs/drivers.md) for more detail.
 
 ### Agents and skills
 

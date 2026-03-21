@@ -13,10 +13,6 @@ export function getLogDateString(): string {
   return `${y}-${m}-${d}`;
 }
 
-// Proxy-based logger that always delegates to the current backing instance.
-// This ensures that modules importing `logger` at the top level always see
-// the configured instance, even if they captured the reference before
-// `configureLogger` was called.
 let _backing: Logger = pino({ level: "warn" }, pino.destination(2));
 
 export const logger: Logger = new Proxy({} as Logger, {
@@ -27,12 +23,12 @@ export const logger: Logger = new Proxy({} as Logger, {
 
 export function configureLogger(
   mode: "discord" | "tui",
-  homeDir: string,
+  logsDir: string,
 ): void {
-  const logDir = resolve(homeDir, Paths.LOG_DIR);
-  mkdirSync(logDir, { recursive: true });
+  const systemLogDir = resolve(logsDir, Paths.SYSTEM_LOG_DIR);
+  mkdirSync(systemLogDir, { recursive: true });
 
-  const logFile = resolve(logDir, `pug-claw-${getLogDateString()}.log`);
+  const logFile = resolve(systemLogDir, `pug-claw-${getLogDateString()}.log`);
   const fileStream = pino.destination(logFile);
   const level = process.env[EnvVars.LOG_LEVEL] ?? "info";
 
@@ -46,7 +42,6 @@ export function configureLogger(
       ]),
     );
   } else {
-    // TUI mode: file only (no stdout pollution)
     _backing = pino({ level }, fileStream);
   }
 }

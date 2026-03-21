@@ -265,10 +265,16 @@ export async function runInit(builtinsOnly = false): Promise<void> {
     ownerId = ownerInput;
   }
 
+  const serverTimezone =
+    Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+
   // Build config
   const config: ConfigFile = {
     default_agent: defaultAgent,
     default_driver: defaultDriver,
+    scheduler: {
+      timezone: serverTimezone,
+    },
     drivers: {
       [Drivers.CLAUDE]: {},
       [Drivers.PI]: {},
@@ -305,7 +311,9 @@ export async function runInit(builtinsOnly = false): Promise<void> {
   mkdirSync(skillsDir, { recursive: true });
   mkdirSync(resolve(resolvedHome, Paths.PLUGINS_DIR), { recursive: true });
   mkdirSync(dataDir, { recursive: true });
-  mkdirSync(resolve(resolvedHome, Paths.LOG_DIR), { recursive: true });
+  mkdirSync(resolve(resolvedHome, Paths.LOGS_DIR, Paths.SYSTEM_LOG_DIR), {
+    recursive: true,
+  });
 
   // Write config.json
   writeFileSync(

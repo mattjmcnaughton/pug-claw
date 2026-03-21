@@ -11,7 +11,7 @@ pug-claw init
 # or: bun run init
 ```
 
-This creates `~/.pug-claw/` with a `config.json`, default agent, and optional `.env` template.
+This creates `~/.pug-claw/` with a `config.json`, default agent, and optional `.env` template. It also initializes `scheduler.timezone` from the host machine's current timezone.
 
 ## Home directory
 
@@ -32,13 +32,16 @@ The home directory must exist and contain a `config.json`. If it doesn't, pug-cl
       SYSTEM.md        # Agent system prompt
       skills/          # Agent-specific skills
   skills/              # Global skills (available to all agents)
-  data/                # Runtime data (memory, conversations, logs)
+  data/                # Runtime data (SQLite runtime DB, locks, future artifacts)
+  logs/
+    system/            # Application logs
+    schedules/         # Scheduler audit logs (JSONL)
   .env                 # Optional dotenv secrets file
 ```
 
 ## config.json
 
-All fields are optional. Missing fields use sensible defaults.
+Most fields are optional. Missing fields use sensible defaults. One exception: `scheduler.timezone` is required whenever `schedules` are configured.
 
 ### Full schema
 
@@ -50,6 +53,9 @@ All fields are optional. Missing fields use sensible defaults.
     "agents_dir": "agents",
     "skills_dir": "skills",
     "data_dir": "data"
+  },
+  "scheduler": {
+    "timezone": "America/New_York"
   },
   "drivers": {
     "claude": {},
@@ -63,6 +69,18 @@ All fields are optional. Missing fields use sensible defaults.
       "driver": "pi",
       "model": "openrouter/openai/gpt-4o",
       "tools": ["Read", "Glob", "Grep"]
+    }
+  },
+  "schedules": {
+    "daily-summary": {
+      "description": "Post a morning summary to Discord",
+      "cron": "0 9 * * *",
+      "agent": "writer",
+      "prompt": "Summarize yesterday's important activity.",
+      "output": {
+        "type": "discord_channel",
+        "channel_id": "123456789"
+      }
     }
   },
   "secrets": {
@@ -83,8 +101,10 @@ All fields are optional. Missing fields use sensible defaults.
 | `default_agent` | string | `"default"` | Agent to use when no channel-specific override exists |
 | `default_driver` | string | `"claude"` | Driver to use by default (`claude` or `pi`) |
 | `paths` | object | — | Custom paths for agents, skills, and data directories |
+| `scheduler` | object | — | Scheduler configuration, currently `timezone` |
 | `drivers` | object | `{}` | Per-driver configuration |
 | `channels` | object | `{}` | Per-channel overrides keyed by Discord channel ID |
+| `schedules` | object | `{}` | Scheduled agent jobs keyed by schedule name |
 | `secrets` | object | — | Secrets provider configuration |
 | `discord` | object | — | Discord identity configuration |
 
@@ -99,6 +119,53 @@ All paths are relative to the home directory unless absolute. Each can also be o
 | `data_dir` | `--data-dir` | `PUG_CLAW_DATA_DIR` | `data` |
 
 **Override precedence:** CLI flag > environment variable > config file > default.
+
+Logs are configured separately via `PUG_CLAW_LOGS_DIR` and default to `<home>/logs`.
+
+### Scheduler
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timezone` | string | Required when `schedules` is present. Must be a valid IANA timezone such as `America/New_York` or `UTC`. |
+
+### Schedules
+
+Schedules are keyed by name. Schedule names must match `^[a-z0-9][a-z0-9_-]*$`.
+
+Each schedule supports:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `description` | string | No | Human-readable description |
+| `enabled` | boolean | No | Defaults to `true`; `false` disables automatic cron execution |
+| `cron` | string | Yes | Standard 5-field cron expression |
+| `agent` | string | Yes | Agent name to run |
+| `driver` | string | No | Optional driver override |
+| `model` | string | No | Optional model override |
+| `prompt` | string | Yes | Prompt sent to the agent for each run |
+| `output` | object | No | Optional explicit output target |
+
+Supported `output` values:
+
+```json
+{
+  "type": "discord_channel",
+  "channel_id": "123456789"
+}
+```
+
+Scheduler semantics:
+
+- schedules run only in Discord mode
+- each run uses a fresh session
+- successful Discord delivery posts only the final response text
+- failures post a short message with a `run_id`
+- missed runs are skipped
+- overlapping runs are skipped
+- disabled schedules can still be triggered manually with `!schedule run <name>`
+- schedules do not inherit per-channel Discord config
+
+See [scheduler.md](./scheduler.md) for the operational guide.
 
 ### Driver configuration
 
@@ -148,7 +215,16 @@ For each runtime setting, pug-claw resolves in this order:
 
 ### Validation
 
-`config.json` is validated at startup using Zod schemas. If the file contains invalid data, pug-claw will fail to start with a descriptive error.
+`config.json` is validated at startup using Zod schemas and additional semantic checks. If the file contains invalid data, pug-claw will fail to start with a descriptive error.
+
+Scheduler validation includes:
+
+- missing `scheduler.timezone` when `schedules` are present
+- invalid schedule names
+- invalid IANA timezone names
+- invalid cron expressions
+- unknown schedule agents
+- unknown schedule drivers
 
 ## Environment variables
 
@@ -162,3 +238,4 @@ These environment variables are used by pug-claw regardless of secrets provider:
 | `LOG_LEVEL` | No | `info` | Log verbosity: `debug`, `info`, `warn`, `error`, `fatal` |
 | `NODE_ENV` | No | — | Set to `production` for JSON log output |
 | `PUG_CLAW_HOME` | No | `~/.pug-claw` | Override the home directory |
+| `PUG_CLAW_LOGS_DIR` | No | `<home>/logs` | Override the logs directory |

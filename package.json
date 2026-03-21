@@ -19,6 +19,7 @@
     "@mariozechner/pi-tui": "latest",
     "chalk": "^5.4.1",
     "commander": "^14.0.3",
+    "croner": "^10.0.1",
     "discord.js": "^14.18.0",
     "js-yaml": "^4.1.0",
     "pino": "^9.6.0",
