@@ -142,7 +142,8 @@ export class PiDriver implements Driver {
     model: Model<Api>;
     provider: string;
   } {
-    const { provider, modelId } = parsePiModelString(modelStr);
+    const resolved = this.availableModels[modelStr] ?? modelStr;
+    const { provider, modelId } = parsePiModelString(resolved);
     // biome-ignore lint/suspicious/noExplicitAny: pi-ai uses narrow union types for provider/model params
     const model = getModel(provider as any, modelId as any);
     if (!model) {

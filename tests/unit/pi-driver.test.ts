@@ -3,6 +3,7 @@ import {
   buildPiSystemPrompt,
   createPiEventHandler,
   parsePiModelString,
+  PiDriver,
 } from "../../src/drivers/pi.ts";
 import type { DriverEvent } from "../../src/drivers/types.ts";
 
@@ -25,6 +26,60 @@ describe("parsePiModelString", () => {
     expect(() => parsePiModelString("no-slash")).toThrow(
       'Pi model must be in "provider/model-id" format',
     );
+  });
+});
+
+// --- PiDriver.availableModels alias resolution ---
+
+describe("PiDriver model alias resolution", () => {
+  test("availableModels contains expected aliases", async () => {
+    const driver = await PiDriver.create();
+    expect(driver.availableModels["gpt"]).toBe("openai-codex/gpt-5.4");
+    expect(driver.availableModels["minimax"]).toBe(
+      "openrouter/minimax/minimax-m2.5",
+    );
+  });
+
+  test("alias is expanded before parsing in createSession", async () => {
+    const driver = await PiDriver.create("gpt");
+    // createSession will fail at the Pi SDK layer (no auth), but it should
+    // NOT fail with the "provider/model-id" format error — that would mean
+    // the alias was not expanded.
+    try {
+      await driver.createSession({
+        systemPrompt: "test",
+        model: "gpt",
+      });
+    } catch (err) {
+      const msg = (err as Error).message;
+      expect(msg).not.toContain('Pi model must be in "provider/model-id"');
+    }
+  });
+
+  test("alias is expanded for minimax alias", async () => {
+    const driver = await PiDriver.create("minimax");
+    try {
+      await driver.createSession({
+        systemPrompt: "test",
+        model: "minimax",
+      });
+    } catch (err) {
+      const msg = (err as Error).message;
+      expect(msg).not.toContain('Pi model must be in "provider/model-id"');
+    }
+  });
+
+  test("fully-qualified model string still works", async () => {
+    const driver = await PiDriver.create();
+    try {
+      await driver.createSession({
+        systemPrompt: "test",
+        model: "openai-codex/gpt-5.4",
+      });
+    } catch (err) {
+      const msg = (err as Error).message;
+      expect(msg).not.toContain('Pi model must be in "provider/model-id"');
+    }
   });
 });
 
