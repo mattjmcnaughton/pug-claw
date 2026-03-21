@@ -131,6 +131,73 @@ async function startAndGetHandler(
   return messageCreateHandler;
 }
 
+describe("discord message filtering", () => {
+  test("ignores bot messages", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("hello", OWNER_ID);
+    msg.author.bot = true;
+    await handler(msg);
+
+    expect(msg.channel.send).not.toHaveBeenCalled();
+    expect(ctx.driver.query).not.toHaveBeenCalled();
+  });
+
+  test("ignores messages from wrong guild", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("hello", OWNER_ID);
+    msg.guildId = "other-guild";
+    await handler(msg);
+
+    expect(msg.channel.send).not.toHaveBeenCalled();
+    expect(ctx.driver.query).not.toHaveBeenCalled();
+  });
+
+  test("processes messages when no guildId filter is configured", async () => {
+    const ctx = makeCtx({ discord: undefined });
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("hello", OWNER_ID);
+    msg.guildId = "any-guild";
+    await handler(msg);
+
+    expect(ctx.driver.query).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("discord message chunking", () => {
+  test("chunks long responses at 2000 characters", async () => {
+    const ctx = makeCtx();
+    const longText = "x".repeat(4500);
+    ctx.driver.query = mock(async () => ({
+      text: longText,
+      sessionId: "session-1",
+    }));
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("hello", OWNER_ID);
+    await handler(msg);
+
+    // 4500 chars should be split into 3 messages: 2000 + 2000 + 500
+    expect(msg._sent).toHaveLength(3);
+    expect(msg._sent[0]).toHaveLength(2000);
+    expect(msg._sent[1]).toHaveLength(2000);
+    expect(msg._sent[2]).toHaveLength(500);
+  });
+
+  test("sends (no response) for empty response", async () => {
+    const ctx = makeCtx();
+    ctx.driver.query = mock(async () => ({
+      text: "   ",
+      sessionId: "session-1",
+    }));
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("hello", OWNER_ID);
+    await handler(msg);
+
+    expect(msg._sent).toContain("(no response)");
+  });
+});
+
 describe("discord !restart command", () => {
   test("blocked for non-owner", async () => {
     const ctx = makeCtx();
