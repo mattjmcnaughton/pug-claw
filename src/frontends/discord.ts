@@ -227,9 +227,11 @@ export class DiscordFrontend implements Frontend {
       if (!("send" in message.channel)) return false;
 
       const channel = message.channel as SendableChannel;
-      const parts = content.slice(1).split(/\s+/, 2);
-      const cmd = parts[0]?.toLowerCase() ?? "";
-      const arg = parts[1]?.trim() ?? "";
+      const spaceIdx = content.indexOf(" ");
+      const cmd = (
+        spaceIdx === -1 ? content.slice(1) : content.slice(1, spaceIdx)
+      ).toLowerCase();
+      const arg = spaceIdx === -1 ? "" : content.slice(spaceIdx + 1).trim();
       const channelId = message.channelId;
 
       if (cmd === "restart") {
