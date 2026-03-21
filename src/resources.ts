@@ -35,7 +35,7 @@ const PathsConfigSchema = z.object({
 });
 
 const SecretsConfigSchema = z.object({
-  provider: z.enum(["env", "dotenv"]).optional(),
+  provider: z.enum([SecretsProviders.ENV, SecretsProviders.DOTENV]).optional(),
   dotenv_path: z.string().optional(),
 });
 
@@ -462,7 +462,7 @@ function loadConfigWithFallback(
     }
   } else {
     primaryError = new Error(
-      `config.json not found in ${resolve(configPath, "..")}\n\nRun \`pug-claw init\` to set up your configuration.`,
+      `${Paths.CONFIG_FILE} not found in ${resolve(configPath, "..")}\n\nRun \`pug-claw init\` to set up your configuration.`,
     );
   }
 
@@ -470,7 +470,7 @@ function loadConfigWithFallback(
     try {
       const config = loadAndValidateConfig(fallbackPath);
       console.warn(
-        `Warning: config.json failed to load (${primaryError?.message}). Using config.last-good.json as fallback.`,
+        `Warning: ${Paths.CONFIG_FILE} failed to load (${primaryError?.message}). Using ${Paths.CONFIG_FALLBACK_FILE} as fallback.`,
       );
       return config;
     } catch (err) {

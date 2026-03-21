@@ -69,7 +69,7 @@ function discoverSkillsFromDir(dir: string): SkillSummary[] {
   const skills: SkillSummary[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const skillMd = `${dir}/${entry.name}/${Paths.SKILL_MD}`;
+    const skillMd = resolve(dir, entry.name, Paths.SKILL_MD);
     if (!existsSync(skillMd)) continue;
 
     const summary = parseSkillFrontmatter(skillMd);
@@ -89,7 +89,9 @@ export function discoverSkills(
   globalSkillsDir?: string,
   allowedGlobalSkills?: string[],
 ): SkillSummary[] {
-  const agentSkills = discoverSkillsFromDir(`${agentDir}/skills`);
+  const agentSkills = discoverSkillsFromDir(
+    resolve(agentDir, Paths.SKILLS_DIR),
+  );
 
   if (!globalSkillsDir) {
     return agentSkills.sort((a, b) => a.name.localeCompare(b.name));

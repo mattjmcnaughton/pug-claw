@@ -1,4 +1,5 @@
 import { Client, GatewayIntentBits, type Message } from "discord.js";
+import { Frontends } from "../constants.ts";
 import { ChannelHandler } from "../channel-handler.ts";
 import { ChatCommandRegistry } from "../chat-commands/registry.ts";
 import { createChatCommandTree } from "../chat-commands/tree.ts";
@@ -174,7 +175,7 @@ export class DiscordFrontend implements Frontend {
           {
             channelId,
             commandPrefix: "!",
-            frontend: "discord",
+            frontend: Frontends.DISCORD,
             isOwner,
             handler: channelHandler,
             actions: {

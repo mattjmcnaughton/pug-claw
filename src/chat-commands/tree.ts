@@ -1,3 +1,4 @@
+import { Frontends } from "../constants.ts";
 import type {
   ChatCommandContext,
   ChatCommandNode,
@@ -234,7 +235,7 @@ export function createChatCommandTree(): ChatCommandNode {
       schedule: {
         name: "schedule",
         description: "Inspect or trigger configured schedules",
-        frontends: ["discord"],
+        frontends: [Frontends.DISCORD],
         ownerOnly: true,
         children: {
           list: {
@@ -318,7 +319,7 @@ export function createChatCommandTree(): ChatCommandNode {
           quit: {
             name: "quit",
             description: "Quit the TUI frontend",
-            frontends: ["tui"],
+            frontends: [Frontends.TUI],
             execute: async (ctx, args) => {
               if (args.length > 0) {
                 return unknownSubcommand(ctx, ["system", "quit"], args);

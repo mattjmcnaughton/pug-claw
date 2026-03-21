@@ -9,6 +9,7 @@ import {
   SessionManager,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
+import { Drivers } from "../constants.ts";
 import { logger } from "../logger.ts";
 import { toError } from "../resources.ts";
 import { appendSkillCatalog, buildEnvironmentBlock } from "../skills.ts";
@@ -113,7 +114,7 @@ export function createPiEventHandler(
 }
 
 export class PiDriver implements Driver {
-  readonly name = "pi";
+  readonly name = Drivers.PI;
   readonly availableModels: Record<string, string> = {
     minimax: "openrouter/minimax/minimax-m2.5",
     gpt: "openai-codex/gpt-5.4",

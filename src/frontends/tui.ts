@@ -14,6 +14,7 @@ import {
   TUI,
 } from "@mariozechner/pi-tui";
 import chalk from "chalk";
+import { Frontends } from "../constants.ts";
 import { ChannelHandler } from "../channel-handler.ts";
 import { toError } from "../resources.ts";
 import { ChatCommandRegistry } from "../chat-commands/registry.ts";
@@ -155,7 +156,7 @@ export class TuiFrontend implements Frontend {
             {
               channelId: TUI_CHANNEL_ID,
               commandPrefix: "/",
-              frontend: "tui",
+              frontend: Frontends.TUI,
               isOwner: true,
               handler: channelHandler,
               actions: {

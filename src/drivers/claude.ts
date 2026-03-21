@@ -1,4 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { Drivers } from "../constants.ts";
 import { logger } from "../logger.ts";
 import { appendSkillCatalog, buildEnvironmentBlock } from "../skills.ts";
 import type {
@@ -145,7 +146,7 @@ export async function processClaudeEvents(
 }
 
 export class ClaudeDriver implements Driver {
-  readonly name = "claude";
+  readonly name = Drivers.CLAUDE;
   readonly availableModels: Record<string, string> = {
     sonnet: "claude-sonnet-4-6",
     opus: "claude-opus-4-6",
