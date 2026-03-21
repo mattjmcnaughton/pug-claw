@@ -12,7 +12,11 @@ import { SchedulerLock } from "./lock.ts";
 import type { SchedulerOutputSink } from "./output.ts";
 import { SchedulerRunner } from "./runner.ts";
 import { SchedulerStore } from "./store.ts";
-import type { ResolvedSchedule, ScheduleSummary } from "./types.ts";
+import {
+  ScheduleTriggerSources,
+  type ResolvedSchedule,
+  type ScheduleSummary,
+} from "./types.ts";
 
 interface ScheduleState {
   schedule: ResolvedSchedule;
@@ -132,7 +136,10 @@ export class SchedulerRuntime {
       return { ok: false, reason: "not_found" };
     }
 
-    const result = this.runner.startRun(state.schedule, "manual");
+    const result = this.runner.startRun(
+      state.schedule,
+      ScheduleTriggerSources.MANUAL,
+    );
     if (!result.started) {
       return { ok: false, reason: "already_running" };
     }
@@ -206,9 +213,13 @@ export class SchedulerRuntime {
       }
 
       if (this.runner.isRunning(state.schedule.name)) {
-        this.runner.recordOverlapSkip(state.schedule, "cron", timezone);
+        this.runner.recordOverlapSkip(
+          state.schedule,
+          ScheduleTriggerSources.CRON,
+          timezone,
+        );
       } else {
-        this.runner.startRun(state.schedule, "cron");
+        this.runner.startRun(state.schedule, ScheduleTriggerSources.CRON);
       }
 
       state.nextRunAt = state.cron.nextRun(now);

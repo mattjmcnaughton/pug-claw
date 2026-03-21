@@ -10,7 +10,7 @@ import { dirname, resolve } from "node:path";
 import { VERSION } from "../constants.ts";
 import type { Logger } from "../logger.ts";
 import { toError } from "../resources.ts";
-import type { SchedulerAuditEvent } from "./types.ts";
+import { SchedulerAuditEvents, type SchedulerAuditEvent } from "./types.ts";
 
 interface LockOwner {
   pid: number;
@@ -68,7 +68,7 @@ export class SchedulerLock {
       this.held = true;
       this.onAuditEvent({
         ts: new Date().toISOString(),
-        event: "scheduler_lock_acquired",
+        event: SchedulerAuditEvents.SCHEDULER_LOCK_ACQUIRED,
         pid: owner.pid,
         hostname: owner.hostname,
         message: "Scheduler lock acquired.",
@@ -90,7 +90,7 @@ export class SchedulerLock {
     if (!reclaimable) {
       this.onAuditEvent({
         ts: new Date().toISOString(),
-        event: "scheduler_lock_not_acquired",
+        event: SchedulerAuditEvents.SCHEDULER_LOCK_NOT_ACQUIRED,
         pid: existingOwner?.pid,
         hostname: existingOwner?.hostname,
         message: "Scheduler lock not acquired.",
@@ -111,7 +111,7 @@ export class SchedulerLock {
       this.held = true;
       this.onAuditEvent({
         ts: new Date().toISOString(),
-        event: "scheduler_lock_reclaimed_stale",
+        event: SchedulerAuditEvents.SCHEDULER_LOCK_RECLAIMED_STALE,
         pid: owner.pid,
         hostname: owner.hostname,
         message: "Scheduler lock reclaimed.",
@@ -122,7 +122,7 @@ export class SchedulerLock {
       this.logger.warn({ err: reclaimError }, "scheduler_lock_reclaim_failed");
       this.onAuditEvent({
         ts: new Date().toISOString(),
-        event: "scheduler_lock_not_acquired",
+        event: SchedulerAuditEvents.SCHEDULER_LOCK_NOT_ACQUIRED,
         pid: existingOwner?.pid,
         hostname: existingOwner?.hostname,
         message: "Scheduler lock not acquired after reclaim attempt.",
