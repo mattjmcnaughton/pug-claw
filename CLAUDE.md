@@ -13,7 +13,7 @@ This is a Bun + TypeScript project.
 
 ### Commands (via justfile)
 
-- `just gate` — Run all static checks (lint, format, typecheck)
+- `just gate` — Run all checks (lint, format, typecheck, tests)
 - `just lint` — Lint with Biome
 - `just lint-fix` — Auto-fix lint issues
 - `just fmt-check` — Check formatting with Biome
