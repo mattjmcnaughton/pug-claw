@@ -1,4 +1,3 @@
-import { resolve } from "node:path";
 import {
   CombinedAutocompleteProvider,
   Editor,
@@ -15,19 +14,11 @@ import {
   TUI,
 } from "@mariozechner/pi-tui";
 import chalk from "chalk";
-import {
-  listAvailableAgents,
-  parseAgentSystemMd,
-  resolveAgentDir,
-} from "../agents.ts";
-import type { Driver } from "../drivers/types.ts";
-import {
-  resolveDriverName as resolveDriverNameFromInputs,
-  resolveModelName,
-} from "../resolve.ts";
-import { expandTilde, toError } from "../resources.ts";
-import { discoverSkills } from "../skills.ts";
+import { ChannelHandler } from "../channel-handler.ts";
+import { toError } from "../resources.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
+
+const TUI_CHANNEL_ID = "tui";
 
 const selectListTheme: SelectListTheme = {
   selectedPrefix: (s) => chalk.cyan(s),
@@ -63,85 +54,28 @@ export class TuiFrontend implements Frontend {
   async start(ctx: FrontendContext): Promise<void> {
     const { drivers, logger } = ctx;
     let { config, resolveAgent, pluginDirs } = ctx;
-    let agentsDir = config.agentsDir;
 
-    let currentDriverName = config.defaultDriver;
-    let currentAgentName = config.defaultAgent;
-    let currentModel: string | undefined;
-    let currentSessionId: string | undefined;
-    let userOverrodeDriver = false;
-    let userOverrodeModel = false;
-
-    function getEffectiveDriverName(): string {
-      const agentDir = resolve(agentsDir, currentAgentName);
-      const resolved = resolveAgent(agentDir);
-      return resolveDriverNameFromInputs({
-        runtimeOverride: userOverrodeDriver ? currentDriverName : undefined,
-        agentFrontmatter: resolved.driver,
-        globalDefault: config.defaultDriver,
-      });
-    }
-
-    function getDriver(): Driver {
-      const name = getEffectiveDriverName();
-      const driver = drivers[name];
-      if (!driver) throw new Error(`Unknown driver: ${name}`);
-      return driver;
-    }
-
-    async function destroySession() {
-      if (currentSessionId) {
-        await getDriver().destroySession(currentSessionId);
-        currentSessionId = undefined;
-      }
-    }
-
-    async function ensureSession(): Promise<string> {
-      if (!currentSessionId) {
-        const driver = getDriver();
-        const agentDir = resolve(agentsDir, currentAgentName);
-        const resolved = resolveAgent(agentDir);
-        const effectiveModel = resolveModelName({
-          runtimeOverride: userOverrodeModel ? currentModel : undefined,
-          agentFrontmatter: resolved.model,
-          driverDefault: driver.defaultModel,
-        });
-
-        const driverName = getEffectiveDriverName();
-        const driverCwd = config.drivers[driverName]?.cwd;
-        const cwd = driverCwd
-          ? resolve(expandTilde(driverCwd))
-          : config.homeDir;
-
-        currentSessionId = await driver.createSession({
-          systemPrompt: resolved.systemPrompt,
-          model: effectiveModel,
-          skills: resolved.skills,
-          pluginDir: pluginDirs.get(currentAgentName),
-          cwd,
-        });
-      }
-      return currentSessionId;
-    }
+    const channelHandler = new ChannelHandler(
+      drivers,
+      config,
+      pluginDirs,
+      resolveAgent,
+      logger,
+      "/",
+    );
 
     // --- TUI setup ---
     const terminal = new ProcessTerminal();
     const tui = new TUI(terminal);
 
     function makeHeaderText(): string {
-      const effectiveDriver = getEffectiveDriverName();
-      const d = getDriver();
-      const agentDir = resolve(agentsDir, currentAgentName);
-      const resolved = resolveAgent(agentDir);
-      const effectiveModel = resolveModelName({
-        runtimeOverride: userOverrodeModel ? currentModel : undefined,
-        agentFrontmatter: resolved.model,
-        driverDefault: d.defaultModel,
-      });
+      const effectiveDriver = channelHandler.resolveDriverName(TUI_CHANNEL_ID);
+      const effectiveModel = channelHandler.resolveModelName(TUI_CHANNEL_ID);
+      const agentName = channelHandler.resolveAgentName(TUI_CHANNEL_ID);
       return (
         chalk.bold("pug-claw") +
         chalk.gray(
-          ` | driver: ${effectiveDriver} | model: ${effectiveModel} | agent: ${currentAgentName}`,
+          ` | driver: ${effectiveDriver} | model: ${effectiveModel} | agent: ${agentName}`,
         )
       );
     }
@@ -207,11 +141,12 @@ export class TuiFrontend implements Frontend {
       // Handle slash commands
       if (trimmed.startsWith("/")) {
         const parts = trimmed.slice(1).split(/\s+/, 2);
-        const cmd = parts[0]?.toLowerCase();
+        const cmd = parts[0]?.toLowerCase() ?? "";
         const arg = parts[1]?.trim() ?? "";
 
+        // Frontend-specific commands
         if (cmd === "quit" || cmd === "exit") {
-          await destroySession();
+          await channelHandler.destroySession(TUI_CHANNEL_ID);
           tui.stop();
           process.exit(0);
         }
@@ -229,8 +164,7 @@ export class TuiFrontend implements Frontend {
             config = reloaded.config;
             resolveAgent = reloaded.resolveAgent;
             pluginDirs = reloaded.pluginDirs;
-            agentsDir = config.agentsDir;
-            await destroySession();
+            await channelHandler.reload(config, pluginDirs, resolveAgent);
             updateHeader();
             showInfo("Config, agents, and skills reloaded. Session reset.");
             logger.info({}, "tui_command_reload");
@@ -242,126 +176,15 @@ export class TuiFrontend implements Frontend {
           return;
         }
 
-        if (cmd === "new") {
-          await destroySession();
-          showInfo("Session reset. Next message starts a fresh conversation.");
-          logger.info({}, "tui_command_new");
-          return;
-        }
-
-        if (cmd === "driver") {
-          if (!arg) {
-            const effectiveDriver = getEffectiveDriverName();
-            const available = Object.keys(drivers)
-              .map((k) => `${k}`)
-              .join(", ");
-            showInfo(
-              `Current driver: ${effectiveDriver}\nAvailable: ${available}`,
-            );
-            return;
-          }
-          if (!drivers[arg]) {
-            showInfo(
-              `Unknown driver: ${arg}. Available: ${Object.keys(drivers).join(", ")}`,
-            );
-            return;
-          }
-          await destroySession();
-          currentDriverName = arg;
-          userOverrodeDriver = true;
-          currentModel = undefined;
-          userOverrodeModel = false;
+        // Delegate to ChannelHandler for shared commands
+        const result = await channelHandler.handleCommand(
+          TUI_CHANNEL_ID,
+          cmd,
+          arg,
+        );
+        if (result !== null) {
+          showInfo(result);
           updateHeader();
-          showInfo(`Driver switched to ${arg}. Session reset.`);
-          logger.info({ driver: arg }, "tui_command_driver");
-          return;
-        }
-
-        if (cmd === "model") {
-          const d = getDriver();
-          const agentDirForModel = resolve(agentsDir, currentAgentName);
-          const resolvedForModel = resolveAgent(agentDirForModel);
-          if (!arg) {
-            const current = resolveModelName({
-              runtimeOverride: userOverrodeModel ? currentModel : undefined,
-              agentFrontmatter: resolvedForModel.model,
-              driverDefault: d.defaultModel,
-            });
-            const aliases = Object.entries(d.availableModels)
-              .map(([k, v]) => `  ${k} → ${v}`)
-              .join("\n");
-            showInfo(
-              `Current model: ${current}\nAliases:\n${aliases}\n\nOr use a raw model ID.`,
-            );
-            return;
-          }
-          const model = d.availableModels[arg.toLowerCase()] ?? arg;
-          await destroySession();
-          currentModel = model;
-          userOverrodeModel = true;
-          updateHeader();
-          showInfo(`Model switched to ${model}. Session reset.`);
-          logger.info({ model }, "tui_command_model");
-          return;
-        }
-
-        if (cmd === "agent") {
-          if (!arg) {
-            const available = listAvailableAgents(agentsDir).join(", ");
-            showInfo(
-              `Current agent: ${currentAgentName}\nAvailable: ${available}`,
-            );
-            return;
-          }
-          const agentDir = resolveAgentDir(agentsDir, arg);
-          if (!agentDir) {
-            showInfo(`Unknown agent: ${arg}`);
-            return;
-          }
-          await destroySession();
-          currentAgentName = arg;
-          userOverrodeDriver = false;
-          userOverrodeModel = false;
-          currentModel = undefined;
-          updateHeader();
-          showInfo(`Agent switched to ${arg}. Session reset.`);
-          logger.info({ agent: arg }, "tui_command_agent");
-          return;
-        }
-
-        if (cmd === "skills") {
-          const agentDir = resolve(agentsDir, currentAgentName);
-          const parsed = parseAgentSystemMd(agentDir);
-          const skills = discoverSkills(
-            agentDir,
-            config.skillsDir,
-            parsed.meta.allowedSkills,
-          );
-          if (skills.length === 0) {
-            showInfo(`No skills found for agent ${currentAgentName}.`);
-          } else {
-            const lines = [`Skills for agent ${currentAgentName}:`];
-            for (const s of skills) {
-              lines.push(`  ${s.name}: ${s.description}`);
-            }
-            showInfo(lines.join("\n"));
-          }
-          return;
-        }
-
-        if (cmd === "status") {
-          const effectiveDriver = getEffectiveDriverName();
-          const d = getDriver();
-          const agentDirForStatus = resolve(agentsDir, currentAgentName);
-          const resolvedForStatus = resolveAgent(agentDirForStatus);
-          const effectiveModel = resolveModelName({
-            runtimeOverride: userOverrodeModel ? currentModel : undefined,
-            agentFrontmatter: resolvedForStatus.model,
-            driverDefault: d.defaultModel,
-          });
-          showInfo(
-            `Driver: ${effectiveDriver}\nAgent: ${currentAgentName}\nModel: ${effectiveModel}\nActive session: ${!!currentSessionId}`,
-          );
           return;
         }
 
@@ -384,16 +207,10 @@ export class TuiFrontend implements Frontend {
       insertBeforeEditor(loader);
       loader.start();
 
-      let responseText = "";
-      try {
-        const sessionId = await ensureSession();
-        const response = await getDriver().query(sessionId, trimmed);
-        responseText = response.text;
-      } catch (err) {
-        const error = toError(err);
-        logger.error({ err: error }, "tui_query_error");
-        responseText = `Error: ${error.message}`;
-      }
+      const responseText = await channelHandler.handleMessage(
+        TUI_CHANNEL_ID,
+        trimmed,
+      );
 
       // Remove loader
       if (loader) {
@@ -402,14 +219,14 @@ export class TuiFrontend implements Frontend {
         loader = null;
       }
 
-      if (!responseText.trim()) {
-        responseText = "(empty response)";
-      }
+      const displayText = responseText.trim()
+        ? responseText
+        : "(empty response)";
 
       const assistantLabel = new Text(chalk.bold.green("assistant:"), 1, 0);
       insertBeforeEditor(assistantLabel);
 
-      const md = new Markdown(responseText, 1, 0, markdownTheme);
+      const md = new Markdown(displayText, 1, 0, markdownTheme);
       insertBeforeEditor(md);
       insertBeforeEditor(new Spacer(1));
 
@@ -422,7 +239,7 @@ export class TuiFrontend implements Frontend {
 
     tui.addInputListener((data) => {
       if (matchesKey(data, Key.ctrl("c"))) {
-        destroySession().then(() => {
+        channelHandler.destroySession(TUI_CHANNEL_ID).then(() => {
           tui.stop();
           process.exit(0);
         });
