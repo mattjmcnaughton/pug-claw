@@ -321,6 +321,54 @@ describe("discord query event callback", () => {
   });
 });
 
+describe("discord !schedule command", () => {
+  test("shows usage when no subcommand given", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("!schedule", OWNER_ID);
+    await handler(msg);
+
+    expect(msg._sent[0]).toContain("Usage:");
+  });
+
+  test("shows usage when subcommand is not 'run'", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("!schedule status heartbeat", OWNER_ID);
+    await handler(msg);
+
+    expect(msg._sent[0]).toContain("Usage:");
+  });
+
+  test("shows usage when schedule name is missing", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("!schedule run", OWNER_ID);
+    await handler(msg);
+
+    expect(msg._sent[0]).toContain("Usage:");
+  });
+
+  test("passes schedule name through when given", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("!schedule run heartbeat", OWNER_ID);
+    await handler(msg);
+
+    // No scheduler runtime, so it should report unknown schedule (not usage)
+    expect(msg._sent[0]).toContain('Unknown schedule "heartbeat"');
+  });
+
+  test("blocked for non-owner", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("!schedule run heartbeat", NON_OWNER_ID);
+    await handler(msg);
+
+    expect(msg._sent[0]).toContain("Only the bot owner");
+  });
+});
+
 describe("discord help text", () => {
   test("includes reload and restart commands", async () => {
     const ctx = makeCtx();
