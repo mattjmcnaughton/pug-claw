@@ -54,15 +54,15 @@ export class SchedulerRuntime {
     this.pluginDirs = ctx.pluginDirs;
     this.resolveAgent = ctx.resolveAgent;
 
-    mkdirSync(this.config.dataDir, { recursive: true });
+    mkdirSync(this.config.internalDir, { recursive: true });
     mkdirSync(this.config.logsDir, { recursive: true });
 
-    const dbPath = resolve(this.config.dataDir, Paths.RUNTIME_DB_FILE);
+    const dbPath = resolve(this.config.internalDir, Paths.RUNTIME_DB_FILE);
     this.store = new SchedulerStore(dbPath, ctx.logger);
     this.auditLog = new SchedulerAuditLog(this.config.logsDir, ctx.logger);
 
     const lockDir = resolve(
-      this.config.dataDir,
+      this.config.internalDir,
       Paths.LOCKS_DIR,
       Paths.SCHEDULER_LOCK_DIR,
     );

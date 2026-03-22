@@ -138,6 +138,18 @@ describe("SchedulerRuntime", () => {
         },
       ]);
 
+      expect(existsSync(resolve(config.internalDir, "pug-claw.sqlite"))).toBe(
+        true,
+      );
+      expect(existsSync(resolve(config.dataDir, "pug-claw.sqlite"))).toBe(
+        false,
+      );
+      expect(
+        existsSync(
+          resolve(config.internalDir, "locks", "scheduler.lock", "owner.json"),
+        ),
+      ).toBe(true);
+
       const auditLogPath = resolve(
         config.logsDir,
         "schedules",
