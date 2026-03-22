@@ -17,5 +17,9 @@ describe("config loading (integration)", () => {
     expect(config.defaultAgent).toBe("test-agent");
     expect(config.defaultDriver).toBe("claude");
     expect(config.agentsDir).toBe(resolve(fixtureHome, "agents"));
+    expect(config.internalDir).toBe(resolve(fixtureHome, "internal"));
+    expect(config.dataDir).toBe(resolve(fixtureHome, "data"));
+    expect(config.codeDir).toBe(resolve(fixtureHome, "code"));
+    expect(config.logsDir).toBe(resolve(fixtureHome, "logs"));
   });
 });

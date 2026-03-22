@@ -46,7 +46,7 @@ async function startFrontend(
   // Resolve homeDir early for logging setup
   const rawHome = opts.home ?? process.env[EnvVars.HOME] ?? Paths.DEFAULT_HOME;
   const homeDir = resolve(expandTilde(rawHome));
-  const logsDir = resolveLogsDir(homeDir);
+  const logsDir = resolveLogsDir(homeDir, undefined, opts);
   configureLogger(mode, logsDir);
 
   const commit = getGitCommit();
@@ -62,9 +62,11 @@ async function startFrontend(
 
   // Export resolved paths so skill scripts (via Bash) can access them
   process.env[EnvVars.HOME] = config.homeDir;
-  process.env[EnvVars.DATA_DIR] = config.dataDir;
   process.env[EnvVars.AGENTS_DIR] = config.agentsDir;
   process.env[EnvVars.SKILLS_DIR] = config.skillsDir;
+  process.env[EnvVars.INTERNAL_DIR] = config.internalDir;
+  process.env[EnvVars.DATA_DIR] = config.dataDir;
+  process.env[EnvVars.CODE_DIR] = config.codeDir;
   process.env[EnvVars.LOGS_DIR] = config.logsDir;
 
   const piDefaultModel = config.drivers[Drivers.PI]?.defaultModel;
@@ -115,7 +117,10 @@ function addSharedOptions(cmd: Command): Command {
     .option("--home <path>", "Home directory (default: ~/.pug-claw)")
     .option("--agents-dir <path>", "Agents directory override")
     .option("--skills-dir <path>", "Skills directory override")
-    .option("--data-dir <path>", "Data directory override");
+    .option("--internal-dir <path>", "Internal runtime directory override")
+    .option("--data-dir <path>", "Data directory override")
+    .option("--code-dir <path>", "Code directory override")
+    .option("--logs-dir <path>", "Logs directory override");
 }
 
 function optsToConfigOptions(
@@ -125,7 +130,10 @@ function optsToConfigOptions(
     home: opts.home,
     agentsDir: opts.agentsDir,
     skillsDir: opts.skillsDir,
+    internalDir: opts.internalDir,
     dataDir: opts.dataDir,
+    codeDir: opts.codeDir,
+    logsDir: opts.logsDir,
   };
 }
 
