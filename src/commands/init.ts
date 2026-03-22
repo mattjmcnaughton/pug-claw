@@ -56,6 +56,23 @@ function copyDirRecursive(src: string, dest: string): void {
   }
 }
 
+export function ensureHomeDirectories(homeDir: string): void {
+  mkdirSync(resolve(homeDir, Paths.AGENTS_DIR), { recursive: true });
+  mkdirSync(resolve(homeDir, Paths.SKILLS_DIR), { recursive: true });
+  mkdirSync(resolve(homeDir, Paths.INTERNAL_DIR), { recursive: true });
+  mkdirSync(resolve(homeDir, Paths.INTERNAL_DIR, Paths.PLUGINS_DIR), {
+    recursive: true,
+  });
+  mkdirSync(resolve(homeDir, Paths.DATA_DIR), { recursive: true });
+  mkdirSync(resolve(homeDir, Paths.CODE_DIR), { recursive: true });
+  mkdirSync(resolve(homeDir, Paths.LOGS_DIR, Paths.SYSTEM_LOG_DIR), {
+    recursive: true,
+  });
+  mkdirSync(resolve(homeDir, Paths.LOGS_DIR, Paths.SCHEDULES_LOG_DIR), {
+    recursive: true,
+  });
+}
+
 export function installBuiltins(homeDir: string): {
   installed: number;
   updated: number;
@@ -127,9 +144,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
       process.exit(1);
     }
 
-    mkdirSync(resolve(resolvedHome, Paths.SKILLS_DIR), { recursive: true });
-    mkdirSync(resolve(resolvedHome, Paths.AGENTS_DIR), { recursive: true });
-    mkdirSync(resolve(resolvedHome, Paths.PLUGINS_DIR), { recursive: true });
+    ensureHomeDirectories(resolvedHome);
 
     const result = installBuiltins(resolvedHome);
     p.note(
@@ -311,14 +326,11 @@ export async function runInit(builtinsOnly = false): Promise<void> {
   const agentDir = resolve(agentsDir, defaultAgent);
   const skillsDir = resolve(resolvedHome, Paths.SKILLS_DIR);
   const dataDir = resolve(resolvedHome, Paths.DATA_DIR);
+  const codeDir = resolve(resolvedHome, Paths.CODE_DIR);
+  const internalDir = resolve(resolvedHome, Paths.INTERNAL_DIR);
 
+  ensureHomeDirectories(resolvedHome);
   mkdirSync(agentDir, { recursive: true });
-  mkdirSync(skillsDir, { recursive: true });
-  mkdirSync(resolve(resolvedHome, Paths.PLUGINS_DIR), { recursive: true });
-  mkdirSync(dataDir, { recursive: true });
-  mkdirSync(resolve(resolvedHome, Paths.LOGS_DIR, Paths.SYSTEM_LOG_DIR), {
-    recursive: true,
-  });
 
   // Write config.json
   writeFileSync(
@@ -352,7 +364,9 @@ export async function runInit(builtinsOnly = false): Promise<void> {
       `Config:   ${resolve(resolvedHome, Paths.CONFIG_FILE)}`,
       `Agents:   ${agentsDir}`,
       `Skills:   ${skillsDir}`,
+      `Internal: ${internalDir}`,
       `Data:     ${dataDir}`,
+      `Code:     ${codeDir}`,
       `Agent:    ${agentDir}/${Paths.SYSTEM_MD}`,
       ...(resolvedDotenvPath ? [`Secrets:  ${resolvedDotenvPath}`] : []),
     ].join("\n"),
