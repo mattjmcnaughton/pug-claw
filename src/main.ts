@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { Command } from "commander";
 import { runCheckConfig } from "./commands/check-config.ts";
 import { runExportCommand } from "./commands/export.ts";
+import { runImportCommand } from "./commands/import.ts";
 import { runInit } from "./commands/init.ts";
 import { runInitService } from "./commands/init-service.ts";
 import {
@@ -199,6 +200,26 @@ program
   .action(
     async (opts: { home?: string; include?: string[]; output?: string }) => {
       await runExportCommand(opts);
+    },
+  );
+
+program
+  .command("import <path>")
+  .description("Restore a backup archive")
+  .option("--home <path>", "Home directory (default: ~/.pug-claw)")
+  .option("--dry-run", "Show what would be restored without writing")
+  .option("--force", "Overwrite existing files without prompting")
+  .action(
+    async (
+      path: string,
+      opts: { dryRun?: boolean; force?: boolean; home?: string },
+    ) => {
+      await runImportCommand({
+        path,
+        home: opts.home,
+        dryRun: opts.dryRun,
+        force: opts.force,
+      });
     },
   );
 
