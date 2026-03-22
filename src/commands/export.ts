@@ -1,10 +1,11 @@
+import { exportBackup } from "../backup/export.ts";
+import { renderBackupExportMessage } from "../backup/render.ts";
 import { logger } from "../logger.ts";
 import {
   ensureResolvedHomeLayout,
   migrateLegacyHomeLayout,
 } from "../migration.ts";
 import { resolveConfig, toError } from "../resources.ts";
-import { exportBackup } from "../backup/export.ts";
 import {
   BackupCliIncludeNames,
   BackupIncludeDirKeys,
@@ -42,11 +43,7 @@ export async function runExportCommand(opts: {
       includeDirs: (opts.include ?? []).map(parseIncludeDir),
     });
 
-    console.log(`Backup written: ${result.outputPath}`);
-    console.log(`Archive size: ${result.sizeBytes} bytes`);
-    console.log(
-      `Included: home=${result.sections.home} internal=${result.sections.internal} data=${result.sections.data} code=${result.sections.code} logs=${result.sections.logs}`,
-    );
+    console.log(renderBackupExportMessage(result));
   } catch (err) {
     const error = toError(err);
     console.error(`Backup export failed: ${error.message}`);

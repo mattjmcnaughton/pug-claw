@@ -32,7 +32,9 @@ The home directory must exist and contain a `config.json`. If it doesn't, pug-cl
       SYSTEM.md        # Agent system prompt
       skills/          # Agent-specific skills
   skills/              # Global skills (available to all agents)
-  data/                # Runtime data (SQLite runtime DB, locks, future artifacts)
+  internal/            # Runtime state (SQLite runtime DB, locks, plugins)
+  data/                # User workspace data
+  code/                # Agent-generated code projects
   logs/
     system/            # Application logs
     schedules/         # Scheduler audit logs (JSONL)
@@ -52,7 +54,13 @@ Most fields are optional. Missing fields use sensible defaults. One exception: `
   "paths": {
     "agents_dir": "agents",
     "skills_dir": "skills",
-    "data_dir": "data"
+    "internal_dir": "internal",
+    "data_dir": "data",
+    "code_dir": "code",
+    "logs_dir": "logs"
+  },
+  "backup": {
+    "include_dirs": ["data_dir", "code_dir"]
   },
   "scheduler": {
     "timezone": "America/New_York"
@@ -100,7 +108,8 @@ Most fields are optional. Missing fields use sensible defaults. One exception: `
 |-------|------|---------|-------------|
 | `default_agent` | string | `"default"` | Agent to use when no channel-specific override exists |
 | `default_driver` | string | `"claude"` | Driver to use by default (`claude` or `pi`) |
-| `paths` | object | — | Custom paths for agents, skills, and data directories |
+| `paths` | object | — | Custom paths for agents, skills, internal runtime data, workspace data, code, and logs |
+| `backup` | object | — | Backup configuration for optional directory inclusion |
 | `scheduler` | object | — | Scheduler configuration, currently `timezone` |
 | `drivers` | object | `{}` | Per-driver configuration |
 | `channels` | object | `{}` | Per-channel overrides keyed by Discord channel ID |
@@ -116,11 +125,20 @@ All paths are relative to the home directory unless absolute. Each can also be o
 |-------|----------|---------|---------|
 | `agents_dir` | `--agents-dir` | `PUG_CLAW_AGENTS_DIR` | `agents` |
 | `skills_dir` | `--skills-dir` | `PUG_CLAW_SKILLS_DIR` | `skills` |
+| `internal_dir` | `--internal-dir` | `PUG_CLAW_INTERNAL_DIR` | `internal` |
 | `data_dir` | `--data-dir` | `PUG_CLAW_DATA_DIR` | `data` |
+| `code_dir` | `--code-dir` | `PUG_CLAW_CODE_DIR` | `code` |
+| `logs_dir` | `--logs-dir` | `PUG_CLAW_LOGS_DIR` | `logs` |
 
 **Override precedence:** CLI flag > environment variable > config file > default.
 
-Logs are configured separately via `PUG_CLAW_LOGS_DIR` and default to `<home>/logs`.
+### Backup
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `include_dirs` | string[] | `[]` | Optional directories to include in backups. Supported values: `data_dir`, `code_dir`, `logs_dir`. |
+
+Home content (`config.json`, `config.last-good.json`, agents, skills) and the runtime SQLite DB are always included. `.env`, runtime locks, and generated plugins are always excluded.
 
 ### Scheduler
 
@@ -238,4 +256,9 @@ These environment variables are used by pug-claw regardless of secrets provider:
 | `LOG_LEVEL` | No | `info` | Log verbosity: `debug`, `info`, `warn`, `error`, `fatal` |
 | `NODE_ENV` | No | — | Set to `production` for JSON log output |
 | `PUG_CLAW_HOME` | No | `~/.pug-claw` | Override the home directory |
+| `PUG_CLAW_AGENTS_DIR` | No | `<home>/agents` | Override the agents directory |
+| `PUG_CLAW_SKILLS_DIR` | No | `<home>/skills` | Override the skills directory |
+| `PUG_CLAW_INTERNAL_DIR` | No | `<home>/internal` | Override the runtime state directory |
+| `PUG_CLAW_DATA_DIR` | No | `<home>/data` | Override the user data directory |
+| `PUG_CLAW_CODE_DIR` | No | `<home>/code` | Override the generated code directory |
 | `PUG_CLAW_LOGS_DIR` | No | `<home>/logs` | Override the logs directory |

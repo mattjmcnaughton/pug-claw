@@ -73,3 +73,15 @@ export interface ExportBackupResult {
   sizeBytes: number;
   sections: BackupSectionsSummary;
 }
+
+export interface BackupDryRunSection {
+  included: boolean;
+  name: "home" | "internal" | "data" | "code" | "logs";
+  path: string;
+  sizeBytes: number;
+}
+
+export interface BackupDryRunResult {
+  sections: BackupDryRunSection[];
+  totalSizeBytes: number;
+}

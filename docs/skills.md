@@ -17,7 +17,7 @@ User sends message
 
 ### Driver-specific injection
 
-**Claude driver:** Skills are injected as native plugins via the Claude Code SDK. At startup (and on `system reload`), pug-claw generates per-agent plugin directories at `~/.pug-claw/plugins/{agentName}/skills/` containing symlinks to each allowed skill's directory. The SDK discovers these natively.
+**Claude driver:** Skills are injected as native plugins via the Claude Code SDK. At startup (and on `system reload`), pug-claw generates per-agent plugin directories at `~/.pug-claw/internal/plugins/{agentName}/skills/` containing symlinks to each allowed skill's directory. The SDK discovers these natively.
 
 **Pi driver (and fallback):** Skills are injected as an XML catalog appended to the system prompt:
 
@@ -172,7 +172,7 @@ The discovery process (`skills.ts`) works as follows:
 6. Valid skills are sorted alphabetically by name
 7. Skills are returned as structured data for driver-specific injection
 
-Plugin directories (`~/.pug-claw/plugins/`) are regenerated on startup and `!system reload`. Skills are discovered once at session creation. To pick up new or modified skills, use `!system reload` (Discord), `/system reload` (TUI), or reset the session with `!session new` / `/session new`.
+Plugin directories (`~/.pug-claw/internal/plugins/`) are regenerated on startup and `!system reload`. Skills are discovered once at session creation. To pick up new or modified skills, use `!system reload` (Discord), `/system reload` (TUI), or reset the session with `!session new` / `/session new`.
 
 ## Listing skills
 

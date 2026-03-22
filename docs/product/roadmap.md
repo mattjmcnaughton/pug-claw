@@ -364,9 +364,9 @@ Multi-step pipelines built on top of the Command Framework (Phase 0). Commands a
 
 ### Export and Backup
 
-- [ ] `pug-claw export` - full backup (config, agents, memory, brain inbox, conversations)
+- [x] `pug-claw export` - full backup v1 (config, agents, skills, runtime DB, optional data/code/logs directories)
 - [ ] `pug-claw export --memory|--brain|--config|--conversations` - selective export
-- [ ] `pug-claw import` - restore from backup
+- [x] `pug-claw import` - restore from backup
 - [ ] `pug-claw inspect memory|data|agents|brain` - show what's stored
 - [ ] Systemd timer or cron for nightly backups
 

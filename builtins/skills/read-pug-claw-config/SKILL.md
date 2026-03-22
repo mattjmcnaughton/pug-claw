@@ -72,7 +72,9 @@ Schedule notes:
   agents/              # Agent definitions
     default/SYSTEM.md
   skills/              # Global skills
-  data/                # Runtime data, SQLite DB, locks
+  internal/            # Runtime state, SQLite DB, locks, plugins
+  data/                # User workspace data
+  code/                # Agent-generated code
   logs/
     system/            # Application logs
     schedules/         # Scheduler audit logs

@@ -14,6 +14,11 @@ import {
   TUI,
 } from "@mariozechner/pi-tui";
 import chalk from "chalk";
+import { dryRunBackup, exportBackup } from "../backup/export.ts";
+import {
+  renderBackupDryRunMessage,
+  renderBackupExportMessage,
+} from "../backup/render.ts";
 import { Frontends } from "../constants.ts";
 import { ChannelHandler } from "../channel-handler.ts";
 import { toError } from "../resources.ts";
@@ -122,6 +127,13 @@ export class TuiFrontend implements Frontend {
             await channelHandler.reload(config, pluginDirs, resolveAgent);
             logger.info({}, "tui_command_reload");
             return undefined;
+          },
+          exportBackup: async () => {
+            const result = await exportBackup(config);
+            return renderBackupExportMessage(result);
+          },
+          dryRunBackup: async () => {
+            return renderBackupDryRunMessage(dryRunBackup(config));
           },
         },
       };

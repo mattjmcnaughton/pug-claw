@@ -121,6 +121,41 @@ export function createChatCommandTree(): ChatCommandNode {
         },
         execute: async (ctx, args) => showOrUnknown(ctx, ["agent"], args),
       },
+      backup: {
+        name: "backup",
+        description: "Create or inspect backup archives",
+        children: {
+          export: {
+            name: "export",
+            description: "Create a backup archive",
+            execute: async (ctx, args) => {
+              if (args.length > 0) {
+                return unknownSubcommand(ctx, ["backup", "export"], args);
+              }
+              const exportBackup = ctx.actions.exportBackup;
+              if (!exportBackup) {
+                return text("Backup commands are not available.");
+              }
+              return text(await exportBackup());
+            },
+          },
+          dryrun: {
+            name: "dryrun",
+            description: "Show what a backup would include",
+            execute: async (ctx, args) => {
+              if (args.length > 0) {
+                return unknownSubcommand(ctx, ["backup", "dryrun"], args);
+              }
+              const dryRunBackup = ctx.actions.dryRunBackup;
+              if (!dryRunBackup) {
+                return text("Backup commands are not available.");
+              }
+              return text(await dryRunBackup());
+            },
+          },
+        },
+        execute: async (ctx, args) => showOrUnknown(ctx, ["backup"], args),
+      },
       driver: {
         name: "driver",
         description: "Inspect and change the active driver",
