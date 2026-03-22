@@ -261,6 +261,16 @@ export async function runInit(builtinsOnly = false): Promise<void> {
     dotenvPath = dotenvInput;
   }
 
+  const backupOutputDir = await p.text({
+    message: "Default backup output directory? (optional, press Enter to skip)",
+    initialValue: "",
+  });
+
+  if (p.isCancel(backupOutputDir)) {
+    p.cancel("Init cancelled.");
+    process.exit(0);
+  }
+
   const guildId = await p.text({
     message: "Discord guild ID? (optional, press Enter to skip)",
     initialValue: "",
@@ -300,6 +310,13 @@ export async function runInit(builtinsOnly = false): Promise<void> {
       [Drivers.PI]: {},
     },
     channels: {},
+    ...(backupOutputDir.trim()
+      ? {
+          backup: {
+            output_dir: backupOutputDir.trim(),
+          },
+        }
+      : {}),
     ...(secretsProvider === SecretsProviders.DOTENV
       ? {
           secrets: {
@@ -328,9 +345,20 @@ export async function runInit(builtinsOnly = false): Promise<void> {
   const dataDir = resolve(resolvedHome, Paths.DATA_DIR);
   const codeDir = resolve(resolvedHome, Paths.CODE_DIR);
   const internalDir = resolve(resolvedHome, Paths.INTERNAL_DIR);
+  const resolvedBackupOutputDir = backupOutputDir.trim()
+    ? (() => {
+        const expanded = expandTilde(backupOutputDir.trim());
+        return expanded.startsWith("/")
+          ? expanded
+          : resolve(resolvedHome, expanded);
+      })()
+    : undefined;
 
   ensureHomeDirectories(resolvedHome);
   mkdirSync(agentDir, { recursive: true });
+  if (resolvedBackupOutputDir) {
+    mkdirSync(resolvedBackupOutputDir, { recursive: true });
+  }
 
   // Write config.json
   writeFileSync(
@@ -368,6 +396,9 @@ export async function runInit(builtinsOnly = false): Promise<void> {
       `Data:     ${dataDir}`,
       `Code:     ${codeDir}`,
       `Agent:    ${agentDir}/${Paths.SYSTEM_MD}`,
+      ...(resolvedBackupOutputDir
+        ? [`Backups:  ${resolvedBackupOutputDir}`]
+        : []),
       ...(resolvedDotenvPath ? [`Secrets:  ${resolvedDotenvPath}`] : []),
     ].join("\n"),
     "Created files",

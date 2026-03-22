@@ -182,6 +182,10 @@ program
     "Output file path (default: ./pug-claw-backup-{timestamp}.tar.gz)",
   )
   .option(
+    "--output-dir <path>",
+    "Output directory for the default backup filename",
+  )
+  .option(
     "--include <dir>",
     "Include optional directory (repeatable: data, code, logs)",
     collectStringValues,
@@ -189,7 +193,12 @@ program
   )
   .option("--home <path>", "Home directory (default: ~/.pug-claw)")
   .action(
-    async (opts: { home?: string; include?: string[]; output?: string }) => {
+    async (opts: {
+      home?: string;
+      include?: string[];
+      output?: string;
+      outputDir?: string;
+    }) => {
       await runExportCommand(opts);
     },
   );

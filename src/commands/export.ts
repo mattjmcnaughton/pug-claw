@@ -27,12 +27,14 @@ export async function runExportCommand(opts: {
   home?: string;
   include?: string[];
   output?: string;
+  outputDir?: string;
 }): Promise<void> {
   try {
     const config = await resolveConfig({ home: opts.home });
 
     const result = await exportBackup(config, {
       outputPath: opts.output,
+      outputDir: opts.outputDir,
       includeDirs: (opts.include ?? []).map(parseIncludeDir),
     });
 

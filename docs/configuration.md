@@ -60,7 +60,8 @@ Most fields are optional. Missing fields use sensible defaults. One exception: `
     "logs_dir": "logs"
   },
   "backup": {
-    "include_dirs": ["data_dir", "code_dir"]
+    "include_dirs": ["data_dir", "code_dir"],
+    "output_dir": "backups"
   },
   "scheduler": {
     "timezone": "America/New_York"
@@ -137,6 +138,7 @@ All paths are relative to the home directory unless absolute. Each can also be o
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `include_dirs` | string[] | `[]` | Optional directories to include in backups. Supported values: `data_dir`, `code_dir`, `logs_dir`. |
+| `output_dir` | string | current working directory | Default directory for backup archives when `pug-claw export` is run without `--output` or `--output-dir`. Relative paths are resolved from the pug-claw home directory. |
 
 Home content (`config.json`, `config.last-good.json`, agents, skills) and the runtime SQLite DB are always included. `.env`, runtime locks, and generated plugins are always excluded.
 
