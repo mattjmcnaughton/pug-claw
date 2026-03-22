@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
-import { ensureResolvedHomeLayout } from "../migration.ts";
+import { ensureResolvedHomeLayout } from "../layout.ts";
 import {
   loadAndValidateConfig,
   resolveConfig,

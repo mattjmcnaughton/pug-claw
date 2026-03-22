@@ -22,10 +22,6 @@ import { DiscordFrontend } from "./frontends/discord.ts";
 import { TuiFrontend } from "./frontends/tui.ts";
 import type { Frontend } from "./frontends/types.ts";
 import { configureLogger, logger } from "./logger.ts";
-import {
-  ensureResolvedHomeLayout,
-  migrateLegacyHomeLayout,
-} from "./migration.ts";
 import { generateAgentPlugins } from "./plugins.ts";
 import type { ConfigOptions, ResolvedConfig } from "./resources.ts";
 import {
@@ -66,9 +62,6 @@ async function startFrontend(
     process.exit(1);
   }
 
-  migrateLegacyHomeLayout(config, logger);
-  ensureResolvedHomeLayout(config);
-
   // Export resolved paths so skill scripts (via Bash) can access them
   process.env[EnvVars.HOME] = config.homeDir;
   process.env[EnvVars.AGENTS_DIR] = config.agentsDir;
@@ -96,8 +89,6 @@ async function startFrontend(
 
   const reloadConfig = async () => {
     const newConfig = await resolveConfig(opts);
-    migrateLegacyHomeLayout(newConfig, logger);
-    ensureResolvedHomeLayout(newConfig);
     const newPluginsDir = resolve(newConfig.internalDir, Paths.PLUGINS_DIR);
     const newPluginDirs = generateAgentPlugins(
       newConfig.agentsDir,
