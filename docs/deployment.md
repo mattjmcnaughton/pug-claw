@@ -134,14 +134,14 @@ Log locations:
 - system logs: `${PUG_CLAW_LOGS_DIR:-<home>/logs}/system/`
 - scheduler audit logs: `${PUG_CLAW_LOGS_DIR:-<home>/logs}/schedules/`
 
-Scheduler runtime state lives under `${PUG_CLAW_DATA_DIR:-<home>/data}` and includes:
+Scheduler runtime state lives under `${PUG_CLAW_INTERNAL_DIR:-<home>/internal}` and includes:
 
 - `pug-claw.sqlite`
 - `locks/scheduler.lock/owner.json`
 
 ## Scheduler operations
 
-The scheduler uses a single-host lock. If multiple Discord bot processes run on the same host and share the same `data/` directory, only one will execute schedules. Other instances still run the bot, but `!schedule run <name>` will be refused on those inactive instances.
+The scheduler uses a single-host lock. If multiple Discord bot processes run on the same host and share the same `internal/` directory, only one will execute schedules. Other instances still run the bot, but `!schedule run <name>` will be refused on those inactive instances.
 
 Use `!schedule list` in Discord to verify whether the current bot process is the active scheduler.
 

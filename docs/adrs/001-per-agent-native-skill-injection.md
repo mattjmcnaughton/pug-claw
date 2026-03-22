@@ -21,7 +21,7 @@ Now, `resolveAgent()` returns skills as structured data (`SkillSummary[]`) along
 
 ### Per-agent plugin directories with symlinks
 
-For the Claude driver, we generate per-agent plugin directories at `~/.pug-claw/plugins/{agentName}/skills/` containing symlinks to each allowed skill's directory. The Claude Code SDK's `plugins: [{ type: "local", path }]` option picks these up natively.
+For the Claude driver, we generate per-agent plugin directories at `~/.pug-claw/internal/plugins/{agentName}/skills/` containing symlinks to each allowed skill's directory. The Claude Code SDK's `plugins: [{ type: "local", path }]` option picks these up natively.
 
 **Why symlinks, not copies:**
 - Skills may contain large supporting files (scripts, references, assets)
@@ -61,7 +61,7 @@ Copies would avoid any risk of broken symlinks but would be slower, use more dis
 ## Consequences
 
 - `ResolvedAgent.systemPrompt` no longer contains the skill catalog. Any code that checked for `<available-skills>` in the prompt needs updating (tests were updated).
-- A new `~/.pug-claw/plugins/` directory is created during `init` and regenerated on startup and `system reload`.
+- A new `~/.pug-claw/internal/plugins/` directory is created during `init` and regenerated on startup and `system reload`.
 - The `DriverOptions` interface now has optional `skills` and `pluginDir` fields — drivers that don't need them can ignore them.
 - `DotenvSecretsProvider` has a side-effect on `process.env`. This is intentional but worth knowing — secrets from the dotenv file are now globally visible within the process.
 

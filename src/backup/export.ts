@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -16,6 +17,7 @@ import { createBackupManifest } from "./manifest.ts";
 import {
   BACKUP_ARCHIVE_ROOT,
   BackupIncludeDirKeys,
+  type BackupDryRunResult,
   type BackupIncludeDirKey,
   type ExportBackupOptions,
   type ExportBackupResult,
@@ -87,6 +89,21 @@ function getIncludedOptionalDirs(
   return new Set([...config.backupIncludeDirs, ...includeDirs]);
 }
 
+function getPathSize(path: string): number {
+  if (!existsSync(path)) {
+    return 0;
+  }
+
+  const stats = statSync(path);
+  if (stats.isFile()) {
+    return stats.size;
+  }
+
+  return readdirSync(path).reduce((total, entry) => {
+    return total + getPathSize(resolve(path, entry));
+  }, 0);
+}
+
 function buildSections(includedDirs: Set<BackupIncludeDirKey>) {
   return {
     home: true,
@@ -126,6 +143,59 @@ function stageOptionalDir(
   }
 
   cpSync(sourcePath, targetPath, { recursive: true });
+}
+
+export function dryRunBackup(
+  config: ResolvedConfig,
+  options: ExportBackupOptions = {},
+): BackupDryRunResult {
+  const includedDirs = getIncludedOptionalDirs(config, options.includeDirs);
+  const sections = buildSections(includedDirs);
+  const sectionDetails = [
+    {
+      name: "home" as const,
+      path: config.homeDir,
+      included: true,
+      sizeBytes:
+        getPathSize(resolve(config.homeDir, Paths.CONFIG_FILE)) +
+        getPathSize(resolve(config.homeDir, Paths.CONFIG_FALLBACK_FILE)) +
+        getPathSize(config.agentsDir) +
+        getPathSize(config.skillsDir),
+    },
+    {
+      name: "internal" as const,
+      path: config.internalDir,
+      included: true,
+      sizeBytes: getPathSize(
+        resolve(config.internalDir, Paths.RUNTIME_DB_FILE),
+      ),
+    },
+    {
+      name: "data" as const,
+      path: config.dataDir,
+      included: sections.data,
+      sizeBytes: sections.data ? getPathSize(config.dataDir) : 0,
+    },
+    {
+      name: "code" as const,
+      path: config.codeDir,
+      included: sections.code,
+      sizeBytes: sections.code ? getPathSize(config.codeDir) : 0,
+    },
+    {
+      name: "logs" as const,
+      path: config.logsDir,
+      included: sections.logs,
+      sizeBytes: sections.logs ? getPathSize(config.logsDir) : 0,
+    },
+  ];
+
+  return {
+    sections: sectionDetails,
+    totalSizeBytes: sectionDetails.reduce((total, section) => {
+      return total + section.sizeBytes;
+    }, 0),
+  };
 }
 
 export async function exportBackup(

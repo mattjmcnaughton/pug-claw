@@ -1,4 +1,9 @@
 import { Client, GatewayIntentBits, type Message } from "discord.js";
+import { dryRunBackup, exportBackup } from "../backup/export.ts";
+import {
+  renderBackupDryRunMessage,
+  renderBackupExportMessage,
+} from "../backup/render.ts";
 import { Frontends } from "../constants.ts";
 import { ChannelHandler } from "../channel-handler.ts";
 import { ChatCommandRegistry } from "../chat-commands/registry.ts";
@@ -188,6 +193,13 @@ export class DiscordFrontend implements Frontend {
                 syncSchedulerRuntime();
                 logger.info({ channel_id: channelId }, "command_reload");
                 return "Config, agents, skills, and schedules reloaded. All sessions reset.";
+              },
+              exportBackup: async () => {
+                const result = await exportBackup(config);
+                return renderBackupExportMessage(result);
+              },
+              dryRunBackup: async () => {
+                return renderBackupDryRunMessage(dryRunBackup(config));
               },
               listSchedules: async () => {
                 const timezone = config.scheduler?.timezone ?? "UTC";

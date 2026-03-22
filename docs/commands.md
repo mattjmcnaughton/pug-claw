@@ -22,6 +22,10 @@ agent
   list
   skills
 
+backup
+  export
+  dryrun
+
 driver
   show
   set <name>
@@ -51,7 +55,9 @@ Examples:
 - Discord: `!driver set pi`
 - Discord: `!help system`
 - Discord: `!schedule list`
+- Discord: `!backup export`
 - TUI: `/agent skills`
+- TUI: `/backup dryrun`
 - TUI: `/system quit`
 
 ## Important rule

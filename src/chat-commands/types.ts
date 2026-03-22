@@ -37,6 +37,8 @@ export interface ChatCommandHandler {
 
 export interface ChatCommandActions {
   reload(): Promise<string | undefined>;
+  exportBackup?(): Promise<string>;
+  dryRunBackup?(): Promise<string>;
   listSchedules?(): Promise<string[]>;
   runSchedule?(name: string): Promise<string>;
 }

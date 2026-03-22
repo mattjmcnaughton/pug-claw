@@ -108,4 +108,4 @@ When editing schedules:
 - The config is validated on load — invalid JSON, invalid cron expressions, unknown schedule agents, unknown schedule drivers, or invalid scheduler timezones will prevent startup
 - After editing, remind the user to `!system reload` or `/system reload` to pick up changes
 - Scheduler control commands are Discord owner-only: `!schedule list` and `!schedule run <name>`
-- Back up the config before making major changes
+- Back up the config before making major changes (`!backup export` in Discord or `/backup export` in the TUI)

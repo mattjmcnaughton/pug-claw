@@ -99,11 +99,11 @@ Discord owner-only commands:
 
 Runtime DB:
 
-- `${PUG_CLAW_DATA_DIR:-<home>/data}/pug-claw.sqlite`
+- `${PUG_CLAW_INTERNAL_DIR:-<home>/internal}/pug-claw.sqlite`
 
 Scheduler lock:
 
-- `${PUG_CLAW_DATA_DIR:-<home>/data}/locks/scheduler.lock/owner.json`
+- `${PUG_CLAW_INTERNAL_DIR:-<home>/internal}/locks/scheduler.lock/owner.json`
 
 Scheduler audit logs:
 
