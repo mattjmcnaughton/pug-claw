@@ -1,17 +1,10 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, test } from "bun:test";
 import { ensureHomeDirectories } from "../../src/commands/init.ts";
 import { Paths } from "../../src/constants.ts";
-import type { Logger } from "../../src/logger.ts";
-import { migrateLegacyHomeLayout } from "../../src/migration.ts";
+import { ensureResolvedHomeLayout } from "../../src/layout.ts";
 import type { ResolvedConfig } from "../../src/resources.ts";
 
 function makeTmpDir(): string {
@@ -23,23 +16,15 @@ function makeTmpDir(): string {
   return dir;
 }
 
-const noopLogger = {
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  fatal: () => {},
-  debug: () => {},
-} as unknown as Logger;
-
 function makeConfig(homeDir: string): ResolvedConfig {
   return {
     homeDir,
-    agentsDir: resolve(homeDir, Paths.AGENTS_DIR),
-    skillsDir: resolve(homeDir, Paths.SKILLS_DIR),
-    internalDir: resolve(homeDir, Paths.INTERNAL_DIR),
-    dataDir: resolve(homeDir, Paths.DATA_DIR),
-    codeDir: resolve(homeDir, Paths.CODE_DIR),
-    logsDir: resolve(homeDir, Paths.LOGS_DIR),
+    agentsDir: resolve(homeDir, "custom-agents"),
+    skillsDir: resolve(homeDir, "custom-skills"),
+    internalDir: resolve(homeDir, "runtime"),
+    dataDir: resolve(homeDir, "workspace-data"),
+    codeDir: resolve(homeDir, "workspace-code"),
+    logsDir: resolve(homeDir, "var/logs"),
     backupIncludeDirs: [],
     defaultAgent: "default",
     defaultDriver: "claude",
@@ -54,7 +39,7 @@ function makeConfig(homeDir: string): ResolvedConfig {
 }
 
 describe("home layout", () => {
-  test("ensureHomeDirectories creates the refactored directory structure", () => {
+  test("ensureHomeDirectories creates the refactored default directory structure", () => {
     const homeDir = makeTmpDir();
 
     try {
@@ -79,74 +64,27 @@ describe("home layout", () => {
     }
   });
 
-  test("migrateLegacyHomeLayout moves runtime files into internal and is idempotent", () => {
+  test("ensureResolvedHomeLayout creates the resolved directory structure", () => {
     const homeDir = makeTmpDir();
     const config = makeConfig(homeDir);
 
     try {
-      mkdirSync(resolve(homeDir, Paths.DATA_DIR, Paths.LOCKS_DIR), {
-        recursive: true,
-      });
-      mkdirSync(resolve(homeDir, Paths.PLUGINS_DIR, "demo-plugin"), {
-        recursive: true,
-      });
-      writeFileSync(
-        resolve(homeDir, Paths.DATA_DIR, Paths.RUNTIME_DB_FILE),
-        "legacy-db",
-      );
-      writeFileSync(
-        resolve(homeDir, Paths.DATA_DIR, `${Paths.RUNTIME_DB_FILE}-wal`),
-        "legacy-wal",
-      );
-      writeFileSync(
-        resolve(homeDir, Paths.DATA_DIR, Paths.LOCKS_DIR, "lock.txt"),
-        "legacy-lock",
-      );
-      writeFileSync(
-        resolve(homeDir, Paths.PLUGINS_DIR, "demo-plugin", "plugin.json"),
-        "legacy-plugin",
-      );
-      writeFileSync(
-        resolve(homeDir, Paths.DATA_DIR, "user-notes.txt"),
-        "keep me in data",
-      );
+      ensureResolvedHomeLayout(config);
 
-      migrateLegacyHomeLayout(config, noopLogger);
-      migrateLegacyHomeLayout(config, noopLogger);
-
-      expect(
-        existsSync(resolve(config.internalDir, Paths.RUNTIME_DB_FILE)),
-      ).toBe(true);
-      expect(
-        readFileSync(
-          resolve(config.internalDir, Paths.RUNTIME_DB_FILE),
-          "utf-8",
-        ),
-      ).toBe("legacy-db");
-      expect(
-        existsSync(resolve(config.internalDir, `${Paths.RUNTIME_DB_FILE}-wal`)),
-      ).toBe(true);
-      expect(
-        existsSync(resolve(config.internalDir, Paths.LOCKS_DIR, "lock.txt")),
-      ).toBe(true);
-      expect(
-        existsSync(
-          resolve(
-            config.internalDir,
-            Paths.PLUGINS_DIR,
-            "demo-plugin",
-            "plugin.json",
-          ),
-        ),
-      ).toBe(true);
-
-      expect(existsSync(resolve(config.dataDir, Paths.RUNTIME_DB_FILE))).toBe(
-        false,
+      expect(existsSync(config.agentsDir)).toBe(true);
+      expect(existsSync(config.skillsDir)).toBe(true);
+      expect(existsSync(config.internalDir)).toBe(true);
+      expect(existsSync(resolve(config.internalDir, Paths.PLUGINS_DIR))).toBe(
+        true,
       );
-      expect(existsSync(resolve(homeDir, Paths.PLUGINS_DIR))).toBe(false);
-      expect(
-        readFileSync(resolve(config.dataDir, "user-notes.txt"), "utf-8"),
-      ).toBe("keep me in data");
+      expect(existsSync(config.dataDir)).toBe(true);
+      expect(existsSync(config.codeDir)).toBe(true);
+      expect(existsSync(resolve(config.logsDir, Paths.SYSTEM_LOG_DIR))).toBe(
+        true,
+      );
+      expect(existsSync(resolve(config.logsDir, Paths.SCHEDULES_LOG_DIR))).toBe(
+        true,
+      );
     } finally {
       rmSync(homeDir, { recursive: true, force: true });
     }

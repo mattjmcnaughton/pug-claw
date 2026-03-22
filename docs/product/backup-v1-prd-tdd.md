@@ -364,8 +364,9 @@ Shows what a backup would include without creating the archive:
 
 - Changes to `src/constants.ts` — new path and env var constants
 - Changes to `src/resources.ts` — new config schema fields, resolution for `internalDir` and `codeDir`
-- Changes to `src/commands/init.ts` — create new directories, migration logic
+- Changes to `src/commands/init.ts` — create new directories
 - Changes to `src/scheduler/runtime.ts` — use `internalDir` instead of `dataDir`
+- One-off migration script under `scripts/one-off/` for upgrading existing homes
 - Changes to `src/main.ts` — export all resolved paths as env vars. After this change, `startFrontend()` must set every resolved directory path into `process.env`:
   - `PUG_CLAW_HOME` (already exported)
   - `PUG_CLAW_AGENTS_DIR` (already exported)

@@ -1,10 +1,5 @@
 import { exportBackup } from "../backup/export.ts";
 import { renderBackupExportMessage } from "../backup/render.ts";
-import { logger } from "../logger.ts";
-import {
-  ensureResolvedHomeLayout,
-  migrateLegacyHomeLayout,
-} from "../migration.ts";
 import { resolveConfig, toError } from "../resources.ts";
 import {
   BackupCliIncludeNames,
@@ -35,8 +30,6 @@ export async function runExportCommand(opts: {
 }): Promise<void> {
   try {
     const config = await resolveConfig({ home: opts.home });
-    migrateLegacyHomeLayout(config, logger);
-    ensureResolvedHomeLayout(config);
 
     const result = await exportBackup(config, {
       outputPath: opts.output,
