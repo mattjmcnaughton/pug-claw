@@ -66,6 +66,7 @@ export interface CreateBackupManifestOptions {
 export interface ExportBackupOptions {
   includeDirs?: BackupIncludeDirKey[];
   outputPath?: string;
+  outputDir?: string;
 }
 
 export interface ExportBackupResult {

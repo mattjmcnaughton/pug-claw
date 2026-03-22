@@ -243,17 +243,18 @@ pug-claw-backup/
 
 ### 4.6 Configurable backup directories
 
-Users declare which workspace directories to include in backups:
+Users declare which workspace directories to include in backups and can set a default output directory:
 
 ```json
 {
   "backup": {
-    "include_dirs": ["data_dir", "code_dir"]
+    "include_dirs": ["data_dir", "code_dir"],
+    "output_dir": "backups"
   }
 }
 ```
 
-Values are keys from the `paths` config. CLI `--include` flags override/extend this.
+Values in `include_dirs` are keys from the `paths` config. `output_dir` is relative to `PUG_CLAW_HOME` unless absolute. CLI `--include` flags override/extend inclusion defaults. `--output` and `--output-dir` override the configured output directory.
 
 ---
 
@@ -266,6 +267,7 @@ pug-claw export [options]
 
 Options:
   --output <path>         Output file path (default: ./pug-claw-backup-{timestamp}.tar.gz)
+  --output-dir <path>     Output directory for the default backup filename
   --include <dir>         Include optional directory (repeatable: data, code, logs)
   --home <path>           Override PUG_CLAW_HOME
 ```

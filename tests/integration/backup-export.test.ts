@@ -56,6 +56,23 @@ function extractArchive(archivePath: string): string {
 }
 
 describe("backup export", () => {
+  test("exportBackup rejects using both outputPath and outputDir", async () => {
+    const homeDir = copyFixtureHome();
+
+    try {
+      createRuntimeDb(homeDir);
+      const config = await resolveConfig({ home: homeDir });
+      await expect(
+        exportBackup(config, {
+          outputPath: resolve(homeDir, "explicit.tar.gz"),
+          outputDir: resolve(homeDir, "backups"),
+        }),
+      ).rejects.toThrow('Cannot specify both "outputPath" and "outputDir".');
+    } finally {
+      rmSync(homeDir, { recursive: true, force: true });
+    }
+  });
+
   test("exportBackup creates the expected archive structure and excludes secrets", async () => {
     const homeDir = copyFixtureHome();
     const outputDir = makeTmpDir();
@@ -166,6 +183,73 @@ describe("backup export", () => {
       } finally {
         rmSync(extractedDir, { recursive: true, force: true });
       }
+    } finally {
+      rmSync(homeDir, { recursive: true, force: true });
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
+  test("exportBackup uses backup.output_dir from config with the default filename", async () => {
+    const homeDir = copyFixtureHome();
+
+    try {
+      createRuntimeDb(homeDir);
+      writeFileSync(
+        resolve(homeDir, "config.json"),
+        `${JSON.stringify(
+          {
+            paths: {
+              agents_dir: "agents",
+              skills_dir: "skills",
+              internal_dir: "internal",
+              data_dir: "data",
+              code_dir: "code",
+              logs_dir: "logs",
+            },
+            secrets: {
+              provider: "env",
+            },
+            backup: {
+              output_dir: "backups",
+            },
+            default_agent: "fixture-agent",
+            default_driver: "claude",
+            drivers: {
+              claude: {},
+              pi: {},
+            },
+            channels: {},
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
+      const config = await resolveConfig({ home: homeDir });
+      const result = await exportBackup(config);
+
+      expect(result.outputPath.startsWith(resolve(homeDir, "backups"))).toBe(
+        true,
+      );
+      expect(result.outputPath.endsWith(".tar.gz")).toBe(true);
+      expect(existsSync(result.outputPath)).toBe(true);
+    } finally {
+      rmSync(homeDir, { recursive: true, force: true });
+    }
+  });
+
+  test("exportBackup uses outputDir with the default filename", async () => {
+    const homeDir = copyFixtureHome();
+    const outputDir = makeTmpDir();
+
+    try {
+      createRuntimeDb(homeDir);
+      const config = await resolveConfig({ home: homeDir });
+      const result = await exportBackup(config, { outputDir });
+
+      expect(result.outputPath.startsWith(outputDir)).toBe(true);
+      expect(result.outputPath.endsWith(".tar.gz")).toBe(true);
+      expect(existsSync(result.outputPath)).toBe(true);
     } finally {
       rmSync(homeDir, { recursive: true, force: true });
       rmSync(outputDir, { recursive: true, force: true });

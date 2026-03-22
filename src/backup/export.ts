@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { Database } from "bun:sqlite";
 import { Paths } from "../constants.ts";
+import { expandTilde } from "../resources.ts";
 import type { ResolvedConfig } from "../resources.ts";
 import { createBackupManifest } from "./manifest.ts";
 import {
@@ -73,13 +74,35 @@ function createArchive(stagingParentDir: string, outputPath: string): void {
   }
 }
 
-function toOutputPath(outputPath?: string): string {
+function toResolvedCliPath(path: string): string {
+  return resolve(expandTilde(path));
+}
+
+function toOutputPath(
+  config: ResolvedConfig,
+  outputPath?: string,
+  outputDir?: string,
+): string {
+  if (outputPath && outputDir) {
+    throw new Error('Cannot specify both "outputPath" and "outputDir".');
+  }
+
   if (outputPath) {
-    return resolve(outputPath);
+    return toResolvedCliPath(outputPath);
   }
 
   const timestamp = new Date().toISOString().replaceAll(":", "-");
-  return resolve(`pug-claw-backup-${timestamp}.tar.gz`);
+  const fileName = `pug-claw-backup-${timestamp}.tar.gz`;
+
+  if (outputDir) {
+    return resolve(toResolvedCliPath(outputDir), fileName);
+  }
+
+  if (config.backupOutputDir) {
+    return resolve(config.backupOutputDir, fileName);
+  }
+
+  return resolve(fileName);
 }
 
 function getIncludedOptionalDirs(
@@ -202,7 +225,11 @@ export async function exportBackup(
   config: ResolvedConfig,
   options: ExportBackupOptions = {},
 ): Promise<ExportBackupResult> {
-  const outputPath = toOutputPath(options.outputPath);
+  const outputPath = toOutputPath(
+    config,
+    options.outputPath,
+    options.outputDir,
+  );
   const includedDirs = getIncludedOptionalDirs(config, options.includeDirs);
   const sections = buildSections(includedDirs);
   const stagingParentDir = makeStagingDir();

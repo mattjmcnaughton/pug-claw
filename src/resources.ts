@@ -50,6 +50,7 @@ const SecretsConfigSchema = z.object({
 const BackupConfigSchema = z
   .object({
     include_dirs: z.array(BackupIncludeDirKeySchema).optional(),
+    output_dir: z.string().optional(),
   })
   .strict();
 
@@ -167,6 +168,7 @@ export interface ResolvedConfig {
   codeDir: string;
   logsDir: string;
   backupIncludeDirs: BackupIncludeDirKey[];
+  backupOutputDir?: string;
 
   defaultAgent: string;
   defaultDriver: string;
@@ -354,6 +356,21 @@ export function resolveConfigPaths(
     codeDir,
     logsDir,
   };
+}
+
+function resolveConfigRelativePath(
+  homeDir: string,
+  configValue: string | undefined,
+): string | undefined {
+  if (!configValue) {
+    return undefined;
+  }
+
+  const expanded = expandTilde(configValue);
+  if (expanded.startsWith("/")) {
+    return expanded;
+  }
+  return resolve(homeDir, expanded);
 }
 
 function validateTimezone(timezone: string): void {
@@ -593,6 +610,10 @@ export async function resolveConfig(
     codeDir: paths.codeDir,
     logsDir: paths.logsDir,
     backupIncludeDirs: rawConfig.backup?.include_dirs ?? [],
+    backupOutputDir: resolveConfigRelativePath(
+      homeDir,
+      rawConfig.backup?.output_dir,
+    ),
     defaultAgent: rawConfig.default_agent ?? Defaults.AGENT,
     defaultDriver: rawConfig.default_driver ?? Defaults.DRIVER,
     drivers,
@@ -617,6 +638,7 @@ export async function resolveConfig(
       codeDir: config.codeDir,
       logsDir: config.logsDir,
       backupIncludeDirs: config.backupIncludeDirs,
+      backupOutputDir: config.backupOutputDir,
       defaultAgent: config.defaultAgent,
       defaultDriver: config.defaultDriver,
       channelCount: Object.keys(config.channels).length,

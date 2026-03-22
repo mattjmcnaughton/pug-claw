@@ -155,7 +155,7 @@ describe("resolveConfig", () => {
   );
 
   test(
-    "config file path overrides work for internal, code, and logs",
+    "config file path overrides work for internal, code, logs, and backup output dir",
     withEnv(cleanEnv, async () => {
       const tmpDir = makeTmpDir();
       writeFileSync(
@@ -168,6 +168,9 @@ describe("resolveConfig", () => {
             code_dir: "projects",
             logs_dir: "var/logs",
           },
+          backup: {
+            output_dir: "backups",
+          },
         }),
       );
       try {
@@ -175,6 +178,30 @@ describe("resolveConfig", () => {
         expect(config.internalDir).toBe(resolve(tmpDir, "runtime"));
         expect(config.codeDir).toBe(resolve(tmpDir, "projects"));
         expect(config.logsDir).toBe(resolve(tmpDir, "var/logs"));
+        expect(config.backupOutputDir).toBe(resolve(tmpDir, "backups"));
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    }),
+  );
+
+  test(
+    "backup output dir supports absolute config values",
+    withEnv(cleanEnv, async () => {
+      const tmpDir = makeTmpDir();
+      writeFileSync(
+        resolve(tmpDir, "config.json"),
+        JSON.stringify({
+          default_agent: "test-agent",
+          default_driver: "claude",
+          backup: {
+            output_dir: "/tmp/pug-claw-backups",
+          },
+        }),
+      );
+      try {
+        const config = await resolveConfig({ home: tmpDir });
+        expect(config.backupOutputDir).toBe("/tmp/pug-claw-backups");
       } finally {
         rmSync(tmpDir, { recursive: true, force: true });
       }
