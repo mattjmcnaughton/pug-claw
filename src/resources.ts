@@ -32,7 +32,10 @@ const ChannelConfigSchema = z.object({
 const PathsConfigSchema = z.object({
   agents_dir: z.string().optional(),
   skills_dir: z.string().optional(),
+  internal_dir: z.string().optional(),
   data_dir: z.string().optional(),
+  code_dir: z.string().optional(),
+  logs_dir: z.string().optional(),
 });
 
 const SecretsConfigSchema = z.object({
@@ -148,7 +151,9 @@ export interface ResolvedConfig {
   homeDir: string;
   agentsDir: string;
   skillsDir: string;
+  internalDir: string;
   dataDir: string;
+  codeDir: string;
   logsDir: string;
 
   defaultAgent: string;
@@ -166,7 +171,9 @@ export interface ResolvedConfig {
 export interface ResolvedConfigPaths {
   agentsDir: string;
   skillsDir: string;
+  internalDir: string;
   dataDir: string;
+  codeDir: string;
   logsDir: string;
 }
 
@@ -253,7 +260,11 @@ function resolvePathWithOverrides(
   cliFlag: string | undefined,
 ): string {
   if (cliFlag) return resolve(expandTilde(cliFlag));
-  if (envVar) return resolve(expandTilde(envVar));
+  if (envVar) {
+    const expanded = expandTilde(envVar);
+    if (expanded.startsWith("/")) return expanded;
+    return resolve(homeDir, expanded);
+  }
   if (configValue) {
     const expanded = expandTilde(configValue);
     if (expanded.startsWith("/")) return expanded;
@@ -262,17 +273,18 @@ function resolvePathWithOverrides(
   return resolve(homeDir, defaultRelative);
 }
 
-export function resolveLogsDir(homeDir: string): string {
-  const rawLogsDir = process.env[EnvVars.LOGS_DIR];
-  if (!rawLogsDir) {
-    return resolve(homeDir, Paths.LOGS_DIR);
-  }
-
-  const expanded = expandTilde(rawLogsDir);
-  if (expanded.startsWith("/")) {
-    return expanded;
-  }
-  return resolve(homeDir, expanded);
+export function resolveLogsDir(
+  homeDir: string,
+  rawConfig?: ConfigFile,
+  opts: ConfigOptions = {},
+): string {
+  return resolvePathWithOverrides(
+    homeDir,
+    Paths.LOGS_DIR,
+    rawConfig?.paths?.logs_dir,
+    process.env[EnvVars.LOGS_DIR],
+    opts.logsDir,
+  );
 }
 
 export function resolveConfigPaths(
@@ -296,6 +308,14 @@ export function resolveConfigPaths(
     opts.skillsDir,
   );
 
+  const internalDir = resolvePathWithOverrides(
+    homeDir,
+    Paths.INTERNAL_DIR,
+    rawConfig.paths?.internal_dir,
+    process.env[EnvVars.INTERNAL_DIR],
+    opts.internalDir,
+  );
+
   const dataDir = resolvePathWithOverrides(
     homeDir,
     Paths.DATA_DIR,
@@ -304,12 +324,22 @@ export function resolveConfigPaths(
     opts.dataDir,
   );
 
-  const logsDir = resolveLogsDir(homeDir);
+  const codeDir = resolvePathWithOverrides(
+    homeDir,
+    Paths.CODE_DIR,
+    rawConfig.paths?.code_dir,
+    process.env[EnvVars.CODE_DIR],
+    opts.codeDir,
+  );
+
+  const logsDir = resolveLogsDir(homeDir, rawConfig, opts);
 
   return {
     agentsDir,
     skillsDir,
+    internalDir,
     dataDir,
+    codeDir,
     logsDir,
   };
 }
@@ -439,7 +469,10 @@ export interface ConfigOptions {
   home?: string;
   agentsDir?: string;
   skillsDir?: string;
+  internalDir?: string;
   dataDir?: string;
+  codeDir?: string;
+  logsDir?: string;
 }
 
 // --- Config Loading Helpers ---
@@ -543,7 +576,9 @@ export async function resolveConfig(
     homeDir,
     agentsDir: paths.agentsDir,
     skillsDir: paths.skillsDir,
+    internalDir: paths.internalDir,
     dataDir: paths.dataDir,
+    codeDir: paths.codeDir,
     logsDir: paths.logsDir,
     defaultAgent: rawConfig.default_agent ?? Defaults.AGENT,
     defaultDriver: rawConfig.default_driver ?? Defaults.DRIVER,
@@ -564,7 +599,9 @@ export async function resolveConfig(
       homeDir: config.homeDir,
       agentsDir: config.agentsDir,
       skillsDir: config.skillsDir,
+      internalDir: config.internalDir,
       dataDir: config.dataDir,
+      codeDir: config.codeDir,
       logsDir: config.logsDir,
       defaultAgent: config.defaultAgent,
       defaultDriver: config.defaultDriver,

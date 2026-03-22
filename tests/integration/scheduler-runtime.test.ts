@@ -9,9 +9,9 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, test } from "bun:test";
 import type { Logger } from "../../src/logger.ts";
-import type { ResolvedConfig } from "../../src/resources.ts";
-import { SchedulerRuntime } from "../../src/scheduler/runtime.ts";
 import type { SchedulerOutputSink } from "../../src/scheduler/output.ts";
+import { SchedulerRuntime } from "../../src/scheduler/runtime.ts";
+import type { ResolvedConfig } from "../../src/resources.ts";
 import { FakeDriver } from "../fakes/fake-driver.ts";
 
 function makeTmpDir(): string {
@@ -54,7 +54,9 @@ class FakeOutputSink implements SchedulerOutputSink {
 
 function makeConfig(homeDir: string): ResolvedConfig {
   const agentsDir = resolve(homeDir, "agents");
+  const internalDir = resolve(homeDir, "internal");
   const dataDir = resolve(homeDir, "data");
+  const codeDir = resolve(homeDir, "code");
   const logsDir = resolve(homeDir, "logs");
   mkdirSync(resolve(agentsDir, "writer"), { recursive: true });
   writeFileSync(resolve(agentsDir, "writer", "SYSTEM.md"), "writer system");
@@ -63,7 +65,9 @@ function makeConfig(homeDir: string): ResolvedConfig {
     homeDir,
     agentsDir,
     skillsDir: resolve(homeDir, "skills"),
+    internalDir,
     dataDir,
+    codeDir,
     logsDir,
     defaultAgent: "writer",
     defaultDriver: "fake",

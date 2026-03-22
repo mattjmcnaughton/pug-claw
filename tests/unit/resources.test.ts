@@ -58,7 +58,10 @@ const cleanEnv = {
   PUG_CLAW_HOME: undefined,
   PUG_CLAW_AGENTS_DIR: undefined,
   PUG_CLAW_SKILLS_DIR: undefined,
+  PUG_CLAW_INTERNAL_DIR: undefined,
   PUG_CLAW_DATA_DIR: undefined,
+  PUG_CLAW_CODE_DIR: undefined,
+  PUG_CLAW_LOGS_DIR: undefined,
 };
 
 describe("resolveConfig", () => {
@@ -71,7 +74,10 @@ describe("resolveConfig", () => {
       expect(config.defaultDriver).toBe("claude");
       expect(config.agentsDir).toBe(resolve(PUG_CLAW_HOME, "agents"));
       expect(config.skillsDir).toBe(resolve(PUG_CLAW_HOME, "skills"));
+      expect(config.internalDir).toBe(resolve(PUG_CLAW_HOME, "internal"));
       expect(config.dataDir).toBe(resolve(PUG_CLAW_HOME, "data"));
+      expect(config.codeDir).toBe(resolve(PUG_CLAW_HOME, "code"));
+      expect(config.logsDir).toBe(resolve(PUG_CLAW_HOME, "logs"));
     }),
   );
 
@@ -104,6 +110,9 @@ describe("resolveConfig", () => {
         expect(config.agentsDir).toBe("/tmp/custom-agents");
         // Other paths still default relative to home
         expect(config.skillsDir).toBe(resolve(PUG_CLAW_HOME, "skills"));
+        expect(config.internalDir).toBe(resolve(PUG_CLAW_HOME, "internal"));
+        expect(config.codeDir).toBe(resolve(PUG_CLAW_HOME, "code"));
+        expect(config.logsDir).toBe(resolve(PUG_CLAW_HOME, "logs"));
       },
     ),
   );
@@ -114,8 +123,61 @@ describe("resolveConfig", () => {
       const config = await resolveConfig({
         home: PUG_CLAW_HOME,
         agentsDir: "/tmp/cli-agents",
+        internalDir: "/tmp/cli-internal",
+        codeDir: "/tmp/cli-code",
+        logsDir: "/tmp/cli-logs",
       });
       expect(config.agentsDir).toBe("/tmp/cli-agents");
+      expect(config.internalDir).toBe("/tmp/cli-internal");
+      expect(config.codeDir).toBe("/tmp/cli-code");
+      expect(config.logsDir).toBe("/tmp/cli-logs");
+    }),
+  );
+
+  test(
+    "individual path overrides via env for internal, code, and logs",
+    withEnv(
+      {
+        ...cleanEnv,
+        PUG_CLAW_INTERNAL_DIR: "custom-internal",
+        PUG_CLAW_CODE_DIR: "/tmp/custom-code",
+        PUG_CLAW_LOGS_DIR: "custom-logs",
+      },
+      async () => {
+        const config = await resolveConfig({ home: PUG_CLAW_HOME });
+        expect(config.internalDir).toBe(
+          resolve(PUG_CLAW_HOME, "custom-internal"),
+        );
+        expect(config.codeDir).toBe("/tmp/custom-code");
+        expect(config.logsDir).toBe(resolve(PUG_CLAW_HOME, "custom-logs"));
+      },
+    ),
+  );
+
+  test(
+    "config file path overrides work for internal, code, and logs",
+    withEnv(cleanEnv, async () => {
+      const tmpDir = makeTmpDir();
+      writeFileSync(
+        resolve(tmpDir, "config.json"),
+        JSON.stringify({
+          default_agent: "test-agent",
+          default_driver: "claude",
+          paths: {
+            internal_dir: "runtime",
+            code_dir: "projects",
+            logs_dir: "var/logs",
+          },
+        }),
+      );
+      try {
+        const config = await resolveConfig({ home: tmpDir });
+        expect(config.internalDir).toBe(resolve(tmpDir, "runtime"));
+        expect(config.codeDir).toBe(resolve(tmpDir, "projects"));
+        expect(config.logsDir).toBe(resolve(tmpDir, "var/logs"));
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
     }),
   );
 
@@ -186,7 +248,10 @@ describe("resolveConfig", () => {
       const config = await resolveConfig({ home: PUG_CLAW_HOME });
       expect(config.agentsDir).toBe(resolve(PUG_CLAW_HOME, "agents"));
       expect(config.skillsDir).toBe(resolve(PUG_CLAW_HOME, "skills"));
+      expect(config.internalDir).toBe(resolve(PUG_CLAW_HOME, "internal"));
       expect(config.dataDir).toBe(resolve(PUG_CLAW_HOME, "data"));
+      expect(config.codeDir).toBe(resolve(PUG_CLAW_HOME, "code"));
+      expect(config.logsDir).toBe(resolve(PUG_CLAW_HOME, "logs"));
     }),
   );
 });
