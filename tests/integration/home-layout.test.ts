@@ -40,6 +40,7 @@ function makeConfig(homeDir: string): ResolvedConfig {
     dataDir: resolve(homeDir, Paths.DATA_DIR),
     codeDir: resolve(homeDir, Paths.CODE_DIR),
     logsDir: resolve(homeDir, Paths.LOGS_DIR),
+    backupIncludeDirs: [],
     defaultAgent: "default",
     defaultDriver: "claude",
     drivers: {},

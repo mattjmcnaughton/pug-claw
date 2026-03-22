@@ -3,6 +3,7 @@ import { execSync } from "node:child_process";
 import { resolve } from "node:path";
 import { Command } from "commander";
 import { runCheckConfig } from "./commands/check-config.ts";
+import { runExportCommand } from "./commands/export.ts";
 import { runInit } from "./commands/init.ts";
 import { runInitService } from "./commands/init-service.ts";
 import {
@@ -146,6 +147,11 @@ function optsToConfigOptions(
   };
 }
 
+function collectStringValues(value: string, previous: string[] = []): string[] {
+  previous.push(value);
+  return previous;
+}
+
 const program = new Command();
 
 program.name("pug-claw").description("AI bot framework").version(VERSION);
@@ -175,6 +181,26 @@ addSharedOptions(
       );
     }),
 );
+
+program
+  .command("export")
+  .description("Create a backup archive")
+  .option(
+    "--output <path>",
+    "Output file path (default: ./pug-claw-backup-{timestamp}.tar.gz)",
+  )
+  .option(
+    "--include <dir>",
+    "Include optional directory (repeatable: data, code, logs)",
+    collectStringValues,
+    [],
+  )
+  .option("--home <path>", "Home directory (default: ~/.pug-claw)")
+  .action(
+    async (opts: { home?: string; include?: string[]; output?: string }) => {
+      await runExportCommand(opts);
+    },
+  );
 
 program
   .command("init")
