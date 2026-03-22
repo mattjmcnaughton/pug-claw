@@ -1,0 +1,20 @@
+{
+  "paths": {
+    "agents_dir": "agents",
+    "skills_dir": "skills",
+    "internal_dir": "internal",
+    "data_dir": "data",
+    "code_dir": "code",
+    "logs_dir": "logs"
+  },
+  "secrets": {
+    "provider": "env"
+  },
+  "default_agent": "fixture-agent",
+  "default_driver": "claude",
+  "drivers": {
+    "claude": {},
+    "pi": {}
+  },
+  "channels": {}
+}

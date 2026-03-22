@@ -45,6 +45,7 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     dataDir: "/tmp/test/data",
     codeDir: "/tmp/test/code",
     logsDir: "/tmp/test/logs",
+    backupIncludeDirs: [],
     defaultAgent: "default",
     defaultDriver: "fake",
     drivers: {},

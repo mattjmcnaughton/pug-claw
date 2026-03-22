@@ -1,0 +1,4 @@
+{
+  "default_agent": "fixture-agent",
+  "default_driver": "claude"
+}

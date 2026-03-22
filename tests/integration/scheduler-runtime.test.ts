@@ -69,6 +69,7 @@ function makeConfig(homeDir: string): ResolvedConfig {
     dataDir,
     codeDir,
     logsDir,
+    backupIncludeDirs: [],
     defaultAgent: "writer",
     defaultDriver: "fake",
     drivers: {},

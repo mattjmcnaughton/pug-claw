@@ -4,6 +4,10 @@ import { homedir } from "node:os";
 import { Cron } from "croner";
 import { z } from "zod";
 import {
+  BackupIncludeDirKeySchema,
+  type BackupIncludeDirKey,
+} from "./backup/types.ts";
+import {
   Defaults,
   Drivers,
   EnvVars,
@@ -43,6 +47,12 @@ const SecretsConfigSchema = z.object({
   dotenv_path: z.string().optional(),
 });
 
+const BackupConfigSchema = z
+  .object({
+    include_dirs: z.array(BackupIncludeDirKeySchema).optional(),
+  })
+  .strict();
+
 const DiscordConfigSchema = z.object({
   guild_id: z.string().optional(),
   owner_id: z.string().optional(),
@@ -78,6 +88,7 @@ export const ConfigFileSchema = z
   .object({
     paths: PathsConfigSchema.optional(),
     secrets: SecretsConfigSchema.optional(),
+    backup: BackupConfigSchema.optional(),
     discord: DiscordConfigSchema.optional(),
     scheduler: SchedulerConfigSchema.optional(),
     default_agent: z.string().optional(),
@@ -155,6 +166,7 @@ export interface ResolvedConfig {
   dataDir: string;
   codeDir: string;
   logsDir: string;
+  backupIncludeDirs: BackupIncludeDirKey[];
 
   defaultAgent: string;
   defaultDriver: string;
@@ -580,6 +592,7 @@ export async function resolveConfig(
     dataDir: paths.dataDir,
     codeDir: paths.codeDir,
     logsDir: paths.logsDir,
+    backupIncludeDirs: rawConfig.backup?.include_dirs ?? [],
     defaultAgent: rawConfig.default_agent ?? Defaults.AGENT,
     defaultDriver: rawConfig.default_driver ?? Defaults.DRIVER,
     drivers,
@@ -603,6 +616,7 @@ export async function resolveConfig(
       dataDir: config.dataDir,
       codeDir: config.codeDir,
       logsDir: config.logsDir,
+      backupIncludeDirs: config.backupIncludeDirs,
       defaultAgent: config.defaultAgent,
       defaultDriver: config.defaultDriver,
       channelCount: Object.keys(config.channels).length,
