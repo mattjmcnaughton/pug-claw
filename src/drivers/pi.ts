@@ -11,8 +11,8 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { Drivers } from "../constants.ts";
 import { logger } from "../logger.ts";
+import { buildFinalSystemPrompt } from "../prompt.ts";
 import { toError } from "../resources.ts";
-import { appendSkillCatalog, buildEnvironmentBlock } from "../skills.ts";
 import type {
   Driver,
   DriverEventCallback,
@@ -45,23 +45,10 @@ export function buildPiSystemPrompt(
   basePrompt: string,
   skills?: DriverOptions["skills"],
 ): string {
-  let systemPrompt = skills
-    ? appendSkillCatalog(basePrompt, skills)
-    : basePrompt;
-
-  if (skills && skills.length > 0) {
-    systemPrompt +=
-      "\n\nIMPORTANT: Only use the skills listed above. " +
-      "Do not search the filesystem for additional skills or capabilities beyond what is listed.";
-  } else {
-    systemPrompt +=
-      "\n\nIMPORTANT: You have no skills loaded in this session. " +
-      "Do not search the filesystem for skills or capabilities. " +
-      "Respond using only your built-in knowledge and tools.";
-  }
-
-  systemPrompt += buildEnvironmentBlock();
-  return systemPrompt;
+  return buildFinalSystemPrompt(basePrompt, {
+    skills,
+    skillMode: "strict",
+  });
 }
 
 export interface PiEventHandlerResult {

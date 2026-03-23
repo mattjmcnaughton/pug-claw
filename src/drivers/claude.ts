@@ -1,7 +1,7 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { Drivers } from "../constants.ts";
 import { logger } from "../logger.ts";
-import { appendSkillCatalog, buildEnvironmentBlock } from "../skills.ts";
+import { buildFinalSystemPrompt } from "../prompt.ts";
 import type {
   Driver,
   DriverEventCallback,
@@ -32,20 +32,10 @@ export function resolveClaudeSessionOptions(
   const model = options.model ?? defaultModel;
   const tools = options.tools ?? DEFAULT_TOOLS;
 
-  // Skills are injected differently depending on whether a pluginDir is set.
-  // With pluginDir: skills are loaded natively via Claude Code SDK plugins,
-  // and we append a hint so the agent knows to use them.
-  // Without: fall back to embedding the full skill catalog in the system prompt.
-  let systemPrompt = options.systemPrompt;
-  if (options.pluginDir && options.skills && options.skills.length > 0) {
-    systemPrompt +=
-      "\n\nYou have plugin skills loaded in this session. " +
-      "When a task matches a skill's description, read the skill's SKILL.md for detailed instructions and use it.";
-  } else if (options.skills) {
-    systemPrompt = appendSkillCatalog(options.systemPrompt, options.skills);
-  }
-
-  systemPrompt += buildEnvironmentBlock();
+  const systemPrompt = buildFinalSystemPrompt(options.systemPrompt, {
+    skills: options.skills,
+    pluginHint: !!options.pluginDir,
+  });
 
   return {
     model,
