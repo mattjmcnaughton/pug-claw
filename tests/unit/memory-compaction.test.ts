@@ -76,4 +76,60 @@ describe("compactMemories", () => {
 
     await store.close();
   });
+
+  test("compacts later duplicates into an existing compaction summary", async () => {
+    const store = await createStore();
+    await store.save({
+      scope: "global",
+      content: "Production server runs Ubuntu 24.04",
+      createdBy: "agent:writer",
+      source: "agent",
+      tags: ["infrastructure"],
+    });
+    await store.save({
+      scope: "global",
+      content: "Production server runs Ubuntu 24.04",
+      createdBy: "agent:writer",
+      source: "agent",
+      tags: ["ops"],
+    });
+
+    const first = await compactMemories(store, "global");
+    const summaryBefore = (await store.peek({
+      scope: "global",
+      status: "active",
+    }))[0];
+
+    await store.save({
+      scope: "global",
+      content: "Production server runs Ubuntu 24.04",
+      createdBy: "agent:writer",
+      source: "agent",
+      tags: ["servers"],
+    });
+
+    const second = await compactMemories(store, "global");
+    const activeEntries = await store.peek({
+      scope: "global",
+      status: "active",
+    });
+    const compactedEntries = await store.peek({
+      scope: "global",
+      status: "compacted",
+    });
+
+    expect(first.createdEntries).toBe(1);
+    expect(second.createdEntries).toBe(0);
+    expect(second.compactedEntries).toBe(1);
+    expect(activeEntries).toHaveLength(1);
+    expect(activeEntries[0]?.id).toBe(summaryBefore?.id);
+    expect(activeEntries[0]?.tags).toEqual([
+      "infrastructure",
+      "ops",
+      "servers",
+    ]);
+    expect(compactedEntries).toHaveLength(3);
+
+    await store.close();
+  });
 });

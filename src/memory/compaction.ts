@@ -31,44 +31,55 @@ export async function compactMemories(
       status: "active",
     });
     const groups = new Map<string, MemoryEntry[]>();
+    const compactionEntries = new Map<string, MemoryEntry>();
 
     for (const entry of entries) {
       const key = normalizeContent(entry.content);
+      if (entry.source === "compaction") {
+        compactionEntries.set(key, entry);
+        continue;
+      }
+
       const existing = groups.get(key) ?? [];
       existing.push(entry);
       groups.set(key, existing);
     }
 
-    for (const group of groups.values()) {
-      if (group.length < 2) {
+    for (const [key, group] of groups.entries()) {
+      if (group.length === 0) {
         continue;
       }
 
-      const existingCompactionEntries = entries.filter(
-        (entry) =>
-          entry.source === "compaction" &&
-          normalizeContent(entry.content) ===
-            normalizeContent(group[0]?.content ?? ""),
-      );
-      if (existingCompactionEntries.length > 0) {
+      const existingCompactionEntry = compactionEntries.get(key);
+      if (existingCompactionEntry) {
+        const mergedTags = mergeTags([existingCompactionEntry, ...group]);
+        if (
+          JSON.stringify(mergedTags) !==
+          JSON.stringify(existingCompactionEntry.tags)
+        ) {
+          await memoryBackend.update(existingCompactionEntry.id, {
+            tags: mergedTags,
+          });
+        }
+      } else if (group.length >= 2) {
+        const newest = [...group].sort((left, right) =>
+          right.updatedAt.localeCompare(left.updatedAt),
+        )[0];
+        if (!newest) {
+          continue;
+        }
+
+        await memoryBackend.save({
+          scope: currentScope as MemoryScope,
+          content: newest.content,
+          tags: mergeTags(group),
+          createdBy: `system:${Defaults.MEMORY_COMPACTOR_AGENT}`,
+          source: "compaction",
+        });
+        createdEntries += 1;
+      } else {
         continue;
       }
-
-      const newest = [...group].sort((left, right) =>
-        right.updatedAt.localeCompare(left.updatedAt),
-      )[0];
-      if (!newest) {
-        continue;
-      }
-
-      await memoryBackend.save({
-        scope: currentScope as MemoryScope,
-        content: newest.content,
-        tags: mergeTags(group),
-        createdBy: `system:${Defaults.MEMORY_COMPACTOR_AGENT}`,
-        source: "compaction",
-      });
-      createdEntries += 1;
 
       for (const entry of group) {
         const updated = await memoryBackend.update(entry.id, {
