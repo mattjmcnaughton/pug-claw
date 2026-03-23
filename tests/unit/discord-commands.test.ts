@@ -45,6 +45,14 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     codeDir: "/tmp/test/code",
     logsDir: "/tmp/test/logs",
     backupIncludeDirs: [],
+    memory: {
+      enabled: true,
+      injectionBudgetTokens: 2000,
+      embeddings: {
+        enabled: false,
+        model: "Xenova/all-MiniLM-L6-v2",
+      },
+    },
     defaultAgent: "default",
     defaultDriver: "mock",
     drivers: {},
@@ -251,6 +259,7 @@ function makeCtx(configOverrides?: Partial<ResolvedConfig>): FrontendContext & {
     resolveAgent: () => ({
       systemPrompt: "system prompt",
       skills: [],
+      memory: true,
     }),
     logger: loggerSpies as unknown as Logger,
     reloadConfig: mock(async () => ({
@@ -259,6 +268,7 @@ function makeCtx(configOverrides?: Partial<ResolvedConfig>): FrontendContext & {
       resolveAgent: () => ({
         systemPrompt: "reloaded system prompt",
         skills: [],
+        memory: true,
       }),
     })),
     driver,

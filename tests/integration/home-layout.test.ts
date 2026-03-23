@@ -26,6 +26,14 @@ function makeConfig(homeDir: string): ResolvedConfig {
     codeDir: resolve(homeDir, "workspace-code"),
     logsDir: resolve(homeDir, "var/logs"),
     backupIncludeDirs: [],
+    memory: {
+      enabled: true,
+      injectionBudgetTokens: 2000,
+      embeddings: {
+        enabled: false,
+        model: "Xenova/all-MiniLM-L6-v2",
+      },
+    },
     defaultAgent: "default",
     defaultDriver: "claude",
     drivers: {},

@@ -78,6 +78,14 @@ describe("resolveConfig", () => {
       expect(config.dataDir).toBe(resolve(PUG_CLAW_HOME, "data"));
       expect(config.codeDir).toBe(resolve(PUG_CLAW_HOME, "code"));
       expect(config.logsDir).toBe(resolve(PUG_CLAW_HOME, "logs"));
+      expect(config.memory).toEqual({
+        enabled: true,
+        injectionBudgetTokens: 2000,
+        embeddings: {
+          enabled: false,
+          model: "Xenova/all-MiniLM-L6-v2",
+        },
+      });
     }),
   );
 

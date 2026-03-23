@@ -59,6 +59,21 @@ const DiscordConfigSchema = z.object({
   owner_id: z.string().optional(),
 });
 
+const EmbeddingsConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    model: z.string().optional(),
+  })
+  .strict();
+
+const MemoryConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    injection_budget_tokens: z.number().int().positive().optional(),
+    embeddings: EmbeddingsConfigSchema.optional(),
+  })
+  .strict();
+
 const SchedulerConfigSchema = z
   .object({
     timezone: z.string().min(1),
@@ -91,6 +106,7 @@ export const ConfigFileSchema = z
     secrets: SecretsConfigSchema.optional(),
     backup: BackupConfigSchema.optional(),
     discord: DiscordConfigSchema.optional(),
+    memory: MemoryConfigSchema.optional(),
     scheduler: SchedulerConfigSchema.optional(),
     default_agent: z.string().optional(),
     default_driver: z.string().optional(),
@@ -138,6 +154,15 @@ export interface ResolvedScheduleOutput {
   channelId: string;
 }
 
+export interface ResolvedMemoryConfig {
+  enabled: boolean;
+  injectionBudgetTokens: number;
+  embeddings: {
+    enabled: boolean;
+    model: string;
+  };
+}
+
 export interface ResolvedScheduleConfig {
   description?: string;
   enabled: boolean;
@@ -169,6 +194,7 @@ export interface ResolvedConfig {
   logsDir: string;
   backupIncludeDirs: BackupIncludeDirKey[];
   backupOutputDir?: string;
+  memory: ResolvedMemoryConfig;
 
   defaultAgent: string;
   defaultDriver: string;
@@ -614,6 +640,16 @@ export async function resolveConfig(
       homeDir,
       rawConfig.backup?.output_dir,
     ),
+    memory: {
+      enabled: rawConfig.memory?.enabled ?? true,
+      injectionBudgetTokens:
+        rawConfig.memory?.injection_budget_tokens ?? 2000,
+      embeddings: {
+        enabled: rawConfig.memory?.embeddings?.enabled ?? false,
+        model:
+          rawConfig.memory?.embeddings?.model ?? "Xenova/all-MiniLM-L6-v2",
+      },
+    },
     defaultAgent: rawConfig.default_agent ?? Defaults.AGENT,
     defaultDriver: rawConfig.default_driver ?? Defaults.DRIVER,
     drivers,

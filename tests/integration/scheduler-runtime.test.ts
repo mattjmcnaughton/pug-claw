@@ -70,6 +70,14 @@ function makeConfig(homeDir: string): ResolvedConfig {
     codeDir,
     logsDir,
     backupIncludeDirs: [],
+    memory: {
+      enabled: true,
+      injectionBudgetTokens: 2000,
+      embeddings: {
+        enabled: false,
+        model: "Xenova/all-MiniLM-L6-v2",
+      },
+    },
     defaultAgent: "writer",
     defaultDriver: "fake",
     drivers: {},
@@ -111,6 +119,7 @@ describe("SchedulerRuntime", () => {
       resolveAgent: () => ({
         systemPrompt: "system",
         skills: [],
+        memory: true,
       }),
       logger: noopLogger,
       outputSink,

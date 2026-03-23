@@ -12,6 +12,7 @@ const AgentFrontmatterSchema = z
     description: z.unknown().optional(),
     driver: z.unknown().optional(),
     model: z.unknown().optional(),
+    memory: z.unknown().optional(),
     "allowed-skills": z.array(z.unknown()).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
   })
@@ -22,6 +23,7 @@ export interface AgentMeta {
   description?: string;
   driver?: string;
   model?: string;
+  memory?: boolean;
   allowedSkills?: string[];
   metadata?: Record<string, string>;
 }
@@ -83,6 +85,9 @@ export function parseAgentSystemMd(agentDir: string): ParsedAgent {
   }
   if (typeof record.model === "string") {
     meta.model = record.model;
+  }
+  if (typeof record.memory === "boolean") {
+    meta.memory = record.memory;
   }
   if (Array.isArray(record["allowed-skills"])) {
     meta.allowedSkills = record["allowed-skills"].filter(
