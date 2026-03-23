@@ -70,6 +70,7 @@ export class TuiFrontend implements Frontend {
       pluginDirs,
       resolveAgent,
       logger,
+      ctx.memoryBackend,
     );
     const commandRegistry = new ChatCommandRegistry(createChatCommandTree());
 

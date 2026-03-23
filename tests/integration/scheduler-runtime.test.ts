@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, test } from "bun:test";
 import type { Logger } from "../../src/logger.ts";
+import { MemoryStore } from "../../src/memory/store.ts";
 import type { SchedulerOutputSink } from "../../src/scheduler/output.ts";
 import { SchedulerRuntime } from "../../src/scheduler/runtime.ts";
 import type { ResolvedConfig } from "../../src/resources.ts";
@@ -112,6 +113,18 @@ describe("SchedulerRuntime", () => {
     driver.setDefaultResponse("scheduled hello");
 
     const config = makeConfig(homeDir);
+    const memoryStore = new MemoryStore(
+      resolve(config.internalDir, "pug-claw.sqlite"),
+      noopLogger,
+    );
+    await memoryStore.init();
+    await memoryStore.save({
+      scope: "agent:writer",
+      content: "Include the daily standup summary in scheduled updates",
+      createdBy: "agent:writer",
+      source: "agent",
+    });
+
     const runtime = new SchedulerRuntime({
       drivers: { fake: driver },
       config,
@@ -123,6 +136,7 @@ describe("SchedulerRuntime", () => {
       }),
       logger: noopLogger,
       outputSink,
+      memoryBackend: memoryStore,
     });
 
     try {
@@ -147,6 +161,9 @@ describe("SchedulerRuntime", () => {
           text: "scheduled hello",
         },
       ]);
+      expect(driver.createdSessions[0]?.options.systemPrompt).toContain(
+        "Include the daily standup summary in scheduled updates",
+      );
 
       expect(existsSync(resolve(config.internalDir, "pug-claw.sqlite"))).toBe(
         true,
@@ -171,6 +188,7 @@ describe("SchedulerRuntime", () => {
       expect(auditText).toContain("scheduled hello");
     } finally {
       runtime.stop();
+      await memoryStore.close();
       rmSync(homeDir, { recursive: true, force: true });
     }
   });
@@ -189,6 +207,7 @@ describe("SchedulerRuntime", () => {
       resolveAgent: () => ({
         systemPrompt: "system",
         skills: [],
+        memory: true,
       }),
       logger: noopLogger,
       outputSink,

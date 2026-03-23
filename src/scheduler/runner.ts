@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import type { Driver } from "../drivers/types.ts";
 import type { Logger } from "../logger.ts";
+import { buildMemoryBlockForAgent } from "../memory/injection.ts";
+import type { MemoryBackend } from "../memory/types.ts";
 import { expandTilde, toError, type ResolvedConfig } from "../resources.ts";
 import { resolveDriverName, resolveModelName } from "../resolve.ts";
 import type { ResolvedAgent } from "../skills.ts";
@@ -30,6 +32,7 @@ export interface SchedulerRunnerContext {
   store: SchedulerStore;
   auditLog: SchedulerAuditLog;
   outputSink: SchedulerOutputSink;
+  memoryBackend?: MemoryBackend;
 }
 
 export interface StartScheduleRunResult {
@@ -62,6 +65,26 @@ export class SchedulerRunner {
   private runningSchedules = new Set<string>();
 
   constructor(private ctx: SchedulerRunnerContext) {}
+
+  private async buildMemoryBlock(
+    schedule: ResolvedSchedule,
+    resolvedAgent: ResolvedAgent,
+  ): Promise<string | undefined> {
+    if (!this.ctx.memoryBackend || !this.ctx.config.memory.enabled) {
+      return undefined;
+    }
+    if (!resolvedAgent.memory) {
+      return undefined;
+    }
+
+    const memoryBlock = await buildMemoryBlockForAgent(
+      this.ctx.memoryBackend,
+      schedule.agent,
+      this.ctx.config.memory.injectionBudgetTokens,
+    );
+
+    return memoryBlock || undefined;
+  }
 
   updateContext(ctx: SchedulerRunnerContext): void {
     this.ctx = ctx;
@@ -242,11 +265,13 @@ export class SchedulerRunner {
       const cwd = driverCwd
         ? resolve(expandTilde(driverCwd))
         : this.ctx.config.homeDir;
+      const memoryBlock = await this.buildMemoryBlock(schedule, resolvedAgent);
 
       sessionId = await driver.createSession({
         systemPrompt: resolvedAgent.systemPrompt,
         model: modelName,
         skills: resolvedAgent.skills,
+        memoryBlock,
         pluginDir: this.ctx.pluginDirs.get(schedule.agent),
         cwd,
       });

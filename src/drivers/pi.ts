@@ -44,9 +44,11 @@ export function parsePiModelString(modelStr: string): {
 export function buildPiSystemPrompt(
   basePrompt: string,
   skills?: DriverOptions["skills"],
+  memoryBlock?: string,
 ): string {
   return buildFinalSystemPrompt(basePrompt, {
     skills,
+    memoryBlock,
     skillMode: "strict",
   });
 }
@@ -168,6 +170,7 @@ export class PiDriver implements Driver {
     const systemPrompt = buildPiSystemPrompt(
       options.systemPrompt,
       options.skills,
+      options.memoryBlock,
     );
 
     logger.info({ systemPrompt }, "pi_session_system_prompt");

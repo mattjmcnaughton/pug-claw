@@ -5,6 +5,8 @@ import {
   resolveAgentDir,
 } from "./agents.ts";
 import type { Driver, DriverEventCallback } from "./drivers/types.ts";
+import { buildMemoryBlockForAgent } from "./memory/injection.ts";
+import type { MemoryBackend } from "./memory/types.ts";
 import type { Logger } from "./logger.ts";
 import {
   resolveDriverName as resolveDriverNameFromInputs,
@@ -39,6 +41,7 @@ export class ChannelHandler {
     private pluginDirs: Map<string, string>,
     private resolveAgentFn: (agentDir: string) => ResolvedAgent,
     private logger: Logger,
+    private memoryBackend?: MemoryBackend,
   ) {}
 
   private getState(channelId: string): ChannelState {
@@ -148,6 +151,29 @@ export class ChannelHandler {
     });
   }
 
+  private async buildMemoryBlock(
+    channelId: string,
+    settingsChannelId = channelId,
+  ): Promise<string | undefined> {
+    if (!this.memoryBackend || !this.config.memory.enabled) {
+      return undefined;
+    }
+
+    const resolved = this.getResolvedAgent(channelId, settingsChannelId);
+    if (!resolved.memory) {
+      return undefined;
+    }
+
+    const agentName = this.resolveAgentName(channelId, settingsChannelId);
+    const memoryBlock = await buildMemoryBlockForAgent(
+      this.memoryBackend,
+      agentName,
+      this.config.memory.injectionBudgetTokens,
+    );
+
+    return memoryBlock || undefined;
+  }
+
   async ensureSession(
     channelId: string,
     settingsChannelId = channelId,
@@ -165,12 +191,17 @@ export class ChannelHandler {
     const cwd = driverCwd
       ? resolve(expandTilde(driverCwd))
       : this.config.homeDir;
+    const memoryBlock = await this.buildMemoryBlock(
+      channelId,
+      settingsChannelId,
+    );
 
     const sessionId = await driver.createSession({
       systemPrompt: resolved.systemPrompt,
       model,
       tools,
       skills: resolved.skills,
+      memoryBlock,
       pluginDir: this.pluginDirs.get(agentName),
       cwd,
     });
