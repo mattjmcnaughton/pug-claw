@@ -165,4 +165,57 @@ describe("SchedulerRuntime", () => {
       rmSync(homeDir, { recursive: true, force: true });
     }
   });
+
+  test("empty agent response skips Discord delivery", async () => {
+    const homeDir = makeTmpDir();
+    const outputSink = new FakeOutputSink();
+    const driver = new FakeDriver({ defaultModel: "fake-model" });
+    driver.setDefaultResponse("");
+
+    const config = makeConfig(homeDir);
+    const runtime = new SchedulerRuntime({
+      drivers: { fake: driver },
+      config,
+      pluginDirs: new Map(),
+      resolveAgent: () => ({
+        systemPrompt: "system",
+        skills: [],
+      }),
+      logger: noopLogger,
+      outputSink,
+    });
+
+    try {
+      runtime.initialize();
+      const result = runtime.runSchedule("daily-summary");
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        throw new Error("Expected manual run to start");
+      }
+
+      await waitFor(() => {
+        const summary = runtime.listSchedules()[0];
+        return summary?.lastRun?.status === "succeeded";
+      });
+
+      const summary = runtime.listSchedules()[0];
+      expect(summary?.lastRun?.runId).toBe(result.runId);
+      expect(summary?.lastRun?.deliveryStatus).toBe("not_applicable");
+      expect(outputSink.sent).toEqual([]);
+
+      const auditLogPath = resolve(
+        config.logsDir,
+        "schedules",
+        `${new Date().toISOString().slice(0, 10)}.jsonl`,
+      );
+      const auditText = readFileSync(auditLogPath, "utf-8");
+      expect(auditText).toContain(
+        "Delivery skipped: agent returned empty response.",
+      );
+      expect(auditText).toContain("(no response)");
+    } finally {
+      runtime.stop();
+      rmSync(homeDir, { recursive: true, force: true });
+    }
+  });
 });
