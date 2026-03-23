@@ -79,8 +79,11 @@ function resolveSearchScopes(
   actor: MemoryToolActor,
   scope?: "agent" | "global" | "user",
 ): MemoryScope[] {
-  if (!scope || scope === "agent") {
+  if (!scope) {
     return [requireAgentScope(actor), USER_SCOPE, "global"];
+  }
+  if (scope === "agent") {
+    return [requireAgentScope(actor)];
   }
   if (scope === "global") {
     return ["global"];

@@ -86,6 +86,40 @@ describe("memory tool handlers", () => {
     await store.close();
   });
 
+  test("searchMemory with scope=agent searches only the agent scope", async () => {
+    const store = await createStore();
+    await store.save({
+      scope: "agent:writer",
+      content: "Use AP style",
+      createdBy: "agent:writer",
+      source: "agent",
+    });
+    await store.save({
+      scope: "global",
+      content: "Use AP style globally",
+      createdBy: "agent:writer",
+      source: "agent",
+    });
+    await store.save({
+      scope: "user:default",
+      content: "Use AP style for user notes",
+      createdBy: "user",
+      source: "user",
+    });
+
+    const result = await searchMemory(makeAgentContext(store), {
+      query: "AP style",
+      scope: "agent",
+      limit: 10,
+    });
+
+    expect(result.results.map((entry) => entry.entry.scope)).toEqual([
+      "agent:writer",
+    ]);
+
+    await store.close();
+  });
+
   test("updateMemory allows an agent to update its own shared-scope entry", async () => {
     const store = await createStore();
     const entry = await store.save({
