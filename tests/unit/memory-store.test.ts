@@ -373,4 +373,67 @@ describe("MemoryStore", () => {
 
     await store.close();
   });
+
+  describe("SQL injection hardening", () => {
+    test("stores SQL-like content as plain text", async () => {
+      const store = await createStore();
+      const payload = "global'; DROP TABLE memories; --";
+
+      const saved = await saveMemory(store, {
+        content: payload,
+        tags: ["sql'); DELETE FROM memories; --"],
+      });
+      const loaded = await store.get(saved.id);
+
+      expect(loaded?.content).toBe(payload);
+      expect(loaded?.tags).toEqual(["sql'); DELETE FROM memories; --"]);
+      expect(await store.count({})).toBe(1);
+
+      await store.close();
+    });
+
+    test("binds id parameters for get, update, and delete", async () => {
+      const store = await createStore();
+      const first = await saveMemory(store, {
+        content: "first row",
+      });
+      const second = await saveMemory(store, {
+        content: "second row",
+      });
+      const injectedId = `${first.id}' OR 1=1 --`;
+
+      expect(await store.get(injectedId)).toBeNull();
+      expect(
+        await store.update(injectedId, {
+          content: "pwned",
+        }),
+      ).toBeNull();
+      expect(await store.delete(injectedId)).toBe(false);
+
+      expect((await store.get(first.id))?.content).toBe("first row");
+      expect((await store.get(second.id))?.content).toBe("second row");
+      expect(await store.count({})).toBe(2);
+
+      await store.close();
+    });
+
+    test("rejects malicious scope filters", async () => {
+      const store = await createStore();
+
+      await expect(
+        store.list({
+          scope: "global' OR 1=1 --" as "global",
+        }),
+      ).rejects.toThrow(`Invalid memory scope: "global' OR 1=1 --"`);
+
+      await expect(
+        store.search({
+          scope: "agent:writer' OR 1=1 --" as "agent:writer",
+          text: "anything",
+        }),
+      ).rejects.toThrow(`Invalid memory scope: "agent:writer' OR 1=1 --"`);
+
+      await store.close();
+    });
+  });
 });
