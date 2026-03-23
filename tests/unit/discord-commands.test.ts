@@ -706,6 +706,18 @@ describe("discord thread handling", () => {
   });
 });
 
+describe("discord !memory command", () => {
+  test("blocked for non-owner", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeMessage("!memory show", NON_OWNER_ID);
+    await handler(msg);
+
+    expect(msg._sent[0]).toContain("Only the bot owner");
+    expect(ctx.driver.query).not.toHaveBeenCalled();
+  });
+});
+
 describe("discord !schedule command", () => {
   test("shows usage when no subcommand given", async () => {
     const ctx = makeCtx();

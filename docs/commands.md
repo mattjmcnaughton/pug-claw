@@ -36,7 +36,7 @@ model
   set <name>
   list
 
-memory
+memory   # owner only in Discord; available in the TUI
   show [scope]
   search <query>
   remember <text>
