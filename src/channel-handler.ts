@@ -6,6 +6,7 @@ import {
 } from "./agents.ts";
 import type { Driver, DriverEventCallback } from "./drivers/types.ts";
 import { buildMemoryBlockForAgent } from "./memory/injection.ts";
+import { buildMemoryToolInstructions, type MemoryToolContext } from "./memory/tools.ts";
 import type { MemoryBackend } from "./memory/types.ts";
 import type { Logger } from "./logger.ts";
 import {
@@ -151,10 +152,10 @@ export class ChannelHandler {
     });
   }
 
-  private async buildMemoryBlock(
+  private getMemoryToolContext(
     channelId: string,
     settingsChannelId = channelId,
-  ): Promise<string | undefined> {
+  ): MemoryToolContext | undefined {
     if (!this.memoryBackend || !this.config.memory.enabled) {
       return undefined;
     }
@@ -165,9 +166,33 @@ export class ChannelHandler {
     }
 
     const agentName = this.resolveAgentName(channelId, settingsChannelId);
+    return {
+      memoryBackend: this.memoryBackend,
+      actor: {
+        type: "agent",
+        agentName,
+        createdBy: `agent:${agentName}`,
+        source: "agent",
+      },
+    };
+  }
+
+  private async buildMemoryBlock(
+    channelId: string,
+    settingsChannelId = channelId,
+  ): Promise<string | undefined> {
+    const memoryToolContext = this.getMemoryToolContext(
+      channelId,
+      settingsChannelId,
+    );
+    if (!memoryToolContext) {
+      return undefined;
+    }
+
     const memoryBlock = await buildMemoryBlockForAgent(
-      this.memoryBackend,
-      agentName,
+      memoryToolContext.memoryBackend,
+      memoryToolContext.actor.agentName ??
+        this.resolveAgentName(channelId, settingsChannelId),
       this.config.memory.injectionBudgetTokens,
     );
 
@@ -191,17 +216,25 @@ export class ChannelHandler {
     const cwd = driverCwd
       ? resolve(expandTilde(driverCwd))
       : this.config.homeDir;
+    const memoryToolContext = this.getMemoryToolContext(
+      channelId,
+      settingsChannelId,
+    );
     const memoryBlock = await this.buildMemoryBlock(
       channelId,
       settingsChannelId,
     );
+    const systemPrompt = memoryToolContext
+      ? `${resolved.systemPrompt}\n\n${buildMemoryToolInstructions()}`
+      : resolved.systemPrompt;
 
     const sessionId = await driver.createSession({
-      systemPrompt: resolved.systemPrompt,
+      systemPrompt,
       model,
       tools,
       skills: resolved.skills,
       memoryBlock,
+      memoryToolContext,
       pluginDir: this.pluginDirs.get(agentName),
       cwd,
     });

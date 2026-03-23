@@ -76,6 +76,47 @@ describe("resolveClaudeSessionOptions", () => {
     expect(result.systemPrompt).toContain("# Environment");
   });
 
+  test("registers memory tools via an MCP server when memoryToolContext is provided", () => {
+    const result = resolveClaudeSessionOptions({
+      systemPrompt: "test",
+      memoryToolContext: {
+        memoryBackend: {
+          init: async () => {},
+          close: async () => {},
+          save: async () => {
+            throw new Error("unused");
+          },
+          update: async () => null,
+          get: async () => null,
+          delete: async () => false,
+          archive: async () => false,
+          peek: async () => [],
+          list: async () => [],
+          search: async () => [],
+          listScopes: async () => [],
+          count: async () => 0,
+          stats: async () => ({
+            totalEntries: 0,
+            activeEntries: 0,
+            archivedEntries: 0,
+            compactedEntries: 0,
+            entriesByScope: {},
+          }),
+          exportMarkdown: async () => "",
+        },
+        actor: {
+          type: "agent",
+          agentName: "writer",
+          createdBy: "agent:writer",
+          source: "agent",
+        },
+      },
+    });
+
+    expect(result.mcpServers).toBeDefined();
+    expect(Object.keys(result.mcpServers ?? {})).toEqual(["memory"]);
+  });
+
   test("passes cwd through", () => {
     const result = resolveClaudeSessionOptions({
       systemPrompt: "test",
@@ -118,6 +159,17 @@ describe("buildClaudeSdkOptions", () => {
     };
     const opts = buildClaudeSdkOptions(resolved);
     expect(opts.plugins).toEqual([{ type: "local", path: "/plugins" }]);
+  });
+
+  test("passes mcpServers when present", () => {
+    const resolved: ResolvedSessionOptions = {
+      ...baseResolved,
+      mcpServers: {
+        memory: { type: "sdk", name: "memory", instance: {} } as never,
+      },
+    };
+    const opts = buildClaudeSdkOptions(resolved);
+    expect(opts.mcpServers).toEqual(resolved.mcpServers);
   });
 
   test("maps tools to allowedTools", () => {

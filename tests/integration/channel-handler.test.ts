@@ -224,6 +224,7 @@ describe("memory injection", () => {
       expect(systemPrompt).toContain("# Memory");
       expect(systemPrompt).toContain("User prefers concise responses");
       expect(systemPrompt).toContain("Production server runs Ubuntu 24.04");
+      expect(systemPrompt).toContain("Use SaveMemory to remember new information");
     } finally {
       await memoryStore.close();
     }

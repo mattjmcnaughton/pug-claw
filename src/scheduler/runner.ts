@@ -3,6 +3,10 @@ import { resolve } from "node:path";
 import type { Driver } from "../drivers/types.ts";
 import type { Logger } from "../logger.ts";
 import { buildMemoryBlockForAgent } from "../memory/injection.ts";
+import {
+  buildMemoryToolInstructions,
+  type MemoryToolContext,
+} from "../memory/tools.ts";
 import type { MemoryBackend } from "../memory/types.ts";
 import { expandTilde, toError, type ResolvedConfig } from "../resources.ts";
 import { resolveDriverName, resolveModelName } from "../resolve.ts";
@@ -66,10 +70,10 @@ export class SchedulerRunner {
 
   constructor(private ctx: SchedulerRunnerContext) {}
 
-  private async buildMemoryBlock(
+  private getMemoryToolContext(
     schedule: ResolvedSchedule,
     resolvedAgent: ResolvedAgent,
-  ): Promise<string | undefined> {
+  ): MemoryToolContext | undefined {
     if (!this.ctx.memoryBackend || !this.ctx.config.memory.enabled) {
       return undefined;
     }
@@ -77,9 +81,29 @@ export class SchedulerRunner {
       return undefined;
     }
 
+    return {
+      memoryBackend: this.ctx.memoryBackend,
+      actor: {
+        type: "agent",
+        agentName: schedule.agent,
+        createdBy: `agent:${schedule.agent}`,
+        source: "agent",
+      },
+    };
+  }
+
+  private async buildMemoryBlock(
+    schedule: ResolvedSchedule,
+    resolvedAgent: ResolvedAgent,
+  ): Promise<string | undefined> {
+    const memoryToolContext = this.getMemoryToolContext(schedule, resolvedAgent);
+    if (!memoryToolContext) {
+      return undefined;
+    }
+
     const memoryBlock = await buildMemoryBlockForAgent(
-      this.ctx.memoryBackend,
-      schedule.agent,
+      memoryToolContext.memoryBackend,
+      memoryToolContext.actor.agentName ?? schedule.agent,
       this.ctx.config.memory.injectionBudgetTokens,
     );
 
@@ -265,13 +289,18 @@ export class SchedulerRunner {
       const cwd = driverCwd
         ? resolve(expandTilde(driverCwd))
         : this.ctx.config.homeDir;
+      const memoryToolContext = this.getMemoryToolContext(schedule, resolvedAgent);
       const memoryBlock = await this.buildMemoryBlock(schedule, resolvedAgent);
+      const systemPrompt = memoryToolContext
+        ? `${resolvedAgent.systemPrompt}\n\n${buildMemoryToolInstructions()}`
+        : resolvedAgent.systemPrompt;
 
       sessionId = await driver.createSession({
-        systemPrompt: resolvedAgent.systemPrompt,
+        systemPrompt,
         model: modelName,
         skills: resolvedAgent.skills,
         memoryBlock,
+        memoryToolContext,
         pluginDir: this.ctx.pluginDirs.get(schedule.agent),
         cwd,
       });

@@ -1,6 +1,18 @@
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import {
+  createSdkMcpServer,
+  query,
+  tool,
+} from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod/v4";
 import { Drivers } from "../constants.ts";
 import { logger } from "../logger.ts";
+import {
+  deleteMemory,
+  listMemory,
+  saveMemory,
+  searchMemory,
+  updateMemory,
+} from "../memory/tools.ts";
 import { buildFinalSystemPrompt } from "../prompt.ts";
 import type {
   Driver,
@@ -15,6 +27,7 @@ export interface ResolvedSessionOptions {
   systemPrompt: string;
   cwd?: string;
   plugins?: { type: "local"; path: string }[];
+  mcpServers?: Record<string, ReturnType<typeof createSdkMcpServer>>;
 }
 
 interface SessionState {
@@ -24,6 +37,84 @@ interface SessionState {
 
 const DEFAULT_MODEL = "claude-sonnet-4-6";
 const DEFAULT_TOOLS = ["Read", "Glob", "Grep", "Bash"];
+
+function textResult(text: string) {
+  return {
+    content: [{ type: "text" as const, text }],
+  };
+}
+
+function createMemoryMcpServer(
+  memoryToolContext: NonNullable<DriverOptions["memoryToolContext"]>,
+) {
+  return createSdkMcpServer({
+    name: "memory",
+    tools: [
+      tool(
+        "SaveMemory",
+        "Save a piece of information to memory for future reference.",
+        {
+          content: z.string(),
+          scope: z.enum(["agent", "global", "user"]).optional(),
+          tags: z.array(z.string()).optional(),
+        },
+        async (args) => {
+          const result = await saveMemory(memoryToolContext, args);
+          return textResult(`Saved memory ${result.entry.id} in ${result.entry.scope}.`);
+        },
+      ),
+      tool(
+        "SearchMemory",
+        "Search memory for relevant information.",
+        {
+          query: z.string(),
+          scope: z.enum(["agent", "global", "user"]).optional(),
+          limit: z.number().int().positive().optional(),
+        },
+        async (args) => {
+          const result = await searchMemory(memoryToolContext, args);
+          return textResult(JSON.stringify(result));
+        },
+      ),
+      tool(
+        "UpdateMemory",
+        "Update an existing memory entry.",
+        {
+          id: z.string(),
+          content: z.string().optional(),
+          tags: z.array(z.string()).optional(),
+        },
+        async (args) => {
+          const result = await updateMemory(memoryToolContext, args);
+          return textResult(JSON.stringify(result));
+        },
+      ),
+      tool(
+        "DeleteMemory",
+        "Archive a memory entry.",
+        {
+          id: z.string(),
+        },
+        async (args) => {
+          const result = await deleteMemory(memoryToolContext, args);
+          return textResult(JSON.stringify(result));
+        },
+      ),
+      tool(
+        "ListMemory",
+        "List memory entries, optionally filtered.",
+        {
+          scope: z.enum(["agent", "global", "user"]).optional(),
+          limit: z.number().int().positive().optional(),
+        },
+        async (args) => {
+          const result = await listMemory(memoryToolContext, args);
+          return textResult(JSON.stringify(result));
+        },
+      ),
+    ],
+  });
+}
 
 export function resolveClaudeSessionOptions(
   options: DriverOptions,
@@ -46,6 +137,11 @@ export function resolveClaudeSessionOptions(
     plugins: options.pluginDir
       ? [{ type: "local" as const, path: options.pluginDir }]
       : undefined,
+    mcpServers: options.memoryToolContext
+      ? {
+          memory: createMemoryMcpServer(options.memoryToolContext),
+        }
+      : undefined,
   };
 }
 
@@ -62,6 +158,7 @@ export function buildClaudeSdkOptions(
     systemPrompt: resolved.systemPrompt,
     cwd: resolved.cwd,
     plugins: resolved.plugins,
+    mcpServers: resolved.mcpServers,
   };
 }
 
