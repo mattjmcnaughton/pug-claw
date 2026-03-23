@@ -77,7 +77,8 @@ export class TuiFrontend implements Frontend {
     let memoryCommandActions = buildMemoryCommandActions({
       memoryBackend: ctx.memoryBackend,
       config,
-      resolveAgentName: (channelId: string) => channelHandler.resolveAgentName(channelId),
+      resolveAgentName: (channelId: string) =>
+        channelHandler.resolveAgentName(channelId),
     });
 
     // --- TUI setup ---

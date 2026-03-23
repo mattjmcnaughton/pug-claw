@@ -17,9 +17,7 @@ interface MemoryCommandActionOptions {
   resolveAgentName: (channelId: string) => string;
 }
 
-export function buildMemoryCommandActions(
-  options: MemoryCommandActionOptions,
-) {
+export function buildMemoryCommandActions(options: MemoryCommandActionOptions) {
   const { memoryBackend, config, resolveAgentName } = options;
 
   return {
@@ -27,7 +25,10 @@ export function buildMemoryCommandActions(
       if (!memoryBackend) {
         return "Memory commands are not available.";
       }
-      const scope = parseMemoryScopeInput(resolveAgentName(channelId), scopeInput);
+      const scope = parseMemoryScopeInput(
+        resolveAgentName(channelId),
+        scopeInput,
+      );
       const entries = await memoryBackend.list({
         scope,
         limit: 20,
@@ -95,7 +96,10 @@ export function buildMemoryCommandActions(
       if (!memoryBackend) {
         return "Memory commands are not available.";
       }
-      const scope = parseMemoryScopeInput(resolveAgentName(channelId), scopeInput);
+      const scope = parseMemoryScopeInput(
+        resolveAgentName(channelId),
+        scopeInput,
+      );
       return exportMemoryForCommand(memoryBackend, config.internalDir, scope);
     },
     memoryStats: async () => {

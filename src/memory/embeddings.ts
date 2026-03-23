@@ -1,5 +1,9 @@
 import { resolve } from "node:path";
-import { type FeatureExtractionPipeline, env, pipeline } from "@huggingface/transformers";
+import {
+  type FeatureExtractionPipeline,
+  env,
+  pipeline,
+} from "@huggingface/transformers";
 import type { EmbeddingProvider } from "./types.ts";
 
 export class HuggingFaceEmbeddingProvider implements EmbeddingProvider {
@@ -24,7 +28,11 @@ export class HuggingFaceEmbeddingProvider implements EmbeddingProvider {
     if (!this.extractor) {
       await this.init();
     }
-    const output = await this.extractor!(text, {
+    const extractor = this.extractor;
+    if (!extractor) {
+      throw new Error("Embedding extractor failed to initialize");
+    }
+    const output = await extractor(text, {
       pooling: "mean",
       normalize: true,
     });

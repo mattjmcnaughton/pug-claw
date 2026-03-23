@@ -69,18 +69,24 @@ function createPiMemoryTools(
     {
       name: "SaveMemory",
       label: "SaveMemory",
-      description: "Save a piece of information to memory for future reference.",
+      description:
+        "Save a piece of information to memory for future reference.",
       parameters: Type.Object({
         content: Type.String(),
-        scope: Type.Optional(Type.Union([
-          Type.Literal("agent"),
-          Type.Literal("global"),
-          Type.Literal("user"),
-        ])),
+        scope: Type.Optional(
+          Type.Union([
+            Type.Literal("agent"),
+            Type.Literal("global"),
+            Type.Literal("user"),
+          ]),
+        ),
         tags: Type.Optional(Type.Array(Type.String())),
       }),
       async execute(_toolCallId, args) {
-        const result = await saveMemory(memoryToolContext, args as Parameters<typeof saveMemory>[1]);
+        const result = await saveMemory(
+          memoryToolContext,
+          args as Parameters<typeof saveMemory>[1],
+        );
         return {
           content: [
             {
@@ -98,11 +104,13 @@ function createPiMemoryTools(
       description: "Search memory for relevant information.",
       parameters: Type.Object({
         query: Type.String(),
-        scope: Type.Optional(Type.Union([
-          Type.Literal("agent"),
-          Type.Literal("global"),
-          Type.Literal("user"),
-        ])),
+        scope: Type.Optional(
+          Type.Union([
+            Type.Literal("agent"),
+            Type.Literal("global"),
+            Type.Literal("user"),
+          ]),
+        ),
         limit: Type.Optional(Type.Number()),
       }),
       async execute(_toolCallId, args) {
@@ -174,11 +182,13 @@ function createPiMemoryTools(
       label: "ListMemory",
       description: "List memory entries, optionally filtered.",
       parameters: Type.Object({
-        scope: Type.Optional(Type.Union([
-          Type.Literal("agent"),
-          Type.Literal("global"),
-          Type.Literal("user"),
-        ])),
+        scope: Type.Optional(
+          Type.Union([
+            Type.Literal("agent"),
+            Type.Literal("global"),
+            Type.Literal("user"),
+          ]),
+        ),
         limit: Type.Optional(Type.Number()),
       }),
       async execute(_toolCallId, args) {

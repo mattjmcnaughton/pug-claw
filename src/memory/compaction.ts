@@ -47,7 +47,8 @@ export async function compactMemories(
       const existingCompactionEntries = entries.filter(
         (entry) =>
           entry.source === "compaction" &&
-          normalizeContent(entry.content) === normalizeContent(group[0]?.content ?? ""),
+          normalizeContent(entry.content) ===
+            normalizeContent(group[0]?.content ?? ""),
       );
       if (existingCompactionEntries.length > 0) {
         continue;
