@@ -39,6 +39,12 @@ export interface ChatCommandActions {
   reload(): Promise<string | undefined>;
   exportBackup?(): Promise<string>;
   dryRunBackup?(): Promise<string>;
+  showMemory?(channelId: string, scopeInput?: string): Promise<string>;
+  searchMemory?(channelId: string, query: string): Promise<string>;
+  rememberMemory?(channelId: string, text: string): Promise<string>;
+  forgetMemory?(channelId: string, idOrPrefix: string): Promise<string>;
+  exportMemory?(channelId: string, scopeInput?: string): Promise<string>;
+  memoryStats?(): Promise<string>;
   listSchedules?(): Promise<string[]>;
   runSchedule?(name: string): Promise<string>;
 }
