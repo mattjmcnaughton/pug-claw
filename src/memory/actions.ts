@@ -6,6 +6,7 @@ import {
   renderMemoryStats,
   resolveMemoryIdPrefix,
 } from "./chat.ts";
+import { compactMemories } from "./compaction.ts";
 import { searchMemory } from "./tools.ts";
 import type { MemoryBackend } from "./types.ts";
 import type { ResolvedConfig } from "../resources.ts";
@@ -106,6 +107,16 @@ export function buildMemoryCommandActions(
         ? `\n\nEmbeddings: enabled (${config.memory.embeddings.model})`
         : `\n\nEmbeddings: disabled (${config.memory.embeddings.model})`;
       return `${renderMemoryStats(stats)}${embeddingsLine}`;
+    },
+    compactMemory: async (channelId: string, scopeInput?: string) => {
+      if (!memoryBackend) {
+        return "Memory commands are not available.";
+      }
+      const scope = scopeInput
+        ? parseMemoryScopeInput(resolveAgentName(channelId), scopeInput)
+        : undefined;
+      const result = await compactMemories(memoryBackend, scope);
+      return `Compacted ${result.compactedEntries} entries into ${result.createdEntries} summaries across ${result.scopes.length} scope(s).`;
     },
     reindexMemory: async () => {
       if (!memoryBackend?.reindex) {

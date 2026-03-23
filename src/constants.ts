@@ -50,6 +50,7 @@ export const Defaults = {
   AGENT: "default",
   DRIVER: "claude",
   SECRETS_PROVIDER: "env",
+  MEMORY_COMPACTOR_AGENT: "memory-compactor",
   SCHEDULER_POLL_INTERVAL_MS: 15_000,
 } as const;
 
