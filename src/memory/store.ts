@@ -564,6 +564,10 @@ export class MemoryStore implements MemoryBackend {
     }
 
     if (this.vectorSearchEnabled) {
+      const fetchLimit = Math.max(
+        query.limit ?? 10,
+        this.listWithoutAccessUpdate({}).length,
+      );
       const rows = this.db
         .query(
           `
@@ -574,7 +578,7 @@ export class MemoryStore implements MemoryBackend {
             LIMIT ?
           `,
         )
-        .all(new Float32Array(embedding), query.limit ?? 10) as Array<{
+        .all(new Float32Array(embedding), fetchLimit) as Array<{
         memory_id: string;
         distance: number;
       }>;
@@ -599,7 +603,7 @@ export class MemoryStore implements MemoryBackend {
         });
       }
 
-      return results;
+      return results.slice(0, query.limit ?? 10);
     }
 
     const entries = this.listWithoutAccessUpdate({
