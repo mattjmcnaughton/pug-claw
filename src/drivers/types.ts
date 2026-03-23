@@ -9,6 +9,7 @@ export interface DriverOptions {
   tools?: string[];
   skills?: import("../skills.ts").SkillSummary[];
   memoryBlock?: string;
+  memoryToolContext?: import("../memory/tools.ts").MemoryToolContext;
   pluginDir?: string;
   cwd?: string;
 }

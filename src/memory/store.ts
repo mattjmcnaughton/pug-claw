@@ -288,6 +288,7 @@ export class MemoryStore implements MemoryBackend {
     if (!text) {
       return [];
     }
+    const queryTerms = text.split(/\s+/).filter(Boolean);
 
     const entries = this.listWithoutAccessUpdate({
       scope: query.scope,
@@ -298,9 +299,13 @@ export class MemoryStore implements MemoryBackend {
 
     const results: MemorySearchResult[] = [];
     for (const entry of entries) {
-      const matchCount =
-        countKeywordMatches(entry.content, text) +
-        countKeywordMatches(entry.tags.join(" "), text);
+      const matchCount = queryTerms.reduce((total, term) => {
+        return (
+          total +
+          countKeywordMatches(entry.content, term) +
+          countKeywordMatches(entry.tags.join(" "), term)
+        );
+      }, 0);
       if (matchCount === 0) {
         continue;
       }
