@@ -80,6 +80,7 @@ function makeMessage(content: string, authorId: string) {
     id: "msg-1",
     channel: {
       name: "test-channel",
+      isThread: () => false,
       send: mock(async (text: string) => {
         sent.push(text);
       }),
@@ -89,11 +90,160 @@ function makeMessage(content: string, authorId: string) {
   };
 }
 
-function makeCtx(
-  configOverrides?: Partial<ResolvedConfig>,
-): FrontendContext & { driver: ReturnType<typeof makeMockDriver> } {
+function makeReplyMessage(
+  content: string,
+  authorId: string,
+  options?: {
+    channelId?: string;
+    messageId?: string;
+    referenceMessageId?: string;
+    rootMessageId?: string;
+    rootContent?: string;
+    chainReferenceId?: string;
+    chainContent?: string;
+    fetchThrows?: boolean;
+  },
+) {
+  const sent: string[] = [];
+  const channelId = options?.channelId ?? "chan-1";
+  const messageId = options?.messageId ?? "msg-reply-1";
+  const referenceMessageId = options?.referenceMessageId;
+  const rootMessageId =
+    options?.rootMessageId ?? referenceMessageId ?? "root-1";
+  const rootContent = options?.rootContent ?? "root message";
+  const chainReferenceId = options?.chainReferenceId;
+  const chainContent = options?.chainContent ?? "intermediate message";
+
+  const rootMessage = {
+    id: rootMessageId,
+    content: rootContent,
+    reference: undefined,
+    fetchReference: mock(async () => {
+      throw new Error("no more references");
+    }),
+  };
+
+  const chainedMessage = {
+    id: chainReferenceId ?? "chain-1",
+    content: chainContent,
+    reference: { messageId: rootMessage.id },
+    fetchReference: mock(async () => rootMessage),
+  };
+
+  return {
+    content,
+    author: { id: authorId, bot: false, tag: `user#${authorId}` },
+    channelId,
+    guildId: "guild-1",
+    id: messageId,
+    reference: referenceMessageId
+      ? { messageId: referenceMessageId }
+      : undefined,
+    fetchReference: mock(async () => {
+      if (options?.fetchThrows) {
+        throw new Error("reference failed");
+      }
+      if (chainReferenceId) {
+        return chainedMessage;
+      }
+      return rootMessage;
+    }),
+    channel: {
+      id: channelId,
+      name: "test-channel",
+      isThread: () => false,
+      send: mock(async (text: string) => {
+        sent.push(text);
+      }),
+      sendTyping: mock(async () => {}),
+    },
+    _sent: sent,
+  };
+}
+
+function makeThreadMessage(
+  content: string,
+  authorId: string,
+  options?: {
+    channelId?: string;
+    parentId?: string;
+    messageId?: string;
+    starterContent?: string;
+    starterFetchThrows?: boolean;
+    referenceMessageId?: string;
+    replyRootContent?: string;
+    replyFetchThrows?: boolean;
+  },
+) {
+  const sent: string[] = [];
+  const channelId = options?.channelId ?? "thread-1";
+  const parentId = options?.parentId ?? "chan-1";
+  const messageId = options?.messageId ?? "thread-msg-1";
+  const starterContent = options?.starterContent ?? "thread starter";
+  const referenceMessageId = options?.referenceMessageId;
+
+  const starterMessage = {
+    id: `${channelId}-starter`,
+    content: starterContent,
+  };
+
+  const replyRootMessage = {
+    id: referenceMessageId ?? "thread-reply-root",
+    content: options?.replyRootContent ?? "thread reply root",
+    reference: undefined,
+    fetchReference: mock(async () => {
+      throw new Error("no more references");
+    }),
+  };
+
+  return {
+    content,
+    author: { id: authorId, bot: false, tag: `user#${authorId}` },
+    channelId,
+    guildId: "guild-1",
+    id: messageId,
+    reference: referenceMessageId
+      ? { messageId: referenceMessageId }
+      : undefined,
+    fetchReference: mock(async () => {
+      if (options?.replyFetchThrows) {
+        throw new Error("thread reply reference failed");
+      }
+      return replyRootMessage;
+    }),
+    channel: {
+      id: channelId,
+      parentId,
+      name: "thread-channel",
+      isThread: () => true,
+      fetchStarterMessage: mock(async () => {
+        if (options?.starterFetchThrows) {
+          throw new Error("starter fetch failed");
+        }
+        return starterMessage;
+      }),
+      send: mock(async (text: string) => {
+        sent.push(text);
+      }),
+      sendTyping: mock(async () => {}),
+    },
+    _sent: sent,
+  };
+}
+
+function makeCtx(configOverrides?: Partial<ResolvedConfig>): FrontendContext & {
+  driver: ReturnType<typeof makeMockDriver>;
+  loggerSpies: Record<string, ReturnType<typeof mock>>;
+} {
   const driver = makeMockDriver();
   const config = makeConfig(configOverrides);
+  const loggerSpies = {
+    info: mock(() => {}),
+    warn: mock(() => {}),
+    error: mock(() => {}),
+    fatal: mock(() => {}),
+    debug: mock(() => {}),
+  };
   return {
     drivers: { mock: driver },
     config,
@@ -102,13 +252,7 @@ function makeCtx(
       systemPrompt: "system prompt",
       skills: [],
     }),
-    logger: {
-      info: () => {},
-      warn: () => {},
-      error: () => {},
-      fatal: () => {},
-      debug: () => {},
-    } as unknown as Logger,
+    logger: loggerSpies as unknown as Logger,
     reloadConfig: mock(async () => ({
       config: makeConfig(configOverrides),
       pluginDirs: new Map<string, string>(),
@@ -118,6 +262,7 @@ function makeCtx(
       }),
     })),
     driver,
+    loggerSpies,
   };
 }
 
@@ -321,6 +466,233 @@ describe("discord query event callback", () => {
     await handler(msg);
 
     expect(msg.channel.sendTyping).toHaveBeenCalled();
+  });
+});
+
+describe("discord reply handling", () => {
+  test("reply message uses channel settings", async () => {
+    const ctx = makeCtx({
+      channels: {
+        "chan-1": {
+          driver: "mock",
+          model: "reply-model",
+          tools: ["tool-x"],
+        },
+      },
+    });
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeReplyMessage("hello", OWNER_ID, {
+      channelId: "chan-1",
+      messageId: "reply-123",
+      referenceMessageId: "root-123",
+      rootContent: "reply kickoff",
+    });
+
+    await handler(msg);
+
+    expect(ctx.driver.createSession).toHaveBeenCalledTimes(1);
+    const createSessionCalls = ctx.driver.createSession.mock
+      .calls as unknown[][];
+    const createSessionCall = createSessionCalls[0];
+    expect(createSessionCall).toBeDefined();
+    const createSessionInput = createSessionCall?.[0] as {
+      model?: string;
+      tools?: string[];
+    };
+    expect(createSessionInput.model).toBe("reply-model");
+    expect(createSessionInput.tools).toEqual(["tool-x"]);
+  });
+
+  test("first reply preloads root content and second does not", async () => {
+    const ctx = makeCtx();
+    const prompts: string[] = [];
+    const queryMock = mock(async (_sessionId: string, prompt: string) => {
+      prompts.push(prompt);
+      return { text: "ok", sessionId: "session-1" };
+    });
+    ctx.driver.query = queryMock as typeof ctx.driver.query;
+    const handler = await startAndGetHandler(ctx);
+
+    const first = makeReplyMessage("first", OWNER_ID, {
+      channelId: "chan-1",
+      messageId: "reply-first",
+      referenceMessageId: "root-abc",
+      rootContent: "root reply",
+    });
+    await handler(first);
+
+    const second = makeReplyMessage("second", OWNER_ID, {
+      channelId: "chan-1",
+      messageId: "reply-second",
+      referenceMessageId: "root-abc",
+      rootContent: "root reply",
+    });
+    await handler(second);
+
+    expect(prompts[0]).toContain("Reply root message:\nroot reply");
+    expect(prompts[0]).toContain("User message:\nfirst");
+    expect(prompts[1]).toBe("second");
+  });
+
+  test("reply root fetch failures do not block responses", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeReplyMessage("hello", OWNER_ID, {
+      referenceMessageId: "root-fail",
+      fetchThrows: true,
+    });
+
+    await handler(msg);
+
+    expect(ctx.driver.query).toHaveBeenCalledTimes(1);
+    const queryCalls = ctx.driver.query.mock.calls as unknown[][];
+    const queryCall = queryCalls[0];
+    expect(queryCall).toBeDefined();
+    const prompt = queryCall?.[1] as string;
+    expect(prompt).toBe("hello");
+  });
+
+  test("reply chain uses root message as session key and bootstrap", async () => {
+    const ctx = makeCtx();
+    const prompts: string[] = [];
+    const queryMock = mock(async (_sessionId: string, prompt: string) => {
+      prompts.push(prompt);
+      return { text: "ok", sessionId: "session-1" };
+    });
+    ctx.driver.query = queryMock as typeof ctx.driver.query;
+    const handler = await startAndGetHandler(ctx);
+
+    const msg = makeReplyMessage("hello chain", OWNER_ID, {
+      messageId: "reply-chain",
+      referenceMessageId: "mid-1",
+      rootMessageId: "root-1",
+      chainReferenceId: "mid-1",
+      chainContent: "middle",
+      rootContent: "root-most",
+    });
+    await handler(msg);
+
+    expect(prompts[0]).toContain("Reply root message:\nroot-most");
+    expect(prompts[0]).toContain("User message:\nhello chain");
+  });
+});
+
+describe("discord thread handling", () => {
+  test("thread message uses parent channel settings", async () => {
+    const ctx = makeCtx({
+      channels: {
+        "chan-1": {
+          driver: "mock",
+          model: "thread-model",
+          tools: ["thread-tool"],
+        },
+      },
+    });
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeThreadMessage("hello", OWNER_ID, {
+      channelId: "thread-42",
+      parentId: "chan-1",
+      starterContent: "thread intro",
+    });
+
+    await handler(msg);
+
+    expect(ctx.driver.createSession).toHaveBeenCalledTimes(1);
+    const createSessionCalls = ctx.driver.createSession.mock
+      .calls as unknown[][];
+    const createSessionCall = createSessionCalls[0];
+    expect(createSessionCall).toBeDefined();
+    const createSessionInput = createSessionCall?.[0] as {
+      model?: string;
+      tools?: string[];
+    };
+    expect(createSessionInput.model).toBe("thread-model");
+    expect(createSessionInput.tools).toEqual(["thread-tool"]);
+  });
+
+  test("first thread message bootstraps starter and second does not", async () => {
+    const ctx = makeCtx();
+    const prompts: string[] = [];
+    const queryMock = mock(async (_sessionId: string, prompt: string) => {
+      prompts.push(prompt);
+      return { text: "ok", sessionId: "session-1" };
+    });
+    ctx.driver.query = queryMock as typeof ctx.driver.query;
+    const handler = await startAndGetHandler(ctx);
+
+    const first = makeThreadMessage("first", OWNER_ID, {
+      channelId: "thread-1",
+      starterContent: "starter text",
+    });
+    await handler(first);
+
+    const second = makeThreadMessage("second", OWNER_ID, {
+      channelId: "thread-1",
+      starterContent: "starter text",
+      messageId: "thread-msg-2",
+    });
+    await handler(second);
+
+    expect(prompts[0]).toContain("Thread starter message:\nstarter text");
+    expect(prompts[0]).toContain("User message:\nfirst");
+    expect(prompts[1]).toBe("second");
+  });
+
+  test("thread starter fetch failures do not block responses", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeThreadMessage("hello", OWNER_ID, {
+      channelId: "thread-fail",
+      starterFetchThrows: true,
+    });
+
+    await handler(msg);
+
+    expect(ctx.driver.query).toHaveBeenCalledTimes(1);
+    const queryCalls = ctx.driver.query.mock.calls as unknown[][];
+    const queryCall = queryCalls[0];
+    expect(queryCall).toBeDefined();
+    const prompt = queryCall?.[1] as string;
+    expect(prompt).toBe("hello");
+    expect(ctx.loggerSpies.warn).toHaveBeenCalledTimes(1);
+  });
+
+  test("reply inside thread uses thread scope", async () => {
+    const ctx = makeCtx();
+    const prompts: string[] = [];
+    const queryMock = mock(async (_sessionId: string, prompt: string) => {
+      prompts.push(prompt);
+      return { text: "ok", sessionId: "session-1" };
+    });
+    ctx.driver.query = queryMock as typeof ctx.driver.query;
+    const handler = await startAndGetHandler(ctx);
+
+    const first = makeThreadMessage("thread reply one", OWNER_ID, {
+      channelId: "thread-priority",
+      messageId: "thread-priority-1",
+      starterContent: "thread-level context",
+      referenceMessageId: "reply-root-1",
+      replyRootContent: "reply context",
+    });
+    await handler(first);
+
+    const second = makeThreadMessage("thread reply two", OWNER_ID, {
+      channelId: "thread-priority",
+      messageId: "thread-priority-2",
+      starterContent: "thread-level context",
+      referenceMessageId: "reply-root-2",
+      replyRootContent: "different reply context",
+    });
+    await handler(second);
+
+    expect(ctx.driver.createSession).toHaveBeenCalledTimes(1);
+    expect(prompts[0]).toContain(
+      "Thread starter message:\nthread-level context",
+    );
+    expect(prompts[0]).not.toContain("Reply root message:");
+    expect(prompts[1]).toBe("thread reply two");
+    expect(first.fetchReference).not.toHaveBeenCalled();
+    expect(second.fetchReference).not.toHaveBeenCalled();
   });
 });
 
