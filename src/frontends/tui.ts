@@ -21,6 +21,7 @@ import {
 } from "../backup/render.ts";
 import { Frontends } from "../constants.ts";
 import { ChannelHandler } from "../channel-handler.ts";
+import { buildMemoryCommandActions } from "../memory/actions.ts";
 import { toError } from "../resources.ts";
 import { ChatCommandRegistry } from "../chat-commands/registry.ts";
 import { createChatCommandTree } from "../chat-commands/tree.ts";
@@ -73,6 +74,11 @@ export class TuiFrontend implements Frontend {
       ctx.memoryBackend,
     );
     const commandRegistry = new ChatCommandRegistry(createChatCommandTree());
+    let memoryCommandActions = buildMemoryCommandActions({
+      memoryBackend: ctx.memoryBackend,
+      config,
+      resolveAgentName: (channelId: string) => channelHandler.resolveAgentName(channelId),
+    });
 
     // --- TUI setup ---
     const terminal = new ProcessTerminal();
@@ -126,6 +132,12 @@ export class TuiFrontend implements Frontend {
             resolveAgent = reloaded.resolveAgent;
             pluginDirs = reloaded.pluginDirs;
             await channelHandler.reload(config, pluginDirs, resolveAgent);
+            memoryCommandActions = buildMemoryCommandActions({
+              memoryBackend: ctx.memoryBackend,
+              config,
+              resolveAgentName: (channelId: string) =>
+                channelHandler.resolveAgentName(channelId),
+            });
             logger.info({}, "tui_command_reload");
             return undefined;
           },
@@ -136,6 +148,7 @@ export class TuiFrontend implements Frontend {
           dryRunBackup: async () => {
             return renderBackupDryRunMessage(dryRunBackup(config));
           },
+          ...memoryCommandActions,
         },
       };
     }

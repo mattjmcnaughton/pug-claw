@@ -10,6 +10,7 @@ import { ChatCommandRegistry } from "../chat-commands/registry.ts";
 import { createChatCommandTree } from "../chat-commands/tree.ts";
 import { toError } from "../resources.ts";
 import { DiscordSchedulerOutputSink } from "../scheduler/discord-output.ts";
+import { buildMemoryCommandActions } from "../memory/actions.ts";
 import { chunkMessage } from "../scheduler/output.ts";
 import { SchedulerRuntime } from "../scheduler/runtime.ts";
 import type { ScheduleSummary } from "../scheduler/types.ts";
@@ -231,6 +232,11 @@ export class DiscordFrontend implements Frontend {
       ctx.memoryBackend,
     );
     const commandRegistry = new ChatCommandRegistry(createChatCommandTree());
+    let memoryCommandActions = buildMemoryCommandActions({
+      memoryBackend: ctx.memoryBackend,
+      config,
+      resolveAgentName: (channelId: string) => channelHandler.resolveAgentName(channelId),
+    });
 
     const outputSink = new DiscordSchedulerOutputSink(client);
     let schedulerRuntime: SchedulerRuntime | undefined;
@@ -300,6 +306,12 @@ export class DiscordFrontend implements Frontend {
                 resolveAgent = reloaded.resolveAgent;
                 pluginDirs = reloaded.pluginDirs;
                 await channelHandler.reload(config, pluginDirs, resolveAgent);
+                memoryCommandActions = buildMemoryCommandActions({
+                  memoryBackend: ctx.memoryBackend,
+                  config,
+                  resolveAgentName: (channelId: string) =>
+                    channelHandler.resolveAgentName(channelId),
+                });
                 syncSchedulerRuntime();
                 logger.info({ channel_id: channelId }, "command_reload");
                 return "Config, agents, skills, and schedules reloaded. All sessions reset.";
@@ -311,6 +323,7 @@ export class DiscordFrontend implements Frontend {
               dryRunBackup: async () => {
                 return renderBackupDryRunMessage(dryRunBackup(config));
               },
+              ...memoryCommandActions,
               listSchedules: async () => {
                 const timezone = config.scheduler?.timezone ?? "UTC";
                 const summaries = schedulerRuntime?.listSchedules() ?? [];

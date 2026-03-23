@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ChannelHandler } from "../../src/channel-handler.ts";
 import { Paths } from "../../src/constants.ts";
 import type { Logger } from "../../src/logger.ts";
+import { buildMemoryCommandActions } from "../../src/memory/actions.ts";
 import { MemoryStore } from "../../src/memory/store.ts";
 import { ChatCommandRegistry } from "../../src/chat-commands/registry.ts";
 import { createChatCommandTree } from "../../src/chat-commands/tree.ts";
@@ -596,6 +597,139 @@ describe("chat commands", () => {
     expect(result?.message).toContain("Active session: `false`");
   });
 
+  test("!memory remember and !memory show manage memory entries", async () => {
+    const memoryStore = new MemoryStore(":memory:", noopLogger);
+    await memoryStore.init();
+    const { handler } = makeHandler(undefined, undefined, undefined, memoryStore);
+    const memoryActions = buildMemoryCommandActions({
+      memoryBackend: memoryStore,
+      config: makeConfig(),
+      resolveAgentName: (channelId: string) => handler.resolveAgentName(channelId),
+    });
+
+    try {
+      const rememberResult = await runCommand(handler, "memory remember Use AP style", {
+        actions: {
+          reload: async () => undefined,
+          ...memoryActions,
+        },
+      });
+      const showResult = await runCommand(handler, "memory show", {
+        actions: {
+          reload: async () => undefined,
+          ...memoryActions,
+        },
+      });
+
+      expect(rememberResult?.message).toContain("Saved to agent:default memory");
+      expect(showResult?.message).toContain("**Memory: agent:default**");
+      expect(showResult?.message).toContain("Use AP style");
+    } finally {
+      await memoryStore.close();
+    }
+  });
+
+  test("!memory forget accepts a unique short prefix", async () => {
+    const memoryStore = new MemoryStore(":memory:", noopLogger);
+    await memoryStore.init();
+    const entry = await memoryStore.save({
+      scope: "agent:default",
+      content: "Forget me",
+      createdBy: "user",
+      source: "user",
+    });
+    const { handler } = makeHandler(undefined, undefined, undefined, memoryStore);
+    const memoryActions = buildMemoryCommandActions({
+      memoryBackend: memoryStore,
+      config: makeConfig(),
+      resolveAgentName: (channelId: string) => handler.resolveAgentName(channelId),
+    });
+
+    try {
+      const prefix = entry.id.slice(0, 12);
+      const result = await runCommand(handler, `memory forget ${prefix}`, {
+        actions: {
+          reload: async () => undefined,
+          ...memoryActions,
+        },
+      });
+
+      expect(result?.message).toContain('Archived: "Forget me"');
+    } finally {
+      await memoryStore.close();
+    }
+  });
+
+  test("!memory forget returns a disambiguation message for ambiguous prefixes", async () => {
+    const memoryStore = new MemoryStore(":memory:", noopLogger);
+    await memoryStore.init();
+    const first = await memoryStore.save({
+      scope: "agent:default",
+      content: "first",
+      createdBy: "user",
+      source: "user",
+    });
+    const second = await memoryStore.save({
+      scope: "agent:default",
+      content: "second",
+      createdBy: "user",
+      source: "user",
+    });
+    const { handler } = makeHandler(undefined, undefined, undefined, memoryStore);
+    const memoryActions = buildMemoryCommandActions({
+      memoryBackend: memoryStore,
+      config: makeConfig(),
+      resolveAgentName: (channelId: string) => handler.resolveAgentName(channelId),
+    });
+
+    try {
+      const result = await runCommand(handler, "memory forget mem_", {
+        actions: {
+          reload: async () => undefined,
+          ...memoryActions,
+        },
+      });
+
+      expect(result?.message).toContain("Ambiguous memory ID prefix");
+      expect(result?.message).toContain(first.id);
+      expect(result?.message).toContain(second.id);
+    } finally {
+      await memoryStore.close();
+    }
+  });
+
+  test("!memory stats returns formatted counts", async () => {
+    const memoryStore = new MemoryStore(":memory:", noopLogger);
+    await memoryStore.init();
+    await memoryStore.save({
+      scope: "agent:default",
+      content: "one",
+      createdBy: "user",
+      source: "user",
+    });
+    const { handler } = makeHandler(undefined, undefined, undefined, memoryStore);
+    const memoryActions = buildMemoryCommandActions({
+      memoryBackend: memoryStore,
+      config: makeConfig(),
+      resolveAgentName: (channelId: string) => handler.resolveAgentName(channelId),
+    });
+
+    try {
+      const result = await runCommand(handler, "memory stats", {
+        actions: {
+          reload: async () => undefined,
+          ...memoryActions,
+        },
+      });
+
+      expect(result?.message).toContain("**Memory Stats**");
+      expect(result?.message).toContain("agent:default");
+      expect(result?.message).toContain("Embeddings: disabled");
+    } finally {
+      await memoryStore.close();
+    }
+  });
+
   test("!session status shows active session after message", async () => {
     const { handler } = makeHandler();
     await handler.ensureSession("chan-1");
@@ -674,6 +808,7 @@ describe("chat commands", () => {
     expect(result?.message).toContain("!agent");
     expect(result?.message).toContain("!driver");
     expect(result?.message).toContain("!model");
+    expect(result?.message).toContain("!memory");
     expect(result?.message).toContain("!session");
     expect(result?.message).toContain("!system");
     expect(result?.message).toContain("!help");

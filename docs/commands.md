@@ -36,6 +36,14 @@ model
   set <name>
   list
 
+memory
+  show [scope]
+  search <query>
+  remember <text>
+  forget <id>
+  export [scope]
+  stats
+
 schedule   # Discord only; owner only
   list
   run <name>
@@ -56,8 +64,11 @@ Examples:
 - Discord: `!help system`
 - Discord: `!schedule list`
 - Discord: `!backup export`
+- Discord: `!memory show`
+- Discord: `!memory remember The deploy key is in 1Password`
 - TUI: `/agent skills`
 - TUI: `/backup dryrun`
+- TUI: `/memory search coding style`
 - TUI: `/system quit`
 
 ## Important rule

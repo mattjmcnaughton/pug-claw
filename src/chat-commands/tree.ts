@@ -219,6 +219,105 @@ export function createChatCommandTree(): ChatCommandNode {
         execute: async (ctx, args) =>
           text(ctx.formatHelp(args.map((arg) => arg.toLowerCase()))),
       },
+      memory: {
+        name: "memory",
+        description: "Inspect and manage persistent memory",
+        children: {
+          show: {
+            name: "show",
+            description: "Show active memory entries",
+            usage: "memory show [scope]",
+            execute: async (ctx, args) => {
+              if (args.length > 1) {
+                return unknownSubcommand(ctx, ["memory", "show"], args);
+              }
+              const showMemory = ctx.actions.showMemory;
+              if (!showMemory) {
+                return text("Memory commands are not available.");
+              }
+              return text(await showMemory(ctx.channelId, args[0]));
+            },
+          },
+          search: {
+            name: "search",
+            description: "Search memory across accessible scopes",
+            usage: "memory search <query>",
+            execute: async (ctx, args) => {
+              const query = args.join(" ").trim();
+              if (!query) {
+                return text(ctx.formatHelp(["memory", "search"]));
+              }
+              const searchMemory = ctx.actions.searchMemory;
+              if (!searchMemory) {
+                return text("Memory commands are not available.");
+              }
+              return text(await searchMemory(ctx.channelId, query));
+            },
+          },
+          remember: {
+            name: "remember",
+            description: "Save a new memory to the current agent scope",
+            usage: "memory remember <text>",
+            execute: async (ctx, args) => {
+              const value = args.join(" ").trim();
+              if (!value) {
+                return text(ctx.formatHelp(["memory", "remember"]));
+              }
+              const rememberMemory = ctx.actions.rememberMemory;
+              if (!rememberMemory) {
+                return text("Memory commands are not available.");
+              }
+              return text(await rememberMemory(ctx.channelId, value));
+            },
+          },
+          forget: {
+            name: "forget",
+            description: "Archive an existing memory entry",
+            usage: "memory forget <id>",
+            execute: async (ctx, args) => {
+              const idOrPrefix = args.join(" ").trim();
+              if (!idOrPrefix) {
+                return text(ctx.formatHelp(["memory", "forget"]));
+              }
+              const forgetMemory = ctx.actions.forgetMemory;
+              if (!forgetMemory) {
+                return text("Memory commands are not available.");
+              }
+              return text(await forgetMemory(ctx.channelId, idOrPrefix));
+            },
+          },
+          export: {
+            name: "export",
+            description: "Export memory as markdown",
+            usage: "memory export [scope]",
+            execute: async (ctx, args) => {
+              if (args.length > 1) {
+                return unknownSubcommand(ctx, ["memory", "export"], args);
+              }
+              const exportMemory = ctx.actions.exportMemory;
+              if (!exportMemory) {
+                return text("Memory commands are not available.");
+              }
+              return text(await exportMemory(ctx.channelId, args[0]));
+            },
+          },
+          stats: {
+            name: "stats",
+            description: "Show memory counts and scope breakdowns",
+            execute: async (ctx, args) => {
+              if (args.length > 0) {
+                return unknownSubcommand(ctx, ["memory", "stats"], args);
+              }
+              const memoryStats = ctx.actions.memoryStats;
+              if (!memoryStats) {
+                return text("Memory commands are not available.");
+              }
+              return text(await memoryStats());
+            },
+          },
+        },
+        execute: async (ctx, args) => showOrUnknown(ctx, ["memory"], args),
+      },
       model: {
         name: "model",
         description: "Inspect and change the active model",
