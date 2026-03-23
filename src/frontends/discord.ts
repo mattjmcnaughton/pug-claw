@@ -19,6 +19,114 @@ interface SendableChannel {
   send(text: string): Promise<unknown>;
 }
 
+interface MessageScope {
+  sessionChannelId: string;
+  settingsChannelId: string;
+  bootstrapPrompt?: string;
+}
+
+function resolveMessageContent(message: Message): string {
+  return message.content.trim();
+}
+
+async function resolveReplyRootMessage(message: Message): Promise<Message> {
+  let current = await message.fetchReference();
+  const seenReferenceIds = new Set<string>();
+
+  // Replies can chain. Walk up references to scope the session to the root reply.
+  for (let depth = 0; depth < 20; depth += 1) {
+    const referenceMessageId = current.reference?.messageId;
+    if (!referenceMessageId || seenReferenceIds.has(referenceMessageId)) {
+      break;
+    }
+
+    seenReferenceIds.add(referenceMessageId);
+    current = await current.fetchReference();
+  }
+
+  return current;
+}
+
+async function resolveMessageScope(
+  message: Message,
+  channelHandler: ChannelHandler,
+  logger: FrontendContext["logger"],
+): Promise<MessageScope> {
+  if (message.channel.isThread()) {
+    const threadId = message.channelId;
+    const threadScopeChannelId = `thread:${threadId}`;
+    const settingsChannelId = message.channel.parentId ?? threadId;
+    let bootstrapPrompt: string | undefined;
+
+    if (!channelHandler.hasSession(threadScopeChannelId)) {
+      try {
+        const starterMessage = await message.channel.fetchStarterMessage();
+        if (starterMessage) {
+          const starterContent = resolveMessageContent(starterMessage);
+          if (starterContent) {
+            bootstrapPrompt = `Thread starter message:\n${starterContent}`;
+          }
+        }
+      } catch (err) {
+        logger.warn(
+          {
+            err: toError(err),
+            channel_id: threadId,
+            message_id: message.id,
+          },
+          "discord_thread_starter_fetch_failed",
+        );
+      }
+    }
+
+    return {
+      sessionChannelId: threadScopeChannelId,
+      settingsChannelId,
+      bootstrapPrompt,
+    };
+  }
+
+  const settingsChannelId = message.channelId;
+  const referenceMessageId = message.reference?.messageId;
+  if (!referenceMessageId) {
+    return {
+      sessionChannelId: message.channelId,
+      settingsChannelId,
+    };
+  }
+
+  let rootMessageId = referenceMessageId;
+  let bootstrapPrompt: string | undefined;
+
+  try {
+    const rootMessage = await resolveReplyRootMessage(message);
+    rootMessageId = rootMessage.id;
+
+    if (!channelHandler.hasSession(`reply:${rootMessageId}`)) {
+      const rootMessageContent = resolveMessageContent(rootMessage);
+      if (rootMessageContent) {
+        bootstrapPrompt = `Reply root message:\n${rootMessageContent}`;
+      }
+    }
+  } catch (err) {
+    logger.warn(
+      {
+        err: toError(err),
+        channel_id: message.channelId,
+        message_id: message.id,
+        reference_message_id: referenceMessageId,
+      },
+      "discord_reply_reference_fetch_failed",
+    );
+  }
+
+  return {
+    sessionChannelId: `reply:${rootMessageId}`,
+    settingsChannelId,
+    bootstrapPrompt,
+  };
+}
+
 function formatDateTime(date: Date, timezone: string): string {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -299,6 +407,8 @@ export class DiscordFrontend implements Frontend {
 
       const channel = message.channel;
       const channelId = message.channelId;
+      const { sessionChannelId, settingsChannelId, bootstrapPrompt } =
+        await resolveMessageScope(message, channelHandler, logger);
 
       await channel.sendTyping();
 
@@ -308,7 +418,7 @@ export class DiscordFrontend implements Frontend {
 
       const toolsSeen = new Set<string>();
       const responseText = await channelHandler.handleMessage(
-        channelId,
+        sessionChannelId,
         message.content,
         (event) => {
           channel.sendTyping().catch(() => {});
@@ -316,6 +426,10 @@ export class DiscordFrontend implements Frontend {
             toolsSeen.add(event.tool);
             channel.send(`Using ${event.tool}...`).catch(() => {});
           }
+        },
+        {
+          settingsChannelId,
+          bootstrapPrompt,
         },
       );
 
@@ -327,7 +441,10 @@ export class DiscordFrontend implements Frontend {
         {
           message_id: message.id,
           channel_id: channelId,
-          driver: channelHandler.resolveDriverName(channelId),
+          driver: channelHandler.resolveDriverName(
+            sessionChannelId,
+            settingsChannelId,
+          ),
           response_length: text.length,
         },
         "response_sent",
