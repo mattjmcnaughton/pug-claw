@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Logger } from "../../src/logger.ts";
 import { MemoryStore } from "../../src/memory/store.ts";
-import type { MemoryStatus } from "../../src/memory/types.ts";
+import type { EmbeddingProvider, MemoryStatus } from "../../src/memory/types.ts";
 
 const noopLogger = {
   info: () => {},
@@ -11,8 +11,50 @@ const noopLogger = {
   debug: () => {},
 } as unknown as Logger;
 
-async function createStore(): Promise<MemoryStore> {
-  const store = new MemoryStore(":memory:", noopLogger);
+function makeVector(...values: number[]): number[] {
+  return [...values, ...new Array(384 - values.length).fill(0)];
+}
+
+class FakeEmbeddingProvider implements EmbeddingProvider {
+  constructor(private vectors: Record<string, number[]>) {}
+
+  async init(): Promise<void> {}
+
+  async embed(text: string): Promise<number[]> {
+    return this.vectors[text] ?? makeVector(0, 0, 0);
+  }
+
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    return Promise.all(texts.map((text) => this.embed(text)));
+  }
+
+  dimensions(): number {
+    return 384;
+  }
+}
+
+class FailingEmbeddingProvider implements EmbeddingProvider {
+  async init(): Promise<void> {
+    throw new Error("embedding init failed");
+  }
+
+  async embed(): Promise<number[]> {
+    return makeVector(0, 0, 0);
+  }
+
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    return texts.map(() => makeVector(0, 0, 0));
+  }
+
+  dimensions(): number {
+    return 384;
+  }
+}
+
+async function createStore(
+  embeddingProvider?: EmbeddingProvider,
+): Promise<MemoryStore> {
+  const store = new MemoryStore(":memory:", noopLogger, embeddingProvider ?? null);
   await store.init();
   return store;
 }
@@ -248,6 +290,82 @@ describe("MemoryStore", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.entry.content).toBe("current preference");
+
+    await store.close();
+  });
+
+  test("semantic search finds related entries when embeddings are enabled", async () => {
+    const store = await createStore(
+      new FakeEmbeddingProvider({
+        "Ubuntu host": makeVector(1, 0, 0),
+        "linux server": makeVector(1, 0, 0),
+      }),
+    );
+    await saveMemory(store, {
+      content: "Ubuntu host",
+      scope: "global",
+    });
+
+    const results = await store.search({ text: "linux server" });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.matchType).toBe("semantic");
+    expect(results[0]?.entry.content).toBe("Ubuntu host");
+
+    await store.close();
+  });
+
+  test("hybrid search prefers results matched by both keyword and semantic search", async () => {
+    const store = await createStore(
+      new FakeEmbeddingProvider({
+        "Ubuntu host": makeVector(1, 0, 0),
+        ubuntu: makeVector(1, 0, 0),
+        unrelated: makeVector(0, 1, 0),
+      }),
+    );
+    await saveMemory(store, {
+      content: "Ubuntu host",
+      scope: "global",
+    });
+
+    const results = await store.search({ text: "ubuntu" });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.matchType).toBe("hybrid");
+
+    await store.close();
+  });
+
+  test("reindex regenerates embeddings for existing memories", async () => {
+    const store = await createStore(
+      new FakeEmbeddingProvider({
+        "stored memory": makeVector(1, 0, 0),
+        stored: makeVector(1, 0, 0),
+      }),
+    );
+    await saveMemory(store, {
+      content: "stored memory",
+    });
+
+    const count = await store.reindex();
+    const results = await store.search({ text: "stored" });
+
+    expect(count).toBe(1);
+    expect(results[0]?.matchType).toBe("hybrid");
+
+    await store.close();
+  });
+
+  test("falls back to keyword search when embeddings fail to initialize", async () => {
+    const store = await createStore(new FailingEmbeddingProvider());
+    await saveMemory(store, {
+      content: "keyword only search still works",
+    });
+
+    const results = await store.search({ text: "keyword" });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.matchType).toBe("keyword");
 
     await store.close();
   });

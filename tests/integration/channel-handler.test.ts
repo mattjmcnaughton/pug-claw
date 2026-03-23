@@ -730,6 +730,36 @@ describe("chat commands", () => {
     }
   });
 
+  test("!memory reindex reports the number of reindexed entries", async () => {
+    const memoryStore = new MemoryStore(":memory:", noopLogger);
+    await memoryStore.init();
+    await memoryStore.save({
+      scope: "agent:default",
+      content: "one",
+      createdBy: "user",
+      source: "user",
+    });
+    const { handler } = makeHandler(undefined, undefined, undefined, memoryStore);
+    const memoryActions = buildMemoryCommandActions({
+      memoryBackend: memoryStore,
+      config: makeConfig(),
+      resolveAgentName: (channelId: string) => handler.resolveAgentName(channelId),
+    });
+
+    try {
+      const result = await runCommand(handler, "memory reindex", {
+        actions: {
+          reload: async () => undefined,
+          ...memoryActions,
+        },
+      });
+
+      expect(result?.message).toContain("Reindexed embeddings for 0 memory entries.");
+    } finally {
+      await memoryStore.close();
+    }
+  });
+
   test("!session status shows active session after message", async () => {
     const { handler } = makeHandler();
     await handler.ensureSession("chan-1");

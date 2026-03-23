@@ -107,5 +107,12 @@ export function buildMemoryCommandActions(
         : `\n\nEmbeddings: disabled (${config.memory.embeddings.model})`;
       return `${renderMemoryStats(stats)}${embeddingsLine}`;
     },
+    reindexMemory: async () => {
+      if (!memoryBackend?.reindex) {
+        return "Memory reindex is not available.";
+      }
+      const count = await memoryBackend.reindex();
+      return `Reindexed embeddings for ${count} memory entries.`;
+    },
   };
 }

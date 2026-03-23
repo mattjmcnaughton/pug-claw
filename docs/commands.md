@@ -43,6 +43,7 @@ memory
   forget <id>
   export [scope]
   stats
+  reindex
 
 schedule   # Discord only; owner only
   list

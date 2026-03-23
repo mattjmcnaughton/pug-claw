@@ -22,6 +22,7 @@ import { DiscordFrontend } from "./frontends/discord.ts";
 import { TuiFrontend } from "./frontends/tui.ts";
 import type { Frontend } from "./frontends/types.ts";
 import { configureLogger, logger } from "./logger.ts";
+import { HuggingFaceEmbeddingProvider } from "./memory/embeddings.ts";
 import { MemoryStore } from "./memory/store.ts";
 import { generateAgentPlugins } from "./plugins.ts";
 import type { ConfigOptions, ResolvedConfig } from "./resources.ts";
@@ -81,9 +82,16 @@ async function startFrontend(
 
   logger.info({ drivers: Object.keys(drivers) }, "drivers_initialized");
 
+  const embeddingProvider = config.memory.embeddings.enabled
+    ? new HuggingFaceEmbeddingProvider(
+        config.memory.embeddings.model,
+        resolve(config.internalDir, Paths.MODELS_DIR),
+      )
+    : null;
   const memoryStore = new MemoryStore(
     resolve(config.internalDir, Paths.RUNTIME_DB_FILE),
     logger,
+    embeddingProvider,
   );
   await memoryStore.init();
 
