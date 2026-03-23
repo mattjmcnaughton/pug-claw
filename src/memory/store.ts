@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Database } from "bun:sqlite";
 import type { Logger } from "../logger.ts";
+import { toError } from "../resources.ts";
 import {
   normalizeMemoryTags,
   validateMemoryScope,
@@ -96,8 +97,31 @@ function countKeywordMatches(text: string, query: string): number {
   return matches;
 }
 
+function cosineSimilarity(left: number[], right: number[]): number {
+  let dot = 0;
+  let leftMagnitude = 0;
+  let rightMagnitude = 0;
+
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    const leftValue = left[index] ?? 0;
+    const rightValue = right[index] ?? 0;
+    dot += leftValue * rightValue;
+    leftMagnitude += leftValue * leftValue;
+    rightMagnitude += rightValue * rightValue;
+  }
+
+  if (leftMagnitude === 0 || rightMagnitude === 0) {
+    return 0;
+  }
+
+  return dot / (Math.sqrt(leftMagnitude) * Math.sqrt(rightMagnitude));
+}
+
 export class MemoryStore implements MemoryBackend {
   private db: Database;
+  private embeddingsReady = false;
+  private vectorSearchEnabled = false;
+  private fallbackEmbeddings = new Map<string, number[]>();
 
   constructor(
     dbPath: string,
@@ -138,9 +162,28 @@ export class MemoryStore implements MemoryBackend {
         ON memories(scope, accessed_at DESC);
     `);
 
-    if (this.embeddingProvider) {
-      this.logger.info({}, "memory_embeddings_pending");
+    if (!this.embeddingProvider) {
+      return;
     }
+
+    try {
+      await this.embeddingProvider.init();
+      this.embeddingsReady = true;
+      const sqliteVec = await import("sqlite-vec");
+      sqliteVec.load(this.db);
+      this.db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS memory_embeddings USING vec0(
+          memory_id TEXT PRIMARY KEY,
+          embedding float[384]
+        );
+      `);
+      this.vectorSearchEnabled = true;
+    } catch (err) {
+      this.vectorSearchEnabled = false;
+      this.logger.warn({ err: toError(err) }, "memory_embeddings_disabled");
+    }
+
+    await this.reindex();
   }
 
   async close(): Promise<void> {
@@ -193,6 +236,8 @@ export class MemoryStore implements MemoryBackend {
         saved.accessedAt,
       );
 
+    await this.syncEmbedding(saved);
+
     return saved;
   }
 
@@ -229,6 +274,10 @@ export class MemoryStore implements MemoryBackend {
         id,
       );
 
+    if (patch.content !== undefined) {
+      await this.syncEmbedding(updated);
+    }
+
     return updated;
   }
 
@@ -247,6 +296,7 @@ export class MemoryStore implements MemoryBackend {
   }
 
   async delete(id: string): Promise<boolean> {
+    this.deleteEmbedding(id);
     const result = this.db
       .query("DELETE FROM memories WHERE id = ?")
       .run(id) as { changes?: number };
@@ -284,47 +334,35 @@ export class MemoryStore implements MemoryBackend {
   }
 
   async search(query: MemorySearchQuery): Promise<MemorySearchResult[]> {
-    const text = query.text?.trim() ?? "";
-    if (!text) {
-      return [];
-    }
-    const queryTerms = text.split(/\s+/).filter(Boolean);
+    const keywordResults = this.searchKeyword(query);
+    const semanticResults = await this.searchSemantic(query);
+    const merged = new Map<string, MemorySearchResult>();
 
-    const entries = this.listWithoutAccessUpdate({
-      scope: query.scope,
-      status: query.status ?? "active",
-      limit: undefined,
-      offset: undefined,
-    });
-
-    const results: MemorySearchResult[] = [];
-    for (const entry of entries) {
-      const matchCount = queryTerms.reduce((total, term) => {
-        return (
-          total +
-          countKeywordMatches(entry.content, term) +
-          countKeywordMatches(entry.tags.join(" "), term)
-        );
-      }, 0);
-      if (matchCount === 0) {
+    for (const result of [...keywordResults, ...semanticResults]) {
+      const existing = merged.get(result.entry.id);
+      if (!existing) {
+        merged.set(result.entry.id, result);
         continue;
       }
 
-      results.push({
-        entry,
-        score: Math.min(1, 0.4 + matchCount * 0.2),
-        matchType: "keyword",
+      merged.set(result.entry.id, {
+        entry: result.entry,
+        score: Math.min(1, Math.max(existing.score, result.score) + 0.05),
+        matchType: "hybrid",
       });
     }
 
-    results.sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-      return right.entry.updatedAt.localeCompare(left.entry.updatedAt);
-    });
-
-    const limitedResults = results.slice(0, query.limit ?? 10);
+    const limitedResults = [...merged.values()]
+      .sort((left, right) => {
+        if (right.score !== left.score) {
+          return right.score - left.score;
+        }
+        if (left.matchType !== right.matchType) {
+          return left.matchType === "hybrid" ? -1 : 1;
+        }
+        return right.entry.updatedAt.localeCompare(left.entry.updatedAt);
+      })
+      .slice(0, query.limit ?? 10);
 
     if (limitedResults.length === 0) {
       return [];
@@ -425,6 +463,34 @@ export class MemoryStore implements MemoryBackend {
     return `${lines.join("\n")}\n`;
   }
 
+  async reindex(): Promise<number> {
+    if (!this.embeddingsReady || !this.embeddingProvider) {
+      return 0;
+    }
+
+    const entries = this.listWithoutAccessUpdate({});
+    this.fallbackEmbeddings.clear();
+    if (this.vectorSearchEnabled) {
+      this.db.query("DELETE FROM memory_embeddings").run();
+    }
+    if (entries.length === 0) {
+      return 0;
+    }
+
+    const embeddings = await this.embeddingProvider.embedBatch(
+      entries.map((entry) => entry.content),
+    );
+    for (const [index, entry] of entries.entries()) {
+      const embedding = embeddings[index];
+      if (!embedding) {
+        continue;
+      }
+      this.upsertEmbedding(entry.id, embedding);
+    }
+
+    return entries.length;
+  }
+
   private async getWithoutAccessUpdate(
     id: string,
   ): Promise<MemoryEntry | null> {
@@ -432,6 +498,135 @@ export class MemoryStore implements MemoryBackend {
       .query("SELECT * FROM memories WHERE id = ? LIMIT 1")
       .get(id) as MemoryRow | null;
     return row ? rowToEntry(row) : null;
+  }
+
+  private searchKeyword(query: MemorySearchQuery): MemorySearchResult[] {
+    const text = query.text?.trim() ?? "";
+    if (!text) {
+      return [];
+    }
+    const queryTerms = text.split(/\s+/).filter(Boolean);
+    const entries = this.listWithoutAccessUpdate({
+      scope: query.scope,
+      status: query.status ?? "active",
+    });
+
+    const results: MemorySearchResult[] = [];
+    for (const entry of entries) {
+      const matchCount = queryTerms.reduce((total, term) => {
+        return (
+          total +
+          countKeywordMatches(entry.content, term) +
+          countKeywordMatches(entry.tags.join(" "), term)
+        );
+      }, 0);
+      if (matchCount === 0) {
+        continue;
+      }
+
+      results.push({
+        entry,
+        score: Math.min(1, 0.4 + matchCount * 0.2),
+        matchType: "keyword",
+      });
+    }
+
+    return results;
+  }
+
+  private async searchSemantic(
+    query: MemorySearchQuery,
+  ): Promise<MemorySearchResult[]> {
+    if (!this.embeddingsReady || !this.embeddingProvider) {
+      return [];
+    }
+
+    const embedding =
+      query.embedding ??
+      (query.text ? await this.embeddingProvider.embed(query.text) : undefined);
+    if (!embedding) {
+      return [];
+    }
+
+    if (this.vectorSearchEnabled) {
+      const rows = this.db
+        .query(
+          `
+            SELECT memory_id, distance
+            FROM memory_embeddings
+            WHERE embedding MATCH ?
+            ORDER BY distance
+            LIMIT ?
+          `,
+        )
+        .all(new Float32Array(embedding), query.limit ?? 10) as Array<{
+        memory_id: string;
+        distance: number;
+      }>;
+
+      const results: MemorySearchResult[] = [];
+      for (const row of rows) {
+        const entry = await this.getWithoutAccessUpdate(row.memory_id);
+        if (!entry) {
+          continue;
+        }
+        if (query.scope && entry.scope !== query.scope) {
+          continue;
+        }
+        if ((query.status ?? "active") !== entry.status) {
+          continue;
+        }
+
+        results.push({
+          entry,
+          score: 1 / (1 + row.distance),
+          matchType: "semantic",
+        });
+      }
+
+      return results;
+    }
+
+    const entries = this.listWithoutAccessUpdate({
+      scope: query.scope,
+      status: query.status ?? "active",
+    });
+    const missingEntries = entries.filter(
+      (entry) => !this.fallbackEmbeddings.has(entry.id),
+    );
+    if (missingEntries.length > 0) {
+      const missingEmbeddings = await this.embeddingProvider.embedBatch(
+        missingEntries.map((entry) => entry.content),
+      );
+      for (const [index, entry] of missingEntries.entries()) {
+        const missingEmbedding = missingEmbeddings[index];
+        if (!missingEmbedding) {
+          continue;
+        }
+        this.fallbackEmbeddings.set(entry.id, missingEmbedding);
+      }
+    }
+
+    const fallbackResults: MemorySearchResult[] = [];
+    for (const entry of entries) {
+      const entryEmbedding = this.fallbackEmbeddings.get(entry.id);
+      if (!entryEmbedding) {
+        continue;
+      }
+      const similarity = cosineSimilarity(embedding, entryEmbedding);
+      if (similarity <= 0) {
+        continue;
+      }
+      fallbackResults.push({
+        entry,
+        score: similarity,
+        matchType: "semantic",
+      });
+    }
+
+    return fallbackResults
+      .sort((left, right) => right.score - left.score)
+      .slice(0, query.limit ?? 10);
   }
 
   private listWithoutAccessUpdate(filter: MemoryFilter): MemoryEntry[] {
@@ -475,6 +670,34 @@ export class MemoryStore implements MemoryBackend {
         filter.offset ?? 0,
         (filter.offset ?? 0) + (filter.limit ?? rows.length),
       );
+  }
+
+  private async syncEmbedding(entry: MemoryEntry): Promise<void> {
+    if (!this.embeddingsReady || !this.embeddingProvider) {
+      return;
+    }
+    const embedding = await this.embeddingProvider.embed(entry.content);
+    this.upsertEmbedding(entry.id, embedding);
+  }
+
+  private upsertEmbedding(id: string, embedding: number[]): void {
+    this.fallbackEmbeddings.set(id, embedding);
+    if (!this.vectorSearchEnabled) {
+      return;
+    }
+    this.db
+      .query(
+        "INSERT OR REPLACE INTO memory_embeddings (memory_id, embedding) VALUES (?, ?)",
+      )
+      .run(id, new Float32Array(embedding));
+  }
+
+  private deleteEmbedding(id: string): void {
+    this.fallbackEmbeddings.delete(id);
+    if (!this.vectorSearchEnabled) {
+      return;
+    }
+    this.db.query("DELETE FROM memory_embeddings WHERE memory_id = ?").run(id);
   }
 
   private touchAccessedAt(ids: string[], accessedAt: string): void {

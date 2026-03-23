@@ -77,6 +77,7 @@ export interface MemoryBackend {
   count(filter: MemoryFilter): Promise<number>;
   stats(): Promise<MemoryStats>;
   exportMarkdown(scope: MemoryScope): Promise<string>;
+  reindex?(): Promise<number>;
 }
 
 export interface EmbeddingProvider {

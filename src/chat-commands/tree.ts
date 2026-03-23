@@ -315,6 +315,20 @@ export function createChatCommandTree(): ChatCommandNode {
               return text(await memoryStats());
             },
           },
+          reindex: {
+            name: "reindex",
+            description: "Regenerate memory embeddings for all entries",
+            execute: async (ctx, args) => {
+              if (args.length > 0) {
+                return unknownSubcommand(ctx, ["memory", "reindex"], args);
+              }
+              const reindexMemory = ctx.actions.reindexMemory;
+              if (!reindexMemory) {
+                return text("Memory commands are not available.");
+              }
+              return text(await reindexMemory());
+            },
+          },
         },
         execute: async (ctx, args) => showOrUnknown(ctx, ["memory"], args),
       },
