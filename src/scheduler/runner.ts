@@ -227,6 +227,7 @@ export class SchedulerRunner {
 
     let sessionId: string | undefined;
     let responseText = "";
+    let emptyResponse = false;
     let executionStatus: ScheduleExecutionStatus =
       ScheduleExecutionStatuses.RUNNING;
     let deliveryStatus: ScheduleDeliveryStatus =
@@ -275,7 +276,8 @@ export class SchedulerRunner {
           }
         },
       );
-      responseText = response.text.trim() ? response.text : "(no response)";
+      emptyResponse = !response.text.trim();
+      responseText = emptyResponse ? "(no response)" : response.text;
       executionStatus = ScheduleExecutionStatuses.SUCCEEDED;
 
       this.ctx.auditLog.append({
@@ -367,37 +369,11 @@ export class SchedulerRunner {
     }
 
     if (schedule.output) {
-      const messageToSend =
+      if (
+        emptyResponse &&
         executionStatus === ScheduleExecutionStatuses.SUCCEEDED
-          ? responseText
-          : buildFailureMessage(schedule.name, runId);
-
-      this.ctx.auditLog.append({
-        ts: makeNowIso(),
-        event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_STARTED,
-        run_id: runId,
-        schedule_name: schedule.name,
-        trigger_source: triggerSource,
-        agent: schedule.agent,
-        driver: driverName,
-        model: modelName,
-        cron_expression: schedule.cron,
-        timezone,
-        output: {
-          type: schedule.output.type,
-          channel_id: schedule.output.channelId,
-        },
-        delivery_status: ScheduleDeliveryStatuses.PENDING,
-        channel_id: schedule.output.channelId,
-        message: "Schedule run delivery started.",
-      });
-
-      try {
-        await this.ctx.outputSink.sendDiscordMessage(
-          schedule.output.channelId,
-          messageToSend,
-        );
-        deliveryStatus = ScheduleDeliveryStatuses.SUCCEEDED;
+      ) {
+        deliveryStatus = ScheduleDeliveryStatuses.NOT_APPLICABLE;
         this.ctx.auditLog.append({
           ts: makeNowIso(),
           event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_SUCCEEDED,
@@ -413,23 +389,19 @@ export class SchedulerRunner {
             type: schedule.output.type,
             channel_id: schedule.output.channelId,
           },
-          delivery_status: ScheduleDeliveryStatuses.SUCCEEDED,
+          delivery_status: ScheduleDeliveryStatuses.NOT_APPLICABLE,
           channel_id: schedule.output.channelId,
-          message: "Schedule run delivery succeeded.",
+          message: "Delivery skipped: agent returned empty response.",
         });
-      } catch (err) {
-        const error = toError(err);
-        deliveryStatus = ScheduleDeliveryStatuses.FAILED;
-        if (executionStatus === ScheduleExecutionStatuses.SUCCEEDED) {
-          errorMessage = error.message;
-        }
-        this.ctx.logger.error(
-          { err: error, run_id: runId, schedule_name: schedule.name },
-          "schedule_run_delivery_error",
-        );
+      } else {
+        const messageToSend =
+          executionStatus === ScheduleExecutionStatuses.SUCCEEDED
+            ? responseText
+            : buildFailureMessage(schedule.name, runId);
+
         this.ctx.auditLog.append({
           ts: makeNowIso(),
-          event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_FAILED,
+          event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_STARTED,
           run_id: runId,
           schedule_name: schedule.name,
           trigger_source: triggerSource,
@@ -442,11 +414,67 @@ export class SchedulerRunner {
             type: schedule.output.type,
             channel_id: schedule.output.channelId,
           },
-          delivery_status: ScheduleDeliveryStatuses.FAILED,
+          delivery_status: ScheduleDeliveryStatuses.PENDING,
           channel_id: schedule.output.channelId,
-          error: error.message,
-          message: "Schedule run delivery failed.",
+          message: "Schedule run delivery started.",
         });
+
+        try {
+          await this.ctx.outputSink.sendDiscordMessage(
+            schedule.output.channelId,
+            messageToSend,
+          );
+          deliveryStatus = ScheduleDeliveryStatuses.SUCCEEDED;
+          this.ctx.auditLog.append({
+            ts: makeNowIso(),
+            event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_SUCCEEDED,
+            run_id: runId,
+            schedule_name: schedule.name,
+            trigger_source: triggerSource,
+            agent: schedule.agent,
+            driver: driverName,
+            model: modelName,
+            cron_expression: schedule.cron,
+            timezone,
+            output: {
+              type: schedule.output.type,
+              channel_id: schedule.output.channelId,
+            },
+            delivery_status: ScheduleDeliveryStatuses.SUCCEEDED,
+            channel_id: schedule.output.channelId,
+            message: "Schedule run delivery succeeded.",
+          });
+        } catch (err) {
+          const error = toError(err);
+          deliveryStatus = ScheduleDeliveryStatuses.FAILED;
+          if (executionStatus === ScheduleExecutionStatuses.SUCCEEDED) {
+            errorMessage = error.message;
+          }
+          this.ctx.logger.error(
+            { err: error, run_id: runId, schedule_name: schedule.name },
+            "schedule_run_delivery_error",
+          );
+          this.ctx.auditLog.append({
+            ts: makeNowIso(),
+            event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_FAILED,
+            run_id: runId,
+            schedule_name: schedule.name,
+            trigger_source: triggerSource,
+            agent: schedule.agent,
+            driver: driverName,
+            model: modelName,
+            cron_expression: schedule.cron,
+            timezone,
+            output: {
+              type: schedule.output.type,
+              channel_id: schedule.output.channelId,
+            },
+            delivery_status: ScheduleDeliveryStatuses.FAILED,
+            channel_id: schedule.output.channelId,
+            error: error.message,
+            message: "Schedule run delivery failed.",
+          });
+        }
       }
     }
 
