@@ -34,6 +34,7 @@ export function resolveClaudeSessionOptions(
 
   const systemPrompt = buildFinalSystemPrompt(options.systemPrompt, {
     skills: options.skills,
+    memoryBlock: options.memoryBlock,
     pluginHint: !!options.pluginDir,
   });
 

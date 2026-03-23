@@ -642,12 +642,10 @@ export async function resolveConfig(
     ),
     memory: {
       enabled: rawConfig.memory?.enabled ?? true,
-      injectionBudgetTokens:
-        rawConfig.memory?.injection_budget_tokens ?? 2000,
+      injectionBudgetTokens: rawConfig.memory?.injection_budget_tokens ?? 2000,
       embeddings: {
         enabled: rawConfig.memory?.embeddings?.enabled ?? false,
-        model:
-          rawConfig.memory?.embeddings?.model ?? "Xenova/all-MiniLM-L6-v2",
+        model: rawConfig.memory?.embeddings?.model ?? "Xenova/all-MiniLM-L6-v2",
       },
     },
     defaultAgent: rawConfig.default_agent ?? Defaults.AGENT,

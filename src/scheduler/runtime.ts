@@ -4,6 +4,7 @@ import { Cron } from "croner";
 import { Defaults, Paths } from "../constants.ts";
 import type { Driver } from "../drivers/types.ts";
 import type { Logger } from "../logger.ts";
+import type { MemoryBackend } from "../memory/types.ts";
 import type { ResolvedConfig } from "../resources.ts";
 import type { ResolvedAgent } from "../skills.ts";
 import { SchedulerAuditLog } from "./audit-log.ts";
@@ -31,6 +32,7 @@ interface SchedulerRuntimeContext {
   resolveAgent: (agentDir: string) => ResolvedAgent;
   logger: Logger;
   outputSink: SchedulerOutputSink;
+  memoryBackend?: MemoryBackend;
 }
 
 export type RunScheduleResult =
@@ -85,6 +87,7 @@ export class SchedulerRuntime {
       store: this.store,
       auditLog: this.auditLog,
       outputSink: this.ctx.outputSink,
+      memoryBackend: this.ctx.memoryBackend,
     });
     this.refreshSchedules();
   }
@@ -167,6 +170,7 @@ export class SchedulerRuntime {
       store: this.store,
       auditLog: this.auditLog,
       outputSink: this.ctx.outputSink,
+      memoryBackend: this.ctx.memoryBackend,
     });
     this.refreshSchedules();
     this.ctx.logger.info(

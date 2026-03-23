@@ -239,7 +239,9 @@ describe("MemoryStore", () => {
   test("search defaults to active status when no status filter is provided", async () => {
     const store = await createStore();
     await saveMemory(store, { content: "current preference" });
-    const archived = await saveMemory(store, { content: "archived preference" });
+    const archived = await saveMemory(store, {
+      content: "archived preference",
+    });
     await store.archive(archived.id);
 
     const results = await store.search({ text: "preference" });

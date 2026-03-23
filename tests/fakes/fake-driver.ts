@@ -72,7 +72,15 @@ export class FakeDriver implements Driver {
   async createSession(options: DriverOptions): Promise<string> {
     if (this.createSessionError) throw this.createSessionError;
     const id = `fake-session-${this.nextSessionId++}`;
-    const session: FakeSession = { id, options };
+    const session: FakeSession = {
+      id,
+      options: {
+        ...options,
+        systemPrompt: options.memoryBlock
+          ? `${options.systemPrompt}\n\n${options.memoryBlock}`
+          : options.systemPrompt,
+      },
+    };
     this.sessions.set(id, session);
     this.createdSessions.push(session);
     return id;

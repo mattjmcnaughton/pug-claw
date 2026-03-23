@@ -68,7 +68,9 @@ function includesAllTags(entryTags: string[], filterTags?: string[]): boolean {
     return true;
   }
 
-  const normalizedEntryTags = new Set(entryTags.map((tag) => tag.toLowerCase()));
+  const normalizedEntryTags = new Set(
+    entryTags.map((tag) => tag.toLowerCase()),
+  );
   return filterTags.every((tag) => normalizedEntryTags.has(tag.toLowerCase()));
 }
 
@@ -194,7 +196,10 @@ export class MemoryStore implements MemoryBackend {
     return saved;
   }
 
-  async update(id: string, patch: MemoryEntryPatch): Promise<MemoryEntry | null> {
+  async update(
+    id: string,
+    patch: MemoryEntryPatch,
+  ): Promise<MemoryEntry | null> {
     const current = await this.getWithoutAccessUpdate(id);
     if (!current) {
       return null;
@@ -253,11 +258,15 @@ export class MemoryStore implements MemoryBackend {
     return updated !== null;
   }
 
-  async list(filter: MemoryFilter): Promise<MemoryEntry[]> {
-    const entries = this.listWithoutAccessUpdate({
+  async peek(filter: MemoryFilter): Promise<MemoryEntry[]> {
+    return this.listWithoutAccessUpdate({
       ...filter,
       status: filter.status ?? "active",
     });
+  }
+
+  async list(filter: MemoryFilter): Promise<MemoryEntry[]> {
+    const entries = await this.peek(filter);
     if (entries.length === 0) {
       return [];
     }
@@ -383,7 +392,9 @@ export class MemoryStore implements MemoryBackend {
       const sectionNames = entry.tags.length > 0 ? entry.tags : ["General"];
       for (const sectionName of sectionNames) {
         const existing = sections.get(sectionName) ?? [];
-        existing.push(`- ${entry.content} (saved ${entry.createdAt.slice(0, 10)})`);
+        existing.push(
+          `- ${entry.content} (saved ${entry.createdAt.slice(0, 10)})`,
+        );
         sections.set(sectionName, existing);
       }
     }
@@ -409,7 +420,9 @@ export class MemoryStore implements MemoryBackend {
     return `${lines.join("\n")}\n`;
   }
 
-  private async getWithoutAccessUpdate(id: string): Promise<MemoryEntry | null> {
+  private async getWithoutAccessUpdate(
+    id: string,
+  ): Promise<MemoryEntry | null> {
     const row = this.db
       .query("SELECT * FROM memories WHERE id = ? LIMIT 1")
       .get(id) as MemoryRow | null;
@@ -453,7 +466,10 @@ export class MemoryStore implements MemoryBackend {
     return rows
       .map((row) => rowToEntry(row))
       .filter((entry) => includesAllTags(entry.tags, filter.tags))
-      .slice(filter.offset ?? 0, (filter.offset ?? 0) + (filter.limit ?? rows.length));
+      .slice(
+        filter.offset ?? 0,
+        (filter.offset ?? 0) + (filter.limit ?? rows.length),
+      );
   }
 
   private touchAccessedAt(ids: string[], accessedAt: string): void {

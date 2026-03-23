@@ -22,6 +22,7 @@ import { DiscordFrontend } from "./frontends/discord.ts";
 import { TuiFrontend } from "./frontends/tui.ts";
 import type { Frontend } from "./frontends/types.ts";
 import { configureLogger, logger } from "./logger.ts";
+import { MemoryStore } from "./memory/store.ts";
 import { generateAgentPlugins } from "./plugins.ts";
 import type { ConfigOptions, ResolvedConfig } from "./resources.ts";
 import {
@@ -80,6 +81,12 @@ async function startFrontend(
 
   logger.info({ drivers: Object.keys(drivers) }, "drivers_initialized");
 
+  const memoryStore = new MemoryStore(
+    resolve(config.internalDir, Paths.RUNTIME_DB_FILE),
+    logger,
+  );
+  await memoryStore.init();
+
   const pluginsDir = resolve(config.internalDir, Paths.PLUGINS_DIR);
   const pluginDirs = generateAgentPlugins(
     config.agentsDir,
@@ -110,6 +117,7 @@ async function startFrontend(
     resolveAgent: (agentDir: string) =>
       resolveAgent(agentDir, config.skillsDir),
     logger,
+    memoryBackend: memoryStore,
     reloadConfig,
   });
 }

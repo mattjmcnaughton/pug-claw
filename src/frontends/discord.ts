@@ -228,6 +228,7 @@ export class DiscordFrontend implements Frontend {
       pluginDirs,
       resolveAgent,
       logger,
+      ctx.memoryBackend,
     );
     const commandRegistry = new ChatCommandRegistry(createChatCommandTree());
 
@@ -252,6 +253,7 @@ export class DiscordFrontend implements Frontend {
         resolveAgent,
         logger,
         outputSink,
+        memoryBackend: ctx.memoryBackend,
       });
       schedulerRuntime.initialize();
     }

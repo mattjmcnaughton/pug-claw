@@ -70,6 +70,7 @@ export interface MemoryBackend {
   get(id: string): Promise<MemoryEntry | null>;
   delete(id: string): Promise<boolean>;
   archive(id: string): Promise<boolean>;
+  peek(filter: MemoryFilter): Promise<MemoryEntry[]>;
   list(filter: MemoryFilter): Promise<MemoryEntry[]>;
   search(query: MemorySearchQuery): Promise<MemorySearchResult[]>;
   listScopes(): Promise<string[]>;
@@ -87,7 +88,9 @@ export interface EmbeddingProvider {
 
 const MEMORY_SCOPE_REGEX = /^(global|agent:[^\s:][^\s]*|user:[^\s:][^\s]*)$/;
 
-export function validateMemoryScope(scope: string): asserts scope is MemoryScope {
+export function validateMemoryScope(
+  scope: string,
+): asserts scope is MemoryScope {
   if (!MEMORY_SCOPE_REGEX.test(scope)) {
     throw new Error(`Invalid memory scope: "${scope}"`);
   }

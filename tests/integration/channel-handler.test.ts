@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { ChannelHandler } from "../../src/channel-handler.ts";
 import { Paths } from "../../src/constants.ts";
 import type { Logger } from "../../src/logger.ts";
+import { MemoryStore } from "../../src/memory/store.ts";
 import { ChatCommandRegistry } from "../../src/chat-commands/registry.ts";
 import { createChatCommandTree } from "../../src/chat-commands/tree.ts";
 import type {
@@ -89,6 +90,7 @@ function makeHandler(
   driver?: FakeDriver,
   configOverrides?: Partial<ResolvedConfig>,
   resolveAgentOverrides?: Partial<ResolvedAgent>,
+  memoryStore?: MemoryStore,
 ): { handler: ChannelHandler; driver: FakeDriver } {
   const d = driver ?? new FakeDriver();
   const config = makeConfig(configOverrides);
@@ -98,6 +100,7 @@ function makeHandler(
     new Map(),
     makeResolveAgent(resolveAgentOverrides),
     noopLogger,
+    memoryStore,
   );
   return { handler, driver: d };
 }
@@ -187,6 +190,71 @@ describe("session lifecycle", () => {
 
     await handler.destroyAllSessions();
     expect(driver.activeSessionCount).toBe(0);
+  });
+});
+
+describe("memory injection", () => {
+  test("injects memory into the created session prompt", async () => {
+    const memoryStore = new MemoryStore(":memory:", noopLogger);
+    await memoryStore.init();
+    await memoryStore.save({
+      scope: "agent:default",
+      content: "User prefers concise responses",
+      createdBy: "agent:default",
+      source: "agent",
+    });
+    await memoryStore.save({
+      scope: "global",
+      content: "Production server runs Ubuntu 24.04",
+      createdBy: "agent:default",
+      source: "agent",
+    });
+
+    try {
+      const { handler, driver } = makeHandler(
+        undefined,
+        undefined,
+        undefined,
+        memoryStore,
+      );
+      await handler.ensureSession("chan-1");
+
+      const systemPrompt =
+        driver.createdSessions[0]?.options.systemPrompt ?? "";
+      expect(systemPrompt).toContain("# Memory");
+      expect(systemPrompt).toContain("User prefers concise responses");
+      expect(systemPrompt).toContain("Production server runs Ubuntu 24.04");
+    } finally {
+      await memoryStore.close();
+    }
+  });
+
+  test("does not inject memory when the agent opts out", async () => {
+    const memoryStore = new MemoryStore(":memory:", noopLogger);
+    await memoryStore.init();
+    await memoryStore.save({
+      scope: "agent:default",
+      content: "This should stay hidden",
+      createdBy: "agent:default",
+      source: "agent",
+    });
+
+    try {
+      const { handler, driver } = makeHandler(
+        undefined,
+        undefined,
+        { memory: false },
+        memoryStore,
+      );
+      await handler.ensureSession("chan-1");
+
+      const systemPrompt =
+        driver.createdSessions[0]?.options.systemPrompt ?? "";
+      expect(systemPrompt).not.toContain("# Memory");
+      expect(systemPrompt).not.toContain("This should stay hidden");
+    } finally {
+      await memoryStore.close();
+    }
   });
 });
 
@@ -282,6 +350,51 @@ describe("channel isolation", () => {
     expect(handler.resolveAgentName("reply:root-2", "parent-chan")).toBe(
       "parent-agent",
     );
+  });
+
+  test("scoped session injects memory for the parent agent", async () => {
+    const memoryStore = new MemoryStore(":memory:", noopLogger);
+    await memoryStore.init();
+    await memoryStore.save({
+      scope: "agent:parent-agent",
+      content: "Parent agent memory",
+      createdBy: "agent:parent-agent",
+      source: "agent",
+    });
+
+    try {
+      const parentDriver = new FakeDriver({ name: "parent" });
+      const fallbackDriver = new FakeDriver({ name: "fake" });
+      const config = makeConfig({
+        channels: {
+          "parent-chan": {
+            driver: "parent",
+            agent: "parent-agent",
+          },
+        },
+      });
+
+      const handler = new ChannelHandler(
+        { fake: fallbackDriver, parent: parentDriver },
+        config,
+        new Map(),
+        makeResolveAgent(),
+        noopLogger,
+        memoryStore,
+      );
+
+      await handler.handleMessage("reply:root-3", "hello", undefined, {
+        settingsChannelId: "parent-chan",
+      });
+
+      const systemPrompt =
+        parentDriver.createdSessions[0]?.options.systemPrompt ?? "";
+      expect(systemPrompt).toContain("# Memory");
+      expect(systemPrompt).toContain("Parent agent memory");
+      expect(fallbackDriver.createdSessions).toHaveLength(0);
+    } finally {
+      await memoryStore.close();
+    }
   });
 
   test("bootstrap prompt is prepended only on first message", async () => {
