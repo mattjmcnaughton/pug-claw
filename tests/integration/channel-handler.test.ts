@@ -46,6 +46,14 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     codeDir: "/tmp/test/code",
     logsDir: "/tmp/test/logs",
     backupIncludeDirs: [],
+    memory: {
+      enabled: true,
+      injectionBudgetTokens: 2000,
+      embeddings: {
+        enabled: false,
+        model: "Xenova/all-MiniLM-L6-v2",
+      },
+    },
     defaultAgent: "default",
     defaultDriver: "fake",
     drivers: {},
@@ -65,6 +73,7 @@ function makeResolveAgent(
   return () => ({
     systemPrompt: "test system prompt",
     skills: [],
+    memory: true,
     ...overrides,
   });
 }

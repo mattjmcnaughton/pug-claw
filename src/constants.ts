@@ -18,6 +18,7 @@ export const Paths = {
   SCHEDULER_LOCK_DIR: "scheduler.lock",
   SCHEDULER_LOCK_OWNER_FILE: "owner.json",
   RUNTIME_DB_FILE: "pug-claw.sqlite",
+  MODELS_DIR: "models",
 } as const;
 
 export const EnvVars = {

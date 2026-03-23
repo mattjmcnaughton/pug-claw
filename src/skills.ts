@@ -173,6 +173,7 @@ export interface ResolvedAgent {
   skills: SkillSummary[];
   driver?: string;
   model?: string;
+  memory: boolean;
 }
 
 export function resolveAgent(
@@ -191,5 +192,6 @@ export function resolveAgent(
     skills,
     driver: parsed.meta.driver,
     model: parsed.meta.model,
+    memory: parsed.meta.memory ?? true,
   };
 }

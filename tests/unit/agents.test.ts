@@ -198,6 +198,34 @@ describe("parseAgentSystemMd", () => {
     expect(parsed.meta.model).toBe("claude-opus-4-6");
   });
 
+  test("parses memory opt-out from frontmatter", () => {
+    const tmpDir = makeTmpDir();
+    writeFileSync(
+      resolve(tmpDir, "SYSTEM.md"),
+      "---\nname: test\nmemory: false\n---\n\nPrompt.\n",
+    );
+    try {
+      const parsed = parseAgentSystemMd(tmpDir);
+      expect(parsed.meta.memory).toBe(false);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("ignores non-boolean memory values", () => {
+    const tmpDir = makeTmpDir();
+    writeFileSync(
+      resolve(tmpDir, "SYSTEM.md"),
+      "---\nname: test\nmemory: maybe\n---\n\nPrompt.\n",
+    );
+    try {
+      const parsed = parseAgentSystemMd(tmpDir);
+      expect(parsed.meta.memory).toBeUndefined();
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   test("ignores non-string driver values", () => {
     const tmpDir = makeTmpDir();
     writeFileSync(
