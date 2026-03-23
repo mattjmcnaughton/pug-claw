@@ -154,6 +154,8 @@ export class SchedulerRunner {
     return runId;
   }
 
+  // TODO: split executeRun into smaller methods (execute, deliver, finalize)
+  // so each phase can be unit-tested independently.
   private async executeRun(
     runId: string,
     schedule: ResolvedSchedule,
