@@ -222,6 +222,7 @@ export function createChatCommandTree(): ChatCommandNode {
       memory: {
         name: "memory",
         description: "Inspect and manage persistent memory",
+        ownerOnly: true,
         children: {
           show: {
             name: "show",
