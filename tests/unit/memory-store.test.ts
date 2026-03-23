@@ -11,17 +11,20 @@ const noopLogger = {
   debug: () => {},
 } as unknown as Logger;
 
-function makeVector(...values: number[]): number[] {
-  return [...values, ...new Array(384 - values.length).fill(0)];
+function makeVector(dimensions: number, ...values: number[]): number[] {
+  return [...values, ...new Array(dimensions - values.length).fill(0)];
 }
 
 class FakeEmbeddingProvider implements EmbeddingProvider {
-  constructor(private vectors: Record<string, number[]>) {}
+  constructor(
+    private vectors: Record<string, number[]>,
+    private vectorDimensions = 384,
+  ) {}
 
   async init(): Promise<void> {}
 
   async embed(text: string): Promise<number[]> {
-    return this.vectors[text] ?? makeVector(0, 0, 0);
+    return this.vectors[text] ?? makeVector(this.vectorDimensions, 0, 0, 0);
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
@@ -29,7 +32,7 @@ class FakeEmbeddingProvider implements EmbeddingProvider {
   }
 
   dimensions(): number {
-    return 384;
+    return this.vectorDimensions;
   }
 }
 
@@ -39,11 +42,11 @@ class FailingEmbeddingProvider implements EmbeddingProvider {
   }
 
   async embed(): Promise<number[]> {
-    return makeVector(0, 0, 0);
+    return makeVector(384, 0, 0, 0);
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
-    return texts.map(() => makeVector(0, 0, 0));
+    return texts.map(() => makeVector(384, 0, 0, 0));
   }
 
   dimensions(): number {
@@ -298,12 +301,15 @@ describe("MemoryStore", () => {
     await store.close();
   });
 
-  test("semantic search finds related entries when embeddings are enabled", async () => {
+  test("semantic search works with the configured embedding dimensions", async () => {
     const store = await createStore(
-      new FakeEmbeddingProvider({
-        "Ubuntu host": makeVector(1, 0, 0),
-        "linux server": makeVector(1, 0, 0),
-      }),
+      new FakeEmbeddingProvider(
+        {
+          "Ubuntu host": makeVector(3, 1, 0, 0),
+          "linux server": makeVector(3, 1, 0, 0),
+        },
+        3,
+      ),
     );
     await saveMemory(store, {
       content: "Ubuntu host",
@@ -322,9 +328,9 @@ describe("MemoryStore", () => {
   test("hybrid search prefers results matched by both keyword and semantic search", async () => {
     const store = await createStore(
       new FakeEmbeddingProvider({
-        "Ubuntu host": makeVector(1, 0, 0),
-        ubuntu: makeVector(1, 0, 0),
-        unrelated: makeVector(0, 1, 0),
+        "Ubuntu host": makeVector(384, 1, 0, 0),
+        ubuntu: makeVector(384, 1, 0, 0),
+        unrelated: makeVector(384, 0, 1, 0),
       }),
     );
     await saveMemory(store, {
@@ -343,8 +349,8 @@ describe("MemoryStore", () => {
   test("reindex regenerates embeddings for existing memories", async () => {
     const store = await createStore(
       new FakeEmbeddingProvider({
-        "stored memory": makeVector(1, 0, 0),
-        stored: makeVector(1, 0, 0),
+        "stored memory": makeVector(384, 1, 0, 0),
+        stored: makeVector(384, 1, 0, 0),
       }),
     );
     await saveMemory(store, {

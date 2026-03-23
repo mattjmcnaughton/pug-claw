@@ -168,17 +168,32 @@ export class MemoryStore implements MemoryBackend {
 
     try {
       await this.embeddingProvider.init();
-      this.embeddingsReady = true;
-      const sqliteVec = await import("sqlite-vec");
-      sqliteVec.load(this.db);
-      this.db.exec(`
-        CREATE VIRTUAL TABLE IF NOT EXISTS memory_embeddings USING vec0(
-          memory_id TEXT PRIMARY KEY,
-          embedding float[384]
+      const dimensions = this.embeddingProvider.dimensions();
+      if (!Number.isInteger(dimensions) || dimensions <= 0) {
+        throw new Error(
+          `Embedding provider dimensions must be a positive integer, got: ${dimensions}`,
         );
-      `);
-      this.vectorSearchEnabled = true;
+      }
+
+      this.embeddingsReady = true;
+
+      try {
+        const sqliteVec = await import("sqlite-vec");
+        sqliteVec.load(this.db);
+        this.db.exec("DROP TABLE IF EXISTS memory_embeddings;");
+        this.db.exec(`
+          CREATE VIRTUAL TABLE memory_embeddings USING vec0(
+            memory_id TEXT PRIMARY KEY,
+            embedding float[${dimensions}]
+          );
+        `);
+        this.vectorSearchEnabled = true;
+      } catch (err) {
+        this.vectorSearchEnabled = false;
+        this.logger.warn({ err: toError(err) }, "memory_embeddings_disabled");
+      }
     } catch (err) {
+      this.embeddingsReady = false;
       this.vectorSearchEnabled = false;
       this.logger.warn({ err: toError(err) }, "memory_embeddings_disabled");
     }
