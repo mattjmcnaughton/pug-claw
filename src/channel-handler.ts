@@ -20,7 +20,13 @@ export interface ChannelState {
   modelOverride?: string;
   agentOverride?: string;
   sessionId?: string;
+  sessionDriverName?: string;
   resolvedAgent?: ResolvedAgent;
+}
+
+export interface HandleMessageOptions {
+  settingsChannelId?: string;
+  bootstrapPrompt?: string;
 }
 
 export class ChannelHandler {
@@ -43,28 +49,34 @@ export class ChannelHandler {
     return state;
   }
 
-  private getResolvedAgent(channelId: string): ResolvedAgent {
+  private getResolvedAgent(
+    channelId: string,
+    settingsChannelId = channelId,
+  ): ResolvedAgent {
     const state = this.getState(channelId);
     if (state.resolvedAgent) return state.resolvedAgent;
-    const agentName = this.resolveAgentName(channelId);
+    const agentName = this.resolveAgentName(channelId, settingsChannelId);
     const agentDir = resolve(this.config.agentsDir, agentName);
     const resolved = this.resolveAgentFn(agentDir);
     state.resolvedAgent = resolved;
     return resolved;
   }
 
-  resolveDriverName(channelId: string): string {
-    const resolved = this.getResolvedAgent(channelId);
+  resolveDriverName(channelId: string, settingsChannelId = channelId): string {
+    const resolved = this.getResolvedAgent(channelId, settingsChannelId);
     return resolveDriverNameFromInputs({
       runtimeOverride: this.getState(channelId).driverOverride,
-      channelConfig: getChannelConfig(this.config, channelId).driver,
+      channelConfig: getChannelConfig(this.config, settingsChannelId).driver,
       agentFrontmatter: resolved.driver,
       globalDefault: this.config.defaultDriver,
     });
   }
 
-  private resolveDriver(channelId: string): Driver {
-    const name = this.resolveDriverName(channelId);
+  private resolveDriver(
+    channelId: string,
+    settingsChannelId = channelId,
+  ): Driver {
+    const name = this.resolveDriverName(channelId, settingsChannelId);
     const driver = this.drivers[name];
     if (!driver) throw new Error(`Unknown driver: ${name}`);
     return driver;
@@ -76,26 +88,29 @@ export class ChannelHandler {
     );
   }
 
-  getAvailableModelAliases(channelId: string): Record<string, string> {
-    return this.resolveDriver(channelId).availableModels;
+  getAvailableModelAliases(
+    channelId: string,
+    settingsChannelId = channelId,
+  ): Record<string, string> {
+    return this.resolveDriver(channelId, settingsChannelId).availableModels;
   }
 
   getAvailableAgentNames(): string[] {
     return listAvailableAgents(this.config.agentsDir);
   }
 
-  resolveAgentName(channelId: string): string {
+  resolveAgentName(channelId: string, settingsChannelId = channelId): string {
     return (
       this.getState(channelId).agentOverride ??
-      getChannelConfig(this.config, channelId).agent ??
+      getChannelConfig(this.config, settingsChannelId).agent ??
       this.config.defaultAgent
     );
   }
 
-  resolveModelName(channelId: string): string {
-    const resolved = this.getResolvedAgent(channelId);
-    const driver = this.resolveDriver(channelId);
-    const channelCfg = getChannelConfig(this.config, channelId);
+  resolveModelName(channelId: string, settingsChannelId = channelId): string {
+    const resolved = this.getResolvedAgent(channelId, settingsChannelId);
+    const driver = this.resolveDriver(channelId, settingsChannelId);
+    const channelCfg = getChannelConfig(this.config, settingsChannelId);
     return resolveModelNameFromInputs({
       runtimeOverride: this.getState(channelId).modelOverride,
       channelConfig: channelCfg.model,
@@ -104,16 +119,19 @@ export class ChannelHandler {
     });
   }
 
-  async ensureSession(channelId: string): Promise<string> {
+  async ensureSession(
+    channelId: string,
+    settingsChannelId = channelId,
+  ): Promise<string> {
     const state = this.getState(channelId);
     if (state.sessionId) return state.sessionId;
 
-    const driver = this.resolveDriver(channelId);
-    const resolved = this.getResolvedAgent(channelId);
-    const model = this.resolveModelName(channelId);
-    const tools = getChannelConfig(this.config, channelId).tools;
-    const agentName = this.resolveAgentName(channelId);
-    const driverName = this.resolveDriverName(channelId);
+    const driver = this.resolveDriver(channelId, settingsChannelId);
+    const resolved = this.getResolvedAgent(channelId, settingsChannelId);
+    const model = this.resolveModelName(channelId, settingsChannelId);
+    const tools = getChannelConfig(this.config, settingsChannelId).tools;
+    const agentName = this.resolveAgentName(channelId, settingsChannelId);
+    const driverName = this.resolveDriverName(channelId, settingsChannelId);
     const driverCwd = this.config.drivers[driverName]?.cwd;
     const cwd = driverCwd
       ? resolve(expandTilde(driverCwd))
@@ -128,15 +146,22 @@ export class ChannelHandler {
       cwd,
     });
     state.sessionId = sessionId;
+    state.sessionDriverName = driverName;
     return sessionId;
   }
 
   async destroySession(channelId: string): Promise<void> {
     const state = this.getState(channelId);
     if (state.sessionId) {
-      const driver = this.resolveDriver(channelId);
+      const driverName =
+        state.sessionDriverName ?? this.resolveDriverName(channelId);
+      const driver = this.drivers[driverName];
+      if (!driver) {
+        throw new Error(`Unknown driver: ${driverName}`);
+      }
       await driver.destroySession(state.sessionId);
       state.sessionId = undefined;
+      state.sessionDriverName = undefined;
     }
   }
 
@@ -247,15 +272,34 @@ export class ChannelHandler {
     };
   }
 
+  hasSession(channelId: string): boolean {
+    return !!this.getState(channelId).sessionId;
+  }
+
   async handleMessage(
     channelId: string,
     prompt: string,
     onEvent?: DriverEventCallback,
+    options: HandleMessageOptions = {},
   ): Promise<string> {
     try {
-      const sessionId = await this.ensureSession(channelId);
-      const driver = this.resolveDriver(channelId);
-      const response = await driver.query(sessionId, prompt, onEvent);
+      const settingsChannelId = options.settingsChannelId ?? channelId;
+      const state = this.getState(channelId);
+      const hadSession = !!state.sessionId;
+      const sessionId = await this.ensureSession(channelId, settingsChannelId);
+      const driverName =
+        this.getState(channelId).sessionDriverName ??
+        this.resolveDriverName(channelId, settingsChannelId);
+      const driver = this.drivers[driverName];
+      if (!driver) {
+        throw new Error(`Unknown driver: ${driverName}`);
+      }
+      const bootstrapPrompt = options.bootstrapPrompt?.trim();
+      const queryPrompt =
+        !hadSession && bootstrapPrompt
+          ? `${bootstrapPrompt}\n\nUser message:\n${prompt}`
+          : prompt;
+      const response = await driver.query(sessionId, queryPrompt, onEvent);
       return response.text;
     } catch (err) {
       const error = toError(err);

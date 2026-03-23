@@ -19,6 +19,24 @@ interface SendableChannel {
   send(text: string): Promise<unknown>;
 }
 
+interface MessageScope {
+  sessionChannelId: string;
+  settingsChannelId: string;
+}
+
+function resolveMessageScope(message: Message): MessageScope {
+  const sessionChannelId = message.channelId;
+  const settingsChannelId =
+    message.channel.isThread() && message.channel.parentId
+      ? message.channel.parentId
+      : sessionChannelId;
+
+  return {
+    sessionChannelId,
+    settingsChannelId,
+  };
+}
+
 function formatDateTime(date: Date, timezone: string): string {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -299,6 +317,27 @@ export class DiscordFrontend implements Frontend {
 
       const channel = message.channel;
       const channelId = message.channelId;
+      const { sessionChannelId, settingsChannelId } =
+        resolveMessageScope(message);
+      const shouldBootstrap =
+        message.channel.isThread() &&
+        !channelHandler.hasSession(sessionChannelId);
+
+      let starterMessageContent: string | undefined;
+      if (shouldBootstrap) {
+        try {
+          const starterMessage = await message.channel.fetchStarterMessage();
+          starterMessageContent = starterMessage?.content?.trim() || undefined;
+        } catch (err) {
+          logger.warn(
+            {
+              err: toError(err),
+              channel_id: sessionChannelId,
+            },
+            "discord_thread_starter_fetch_failed",
+          );
+        }
+      }
 
       await channel.sendTyping();
 
@@ -308,7 +347,7 @@ export class DiscordFrontend implements Frontend {
 
       const toolsSeen = new Set<string>();
       const responseText = await channelHandler.handleMessage(
-        channelId,
+        sessionChannelId,
         message.content,
         (event) => {
           channel.sendTyping().catch(() => {});
@@ -316,6 +355,12 @@ export class DiscordFrontend implements Frontend {
             toolsSeen.add(event.tool);
             channel.send(`Using ${event.tool}...`).catch(() => {});
           }
+        },
+        {
+          settingsChannelId,
+          bootstrapPrompt: starterMessageContent
+            ? `Thread starter message:\n${starterMessageContent}`
+            : undefined,
         },
       );
 
@@ -327,7 +372,10 @@ export class DiscordFrontend implements Frontend {
         {
           message_id: message.id,
           channel_id: channelId,
-          driver: channelHandler.resolveDriverName(channelId),
+          driver: channelHandler.resolveDriverName(
+            sessionChannelId,
+            settingsChannelId,
+          ),
           response_length: text.length,
         },
         "response_sent",

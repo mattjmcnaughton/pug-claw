@@ -80,6 +80,47 @@ function makeMessage(content: string, authorId: string) {
     id: "msg-1",
     channel: {
       name: "test-channel",
+      isThread: () => false,
+      send: mock(async (text: string) => {
+        sent.push(text);
+      }),
+      sendTyping: mock(async () => {}),
+    },
+    _sent: sent,
+  };
+}
+
+function makeThreadMessage(
+  content: string,
+  authorId: string,
+  options?: {
+    channelId?: string;
+    parentId?: string;
+    starterContent?: string;
+    starterThrows?: boolean;
+  },
+) {
+  const sent: string[] = [];
+  const channelId = options?.channelId ?? "thread-1";
+  const parentId = options?.parentId ?? "chan-1";
+  const starterContent = options?.starterContent ?? "starter message";
+  return {
+    content,
+    author: { id: authorId, bot: false, tag: `user#${authorId}` },
+    channelId,
+    guildId: "guild-1",
+    id: "msg-thread-1",
+    channel: {
+      id: channelId,
+      parentId,
+      name: "thread-name",
+      isThread: () => true,
+      fetchStarterMessage: mock(async () => {
+        if (options?.starterThrows) {
+          throw new Error("starter failed");
+        }
+        return { content: starterContent };
+      }),
       send: mock(async (text: string) => {
         sent.push(text);
       }),
@@ -321,6 +362,86 @@ describe("discord query event callback", () => {
     await handler(msg);
 
     expect(msg.channel.sendTyping).toHaveBeenCalled();
+  });
+});
+
+describe("discord thread handling", () => {
+  test("thread message inherits parent channel settings", async () => {
+    const ctx = makeCtx({
+      channels: {
+        "parent-123": {
+          driver: "mock",
+          model: "parent-model",
+          tools: ["tool-x"],
+        },
+      },
+    });
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeThreadMessage("hello", OWNER_ID, {
+      channelId: "thread-123",
+      parentId: "parent-123",
+      starterContent: "thread kickoff",
+    });
+
+    await handler(msg);
+
+    expect(ctx.driver.createSession).toHaveBeenCalledTimes(1);
+    const createSessionCalls = ctx.driver.createSession.mock
+      .calls as unknown[][];
+    const createSessionCall = createSessionCalls[0];
+    expect(createSessionCall).toBeDefined();
+    const createSessionInput = createSessionCall?.[0] as {
+      model?: string;
+      tools?: string[];
+    };
+    expect(createSessionInput.model).toBe("parent-model");
+    expect(createSessionInput.tools).toEqual(["tool-x"]);
+  });
+
+  test("first thread message preloads starter content and second does not", async () => {
+    const ctx = makeCtx();
+    const prompts: string[] = [];
+    const queryMock = mock(async (_sessionId: string, prompt: string) => {
+      prompts.push(prompt);
+      return { text: "ok", sessionId: "session-1" };
+    });
+    ctx.driver.query = queryMock as typeof ctx.driver.query;
+    const handler = await startAndGetHandler(ctx);
+
+    const first = makeThreadMessage("first", OWNER_ID, {
+      channelId: "thread-abc",
+      parentId: "chan-1",
+      starterContent: "root starter",
+    });
+    await handler(first);
+
+    const second = makeThreadMessage("second", OWNER_ID, {
+      channelId: "thread-abc",
+      parentId: "chan-1",
+      starterContent: "root starter",
+    });
+    await handler(second);
+
+    expect(prompts[0]).toContain("Thread starter message:\nroot starter");
+    expect(prompts[0]).toContain("User message:\nfirst");
+    expect(prompts[1]).toBe("second");
+  });
+
+  test("thread starter fetch failures do not block responses", async () => {
+    const ctx = makeCtx();
+    const handler = await startAndGetHandler(ctx);
+    const msg = makeThreadMessage("hello", OWNER_ID, {
+      starterThrows: true,
+    });
+
+    await handler(msg);
+
+    expect(ctx.driver.query).toHaveBeenCalledTimes(1);
+    const queryCalls = ctx.driver.query.mock.calls as unknown[][];
+    const queryCall = queryCalls[0];
+    expect(queryCall).toBeDefined();
+    const prompt = queryCall?.[1] as string;
+    expect(prompt).toBe("hello");
   });
 });
 

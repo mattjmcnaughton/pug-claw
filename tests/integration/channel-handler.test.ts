@@ -201,6 +201,66 @@ describe("channel isolation", () => {
     await handler.destroySession("chan-1");
     expect(driver.activeSessionCount).toBe(1);
   });
+
+  test("thread session can inherit parent channel settings", async () => {
+    const parentDriver = new FakeDriver({ name: "parent" });
+    const fallbackDriver = new FakeDriver({ name: "fake" });
+    const config = makeConfig({
+      channels: {
+        "parent-chan": {
+          driver: "parent",
+          model: "parent-model",
+          agent: "parent-agent",
+          tools: ["tool-a"],
+        },
+      },
+    });
+
+    const handler = new ChannelHandler(
+      { fake: fallbackDriver, parent: parentDriver },
+      config,
+      new Map(),
+      makeResolveAgent(),
+      noopLogger,
+    );
+
+    await handler.handleMessage("thread-1", "hello", undefined, {
+      settingsChannelId: "parent-chan",
+    });
+
+    const created = parentDriver.createdSessions[0];
+    expect(created).toBeDefined();
+    expect(created?.options.model).toBe("parent-model");
+    expect(created?.options.tools).toEqual(["tool-a"]);
+    expect(fallbackDriver.createdSessions).toHaveLength(0);
+  });
+
+  test("bootstrap prompt is prepended only on first message", async () => {
+    const { handler, driver } = makeHandler();
+    let firstPrompt = "";
+    let secondPrompt = "";
+
+    driver.query = async (sessionId, prompt) => {
+      if (!firstPrompt) {
+        firstPrompt = prompt;
+      } else {
+        secondPrompt = prompt;
+      }
+      return { text: "ok", sessionId };
+    };
+
+    await handler.handleMessage("thread-1", "first user message", undefined, {
+      bootstrapPrompt: "Thread starter message:\nstarter text",
+    });
+    await handler.handleMessage("thread-1", "second user message", undefined, {
+      bootstrapPrompt: "Thread starter message:\nstarter text",
+    });
+
+    expect(firstPrompt).toContain("Thread starter message:");
+    expect(firstPrompt).toContain("starter text");
+    expect(firstPrompt).toContain("User message:\nfirst user message");
+    expect(secondPrompt).toBe("second user message");
+  });
 });
 
 describe("resolution", () => {
