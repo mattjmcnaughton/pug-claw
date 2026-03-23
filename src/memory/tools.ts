@@ -93,7 +93,9 @@ function canModifyEntry(actor: MemoryToolActor, entry: MemoryEntry): boolean {
     return true;
   }
 
-  const ownAgentScope = actor.agentName ? `agent:${actor.agentName}` : undefined;
+  const ownAgentScope = actor.agentName
+    ? `agent:${actor.agentName}`
+    : undefined;
   if (entry.scope === ownAgentScope) {
     return true;
   }

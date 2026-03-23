@@ -6,7 +6,10 @@ import {
 } from "./agents.ts";
 import type { Driver, DriverEventCallback } from "./drivers/types.ts";
 import { buildMemoryBlockForAgent } from "./memory/injection.ts";
-import { buildMemoryToolInstructions, type MemoryToolContext } from "./memory/tools.ts";
+import {
+  buildMemoryToolInstructions,
+  type MemoryToolContext,
+} from "./memory/tools.ts";
 import type { MemoryBackend } from "./memory/types.ts";
 import type { Logger } from "./logger.ts";
 import {

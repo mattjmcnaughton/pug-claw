@@ -225,7 +225,9 @@ describe("memory injection", () => {
       expect(systemPrompt).toContain("# Memory");
       expect(systemPrompt).toContain("User prefers concise responses");
       expect(systemPrompt).toContain("Production server runs Ubuntu 24.04");
-      expect(systemPrompt).toContain("Use SaveMemory to remember new information");
+      expect(systemPrompt).toContain(
+        "Use SaveMemory to remember new information",
+      );
     } finally {
       await memoryStore.close();
     }
@@ -600,20 +602,30 @@ describe("chat commands", () => {
   test("!memory remember and !memory show manage memory entries", async () => {
     const memoryStore = new MemoryStore(":memory:", noopLogger);
     await memoryStore.init();
-    const { handler } = makeHandler(undefined, undefined, undefined, memoryStore);
+    const { handler } = makeHandler(
+      undefined,
+      undefined,
+      undefined,
+      memoryStore,
+    );
     const memoryActions = buildMemoryCommandActions({
       memoryBackend: memoryStore,
       config: makeConfig(),
-      resolveAgentName: (channelId: string) => handler.resolveAgentName(channelId),
+      resolveAgentName: (channelId: string) =>
+        handler.resolveAgentName(channelId),
     });
 
     try {
-      const rememberResult = await runCommand(handler, "memory remember Use AP style", {
-        actions: {
-          reload: async () => undefined,
-          ...memoryActions,
+      const rememberResult = await runCommand(
+        handler,
+        "memory remember Use AP style",
+        {
+          actions: {
+            reload: async () => undefined,
+            ...memoryActions,
+          },
         },
-      });
+      );
       const showResult = await runCommand(handler, "memory show", {
         actions: {
           reload: async () => undefined,
@@ -621,7 +633,9 @@ describe("chat commands", () => {
         },
       });
 
-      expect(rememberResult?.message).toContain("Saved to agent:default memory");
+      expect(rememberResult?.message).toContain(
+        "Saved to agent:default memory",
+      );
       expect(showResult?.message).toContain("**Memory: agent:default**");
       expect(showResult?.message).toContain("Use AP style");
     } finally {
@@ -638,11 +652,17 @@ describe("chat commands", () => {
       createdBy: "user",
       source: "user",
     });
-    const { handler } = makeHandler(undefined, undefined, undefined, memoryStore);
+    const { handler } = makeHandler(
+      undefined,
+      undefined,
+      undefined,
+      memoryStore,
+    );
     const memoryActions = buildMemoryCommandActions({
       memoryBackend: memoryStore,
       config: makeConfig(),
-      resolveAgentName: (channelId: string) => handler.resolveAgentName(channelId),
+      resolveAgentName: (channelId: string) =>
+        handler.resolveAgentName(channelId),
     });
 
     try {
@@ -675,11 +695,17 @@ describe("chat commands", () => {
       createdBy: "user",
       source: "user",
     });
-    const { handler } = makeHandler(undefined, undefined, undefined, memoryStore);
+    const { handler } = makeHandler(
+      undefined,
+      undefined,
+      undefined,
+      memoryStore,
+    );
     const memoryActions = buildMemoryCommandActions({
       memoryBackend: memoryStore,
       config: makeConfig(),
-      resolveAgentName: (channelId: string) => handler.resolveAgentName(channelId),
+      resolveAgentName: (channelId: string) =>
+        handler.resolveAgentName(channelId),
     });
 
     try {
@@ -707,11 +733,17 @@ describe("chat commands", () => {
       createdBy: "user",
       source: "user",
     });
-    const { handler } = makeHandler(undefined, undefined, undefined, memoryStore);
+    const { handler } = makeHandler(
+      undefined,
+      undefined,
+      undefined,
+      memoryStore,
+    );
     const memoryActions = buildMemoryCommandActions({
       memoryBackend: memoryStore,
       config: makeConfig(),
-      resolveAgentName: (channelId: string) => handler.resolveAgentName(channelId),
+      resolveAgentName: (channelId: string) =>
+        handler.resolveAgentName(channelId),
     });
 
     try {
@@ -739,11 +771,17 @@ describe("chat commands", () => {
       createdBy: "user",
       source: "user",
     });
-    const { handler } = makeHandler(undefined, undefined, undefined, memoryStore);
+    const { handler } = makeHandler(
+      undefined,
+      undefined,
+      undefined,
+      memoryStore,
+    );
     const memoryActions = buildMemoryCommandActions({
       memoryBackend: memoryStore,
       config: makeConfig(),
-      resolveAgentName: (channelId: string) => handler.resolveAgentName(channelId),
+      resolveAgentName: (channelId: string) =>
+        handler.resolveAgentName(channelId),
     });
 
     try {
@@ -754,7 +792,9 @@ describe("chat commands", () => {
         },
       });
 
-      expect(result?.message).toContain("Reindexed embeddings for 0 memory entries.");
+      expect(result?.message).toContain(
+        "Reindexed embeddings for 0 memory entries.",
+      );
     } finally {
       await memoryStore.close();
     }
@@ -775,11 +815,17 @@ describe("chat commands", () => {
       createdBy: "user",
       source: "user",
     });
-    const { handler } = makeHandler(undefined, undefined, undefined, memoryStore);
+    const { handler } = makeHandler(
+      undefined,
+      undefined,
+      undefined,
+      memoryStore,
+    );
     const memoryActions = buildMemoryCommandActions({
       memoryBackend: memoryStore,
       config: makeConfig(),
-      resolveAgentName: (channelId: string) => handler.resolveAgentName(channelId),
+      resolveAgentName: (channelId: string) =>
+        handler.resolveAgentName(channelId),
     });
 
     try {

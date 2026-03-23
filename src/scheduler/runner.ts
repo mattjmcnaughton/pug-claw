@@ -111,7 +111,11 @@ export class SchedulerRunner {
     schedule: ResolvedSchedule,
     resolvedAgent: ResolvedAgent,
   ): Promise<string | undefined> {
-    if (!resolvedAgent.memory || !this.ctx.memoryBackend || !this.ctx.config.memory.enabled) {
+    if (
+      !resolvedAgent.memory ||
+      !this.ctx.memoryBackend ||
+      !this.ctx.config.memory.enabled
+    ) {
       return undefined;
     }
 
@@ -303,7 +307,10 @@ export class SchedulerRunner {
       const cwd = driverCwd
         ? resolve(expandTilde(driverCwd))
         : this.ctx.config.homeDir;
-      const memoryToolContext = this.getMemoryToolContext(schedule, resolvedAgent);
+      const memoryToolContext = this.getMemoryToolContext(
+        schedule,
+        resolvedAgent,
+      );
       const memoryBlock = await this.buildMemoryBlock(schedule, resolvedAgent);
       const systemPrompt = memoryToolContext
         ? `${resolvedAgent.systemPrompt}\n\n${buildMemoryToolInstructions()}`

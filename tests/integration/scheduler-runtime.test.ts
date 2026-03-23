@@ -244,7 +244,9 @@ describe("SchedulerRuntime", () => {
 
       await waitFor(() => driver.createdSessions.length > 0);
 
-      expect(driver.createdSessions[0]?.options.memoryToolContext).toBeDefined();
+      expect(
+        driver.createdSessions[0]?.options.memoryToolContext,
+      ).toBeDefined();
       expect(driver.createdSessions[0]?.options.systemPrompt).not.toContain(
         "# Memory",
       );

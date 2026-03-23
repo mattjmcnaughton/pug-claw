@@ -60,7 +60,9 @@ function createMemoryMcpServer(
         },
         async (args) => {
           const result = await saveMemory(memoryToolContext, args);
-          return textResult(`Saved memory ${result.entry.id} in ${result.entry.scope}.`);
+          return textResult(
+            `Saved memory ${result.entry.id} in ${result.entry.scope}.`,
+          );
         },
       ),
       tool(

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Logger } from "../../src/logger.ts";
 import { MemoryStore } from "../../src/memory/store.ts";
-import type { EmbeddingProvider, MemoryStatus } from "../../src/memory/types.ts";
+import type { EmbeddingProvider } from "../../src/memory/types.ts";
 
 const noopLogger = {
   info: () => {},
@@ -54,7 +54,11 @@ class FailingEmbeddingProvider implements EmbeddingProvider {
 async function createStore(
   embeddingProvider?: EmbeddingProvider,
 ): Promise<MemoryStore> {
-  const store = new MemoryStore(":memory:", noopLogger, embeddingProvider ?? null);
+  const store = new MemoryStore(
+    ":memory:",
+    noopLogger,
+    embeddingProvider ?? null,
+  );
   await store.init();
   return store;
 }
