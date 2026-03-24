@@ -95,10 +95,12 @@ describe("compactMemories", () => {
     });
 
     const first = await compactMemories(store, "global");
-    const summaryBefore = (await store.peek({
-      scope: "global",
-      status: "active",
-    }))[0];
+    const summaryBefore = (
+      await store.peek({
+        scope: "global",
+        status: "active",
+      })
+    )[0];
 
     await store.save({
       scope: "global",
