@@ -244,6 +244,16 @@ export async function runInit(builtinsOnly = false): Promise<void> {
     process.exit(0);
   }
 
+  const enableMemoryEmbeddings = await p.confirm({
+    message: "Enable semantic memory search with local embeddings?",
+    initialValue: false,
+  });
+
+  if (p.isCancel(enableMemoryEmbeddings)) {
+    p.cancel("Init cancelled.");
+    process.exit(0);
+  }
+
   let dotenvPath: string = Paths.DOT_ENV;
   if (secretsProvider === SecretsProviders.DOTENV) {
     const dotenvInput = await p.text({
@@ -310,6 +320,15 @@ export async function runInit(builtinsOnly = false): Promise<void> {
       [Drivers.PI]: {},
     },
     channels: {},
+    ...(enableMemoryEmbeddings
+      ? {
+          memory: {
+            embeddings: {
+              enabled: true,
+            },
+          },
+        }
+      : {}),
     ...(backupOutputDir.trim()
       ? {
           backup: {
