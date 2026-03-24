@@ -762,7 +762,7 @@ describe("chat commands", () => {
     }
   });
 
-  test("!memory reindex reports the number of reindexed entries", async () => {
+  test("!memory reindex explains when embeddings are disabled", async () => {
     const memoryStore = new MemoryStore(":memory:", noopLogger);
     await memoryStore.init();
     await memoryStore.save({
@@ -792,9 +792,8 @@ describe("chat commands", () => {
         },
       });
 
-      expect(result?.message).toContain(
-        "Reindexed embeddings for 0 memory entries.",
-      );
+      expect(result?.message).toContain("Memory embeddings are disabled");
+      expect(result?.message).toContain("Enable memory.embeddings.enabled");
     } finally {
       await memoryStore.close();
     }

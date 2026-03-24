@@ -126,6 +126,9 @@ export function buildMemoryCommandActions(options: MemoryCommandActionOptions) {
       if (!memoryBackend?.reindex) {
         return "Memory reindex is not available.";
       }
+      if (!config.memory.embeddings.enabled) {
+        return `Memory embeddings are disabled (${config.memory.embeddings.model}). Enable memory.embeddings.enabled to reindex.`;
+      }
       const count = await memoryBackend.reindex();
       return `Reindexed embeddings for ${count} memory entries.`;
     },
