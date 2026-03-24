@@ -45,7 +45,6 @@ export interface ChatCommandActions {
   forgetMemory?(channelId: string, idOrPrefix: string): Promise<string>;
   exportMemory?(channelId: string, scopeInput?: string): Promise<string>;
   memoryStats?(): Promise<string>;
-  compactMemory?(channelId: string, scopeInput?: string): Promise<string>;
   reindexMemory?(): Promise<string>;
   listSchedules?(): Promise<string[]>;
   runSchedule?(name: string): Promise<string>;

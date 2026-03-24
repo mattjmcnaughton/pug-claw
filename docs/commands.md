@@ -2,7 +2,7 @@
 
 pug-claw exposes a shared hierarchical command tree to both frontends:
 
-For memory semantics, scopes, injection rules, embeddings, and compaction behavior, see [`docs/memory.md`](./memory.md).
+For memory semantics, scopes, injection rules, and embeddings, see [`docs/memory.md`](./memory.md).
 
 - **Discord** uses the `!` prefix
 - **TUI** uses the `/` prefix
@@ -45,7 +45,6 @@ memory   # owner only in Discord; available in the TUI; unavailable when memory.
   forget <id>
   export [scope]
   stats
-  compact [scope]
   reindex
 
 schedule   # Discord only; owner only

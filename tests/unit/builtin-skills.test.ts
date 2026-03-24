@@ -80,15 +80,6 @@ describe("built-in agents", () => {
     expect(parsed.systemPrompt.length).toBeGreaterThan(0);
   });
 
-  test("memory-compactor agent has valid SYSTEM.md with memory disabled", () => {
-    const agentDir = resolve(BUILTINS_AGENTS, "memory-compactor");
-    const parsed = parseAgentSystemMd(agentDir);
-    expect(parsed.meta.name).toBe("memory-compactor");
-    expect(parsed.meta.description).toBeTruthy();
-    expect(parsed.meta.memory).toBe(false);
-    expect(parsed.systemPrompt.length).toBeGreaterThan(0);
-  });
-
   test("pug-claw-manager allowed-skills lists all 7 skill names", () => {
     const agentDir = resolve(BUILTINS_AGENTS, "pug-claw-manager");
     const parsed = parseAgentSystemMd(agentDir);

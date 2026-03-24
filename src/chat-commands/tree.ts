@@ -316,21 +316,6 @@ export function createChatCommandTree(): ChatCommandNode {
               return text(await memoryStats());
             },
           },
-          compact: {
-            name: "compact",
-            description: "Manually compact duplicate memories",
-            usage: "memory compact [scope]",
-            execute: async (ctx, args) => {
-              if (args.length > 1) {
-                return unknownSubcommand(ctx, ["memory", "compact"], args);
-              }
-              const compactMemory = ctx.actions.compactMemory;
-              if (!compactMemory) {
-                return text("Memory commands are not available.");
-              }
-              return text(await compactMemory(ctx.channelId, args[0]));
-            },
-          },
           reindex: {
             name: "reindex",
             description: "Regenerate memory embeddings for all entries",

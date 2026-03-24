@@ -799,54 +799,6 @@ describe("chat commands", () => {
     }
   });
 
-  test("!memory compact merges duplicate entries", async () => {
-    const memoryStore = new MemoryStore(":memory:", noopLogger);
-    await memoryStore.init();
-    await memoryStore.save({
-      scope: "agent:default",
-      content: "Use AP style",
-      createdBy: "user",
-      source: "user",
-    });
-    await memoryStore.save({
-      scope: "agent:default",
-      content: "Use AP style",
-      createdBy: "user",
-      source: "user",
-    });
-    const { handler } = makeHandler(
-      undefined,
-      undefined,
-      undefined,
-      memoryStore,
-    );
-    const memoryActions = buildMemoryCommandActions({
-      memoryBackend: memoryStore,
-      config: makeConfig(),
-      resolveAgentName: (channelId: string) =>
-        handler.resolveAgentName(channelId),
-    });
-
-    try {
-      const result = await runCommand(handler, "memory compact agent", {
-        actions: {
-          reload: async () => undefined,
-          ...memoryActions,
-        },
-      });
-      const activeEntries = await memoryStore.peek({
-        scope: "agent:default",
-        status: "active",
-      });
-
-      expect(result?.message).toContain("Compacted 2 entries into 1 summaries");
-      expect(activeEntries).toHaveLength(1);
-      expect(activeEntries[0]?.source).toBe("compaction");
-    } finally {
-      await memoryStore.close();
-    }
-  });
-
   test("!session status shows active session after message", async () => {
     const { handler } = makeHandler();
     await handler.ensureSession("chan-1");

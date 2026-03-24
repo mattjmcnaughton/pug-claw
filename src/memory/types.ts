@@ -13,9 +13,9 @@ export interface MemoryEntry {
 
 export type MemoryScope = `agent:${string}` | "global" | `user:${string}`;
 
-export type MemorySource = "agent" | "user" | "compaction" | "system";
+export type MemorySource = "agent" | "user" | "system";
 
-export type MemoryStatus = "active" | "archived" | "compacted";
+export type MemoryStatus = "active" | "archived";
 
 export interface NewMemoryEntry {
   scope: MemoryScope;
@@ -58,7 +58,6 @@ export interface MemoryStats {
   totalEntries: number;
   activeEntries: number;
   archivedEntries: number;
-  compactedEntries: number;
   entriesByScope: Record<string, number>;
 }
 

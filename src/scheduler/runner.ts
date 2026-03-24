@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import { Defaults } from "../constants.ts";
 import type { Driver } from "../drivers/types.ts";
 import type { Logger } from "../logger.ts";
 import { buildMemoryBlockForAgent } from "../memory/injection.ts";
@@ -77,19 +76,6 @@ export class SchedulerRunner {
   ): MemoryToolContext | undefined {
     if (!this.ctx.memoryBackend || !this.ctx.config.memory.enabled) {
       return undefined;
-    }
-
-    if (schedule.agent === Defaults.MEMORY_COMPACTOR_AGENT) {
-      return {
-        memoryBackend: this.ctx.memoryBackend,
-        actor: {
-          type: "system",
-          agentName: schedule.agent,
-          createdBy: `system:${schedule.agent}`,
-          source: "compaction",
-          canManageAllScopes: true,
-        },
-      };
     }
 
     if (!resolvedAgent.memory) {

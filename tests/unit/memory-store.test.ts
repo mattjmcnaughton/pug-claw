@@ -73,7 +73,7 @@ async function saveMemory(
     content: string;
     tags: string[];
     createdBy: string;
-    source: "agent" | "user" | "system" | "compaction";
+    source: "agent" | "user" | "system";
   }>,
 ) {
   return store.save({
@@ -209,9 +209,8 @@ describe("MemoryStore", () => {
     const store = await createStore();
     await saveMemory(store, { scope: "agent:writer" });
     const archived = await saveMemory(store, { scope: "global" });
-    const compacted = await saveMemory(store, { scope: "user:default" });
+    await saveMemory(store, { scope: "user:default" });
     await store.archive(archived.id);
-    await store.update(compacted.id, { status: "compacted" });
 
     expect(await store.count({})).toBe(3);
     expect(await store.listScopes()).toEqual([
@@ -222,9 +221,8 @@ describe("MemoryStore", () => {
 
     const stats = await store.stats();
     expect(stats.totalEntries).toBe(3);
-    expect(stats.activeEntries).toBe(1);
+    expect(stats.activeEntries).toBe(2);
     expect(stats.archivedEntries).toBe(1);
-    expect(stats.compactedEntries).toBe(1);
     expect(stats.entriesByScope.global).toBe(1);
 
     await store.close();

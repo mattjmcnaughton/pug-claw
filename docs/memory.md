@@ -42,7 +42,6 @@ Entry statuses are:
 
 - `active` — normal memory entries
 - `archived` — soft-deleted entries
-- `compacted` — entries superseded by compaction
 
 ## Configuration
 
@@ -226,7 +225,6 @@ User-facing commands:
 - `memory forget <id>`
 - `memory export [scope]`
 - `memory stats`
-- `memory compact [scope]`
 - `memory reindex`
 
 Frontend access:
@@ -248,8 +246,6 @@ Command behavior:
   - exports one scope as markdown
 - `memory stats`
   - shows counts by status and scope, plus embedding configuration status
-- `memory compact [scope]`
-  - runs duplicate compaction
 - `memory reindex`
   - rebuilds embeddings when embedding support is available
 
@@ -287,49 +283,16 @@ Use it when:
 
 If embeddings are unavailable, the command reports that reindexing is not available.
 
-## Compaction
-
-Compaction is conservative.
-
-Current behavior:
-
-- scans active entries
-- groups exact duplicates by normalized content within a scope
-- creates a new compaction summary entry when needed
-- marks the original duplicate entries as `compacted`
-- preserves / merges tags onto the compaction entry
-
-Compaction does not aggressively rewrite arbitrary memories. It currently targets obvious duplicate cleanup.
-
-## Built-in memory compactor
-
-pug-claw ships a built-in `memory-compactor` agent:
-
-- path: `builtins/agents/memory-compactor/SYSTEM.md`
-- frontmatter sets `memory: false`
-
-This is intentional.
-
-The compactor should not receive normal prompt memory injection. Instead, scheduled compactor runs are special-cased to receive:
-
-- full memory tool access
-- system-level authority to manage all scopes
-- no injected prompt memory block
-
-This keeps compaction explicit and tool-driven instead of letting retrieved prompt memory influence the cleanup logic.
-
 ## Scheduler behavior
 
-For normal scheduled agents:
+For scheduled agents:
 
 - memory injection follows the same rules as interactive sessions
 - memory tools are available only when memory is enabled globally and for that agent
 
-For the built-in compactor schedule:
+## Future work
 
-- memory tools are always attached when memory is enabled globally and a backend exists
-- prompt injection is skipped
-- the run acts as a system-managed compaction actor
+Memory compaction is deferred to a later roadmap item.
 
 ## Operational notes
 
@@ -338,7 +301,6 @@ A few important things to remember:
 - Memory is persistent. Resetting a session does not erase stored memory.
 - `archive` is the normal deletion path exposed to users and tools.
 - Prompt injection uses only active entries.
-- Compacted and archived entries remain in storage for auditability unless hard-deleted through backend internals.
 - When `memory.enabled: false`, memory commands report that memory is not available.
 
 ## When to add memory
@@ -366,7 +328,6 @@ Core implementation:
 - `src/memory/injection.ts`
 - `src/memory/tools.ts`
 - `src/memory/actions.ts`
-- `src/memory/compaction.ts`
 - `src/memory/embeddings.ts`
 
 Runtime integration:
@@ -382,6 +343,5 @@ Tests:
 - `tests/unit/memory-injection.test.ts`
 - `tests/unit/memory-store.test.ts`
 - `tests/unit/memory-tools.test.ts`
-- `tests/unit/memory-compaction.test.ts`
 - `tests/integration/channel-handler.test.ts`
 - `tests/integration/scheduler-runtime.test.ts`

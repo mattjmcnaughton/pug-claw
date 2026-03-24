@@ -215,13 +215,14 @@ A job is anything running outside the main execution thread. Covers both timer-b
 
 #### Cron Jobs
 
-Simple timer-based agent actions. Enables conversation capture, memory compaction, brain reindexing, and daily summaries without full workflow infrastructure.
+Simple timer-based agent actions. Enables conversation capture, brain reindexing, and daily summaries without full workflow infrastructure.
 
 - [x] Schedule config in `config.json`
 - [x] Timer runtime (polling loop + cron parsing, runs inside the main Discord process)
 - [ ] Each job: agent + prompt + output target (Discord channel, brain, log only) — *partial: Discord channel output + built-in logging implemented*
 - [x] `!schedules` command to list active jobs — *TUI command intentionally out of scope for v1*
-- [ ] Built-in jobs: brain reindex, memory compaction
+- [ ] Built-in jobs: brain reindex
+- [ ] Memory compaction — "one-day" feature. Add a lightweight maintenance job that reviews stored memory, merges obvious duplicates or stale entries, and writes back a smaller distilled set. This is intentionally deferred until the core memory write/retrieval/editing flow is stable.
 
 #### Agent-Spawned Jobs
 
