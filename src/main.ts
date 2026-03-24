@@ -82,18 +82,19 @@ async function startFrontend(
 
   logger.info({ drivers: Object.keys(drivers) }, "drivers_initialized");
 
-  const embeddingProvider = config.memory.embeddings.enabled
-    ? new HuggingFaceEmbeddingProvider(
-        config.memory.embeddings.model,
-        resolve(config.internalDir, Paths.MODELS_DIR),
+  const memoryStore = config.memory.enabled
+    ? new MemoryStore(
+        resolve(config.internalDir, Paths.RUNTIME_DB_FILE),
+        logger,
+        config.memory.embeddings.enabled
+          ? new HuggingFaceEmbeddingProvider(
+              config.memory.embeddings.model,
+              resolve(config.internalDir, Paths.MODELS_DIR),
+            )
+          : null,
       )
-    : null;
-  const memoryStore = new MemoryStore(
-    resolve(config.internalDir, Paths.RUNTIME_DB_FILE),
-    logger,
-    embeddingProvider,
-  );
-  await memoryStore.init();
+    : undefined;
+  await memoryStore?.init();
 
   const pluginsDir = resolve(config.internalDir, Paths.PLUGINS_DIR);
   const pluginDirs = generateAgentPlugins(
