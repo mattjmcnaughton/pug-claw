@@ -102,13 +102,12 @@ export function renderMemoryStats(stats: {
   totalEntries: number;
   activeEntries: number;
   archivedEntries: number;
-  compactedEntries: number;
   entriesByScope: Record<string, number>;
 }): string {
   const lines = [
     "**Memory Stats**",
     "",
-    `Total: ${stats.totalEntries} entries (${stats.activeEntries} active, ${stats.archivedEntries} archived, ${stats.compactedEntries} compacted)`,
+    `Total: ${stats.totalEntries} entries (${stats.activeEntries} active, ${stats.archivedEntries} archived)`,
     "",
     "By scope:",
   ];

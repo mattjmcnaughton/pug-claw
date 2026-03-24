@@ -430,8 +430,6 @@ export class MemoryStore implements MemoryBackend {
         statusCounts.find((row) => row.status === "active")?.count ?? 0,
       archivedEntries:
         statusCounts.find((row) => row.status === "archived")?.count ?? 0,
-      compactedEntries:
-        statusCounts.find((row) => row.status === "compacted")?.count ?? 0,
       entriesByScope: Object.fromEntries(
         scopeCounts.map((row) => [row.scope, row.count]),
       ),

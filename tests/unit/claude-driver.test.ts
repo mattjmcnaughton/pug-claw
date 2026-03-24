@@ -99,7 +99,6 @@ describe("resolveClaudeSessionOptions", () => {
             totalEntries: 0,
             activeEntries: 0,
             archivedEntries: 0,
-            compactedEntries: 0,
             entriesByScope: {},
           }),
           exportMarkdown: async () => "",
