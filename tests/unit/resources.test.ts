@@ -85,7 +85,39 @@ describe("resolveConfig", () => {
           enabled: false,
           model: "Xenova/all-MiniLM-L6-v2",
         },
+        seed: {
+          global: [],
+        },
       });
+    }),
+  );
+
+  test(
+    "resolves memory seed config",
+    withEnv(cleanEnv, async () => {
+      const tmpDir = makeTmpDir();
+      writeFileSync(
+        resolve(tmpDir, "config.json"),
+        JSON.stringify({
+          memory: {
+            seed: {
+              global: [
+                "Production server runs Ubuntu 24.04",
+                "This repo uses Bun and Biome",
+              ],
+            },
+          },
+        }),
+      );
+      try {
+        const config = await resolveConfig({ home: tmpDir });
+        expect(config.memory.seed.global).toEqual([
+          "Production server runs Ubuntu 24.04",
+          "This repo uses Bun and Biome",
+        ]);
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
     }),
   );
 

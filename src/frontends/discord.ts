@@ -237,6 +237,7 @@ export class DiscordFrontend implements Frontend {
       config,
       resolveAgentName: (channelId: string) =>
         channelHandler.resolveAgentName(channelId),
+      getAvailableAgentNames: () => channelHandler.getAvailableAgentNames(),
     });
 
     const outputSink = new DiscordSchedulerOutputSink(client);
@@ -312,6 +313,8 @@ export class DiscordFrontend implements Frontend {
                   config,
                   resolveAgentName: (channelId: string) =>
                     channelHandler.resolveAgentName(channelId),
+                  getAvailableAgentNames: () =>
+                    channelHandler.getAvailableAgentNames(),
                 });
                 syncSchedulerRuntime();
                 logger.info({ channel_id: channelId }, "command_reload");

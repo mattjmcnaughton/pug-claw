@@ -42,6 +42,11 @@ export interface ChatCommandActions {
   showMemory?(channelId: string, scopeInput?: string): Promise<string>;
   searchMemory?(channelId: string, query: string): Promise<string>;
   rememberMemory?(channelId: string, text: string): Promise<string>;
+  rememberScopedMemory?(
+    channelId: string,
+    scopeInput: string,
+    text: string,
+  ): Promise<string>;
   forgetMemory?(channelId: string, idOrPrefix: string): Promise<string>;
   exportMemory?(channelId: string, scopeInput?: string): Promise<string>;
   memoryStats?(): Promise<string>;

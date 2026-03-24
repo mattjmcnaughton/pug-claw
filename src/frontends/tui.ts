@@ -79,6 +79,7 @@ export class TuiFrontend implements Frontend {
       config,
       resolveAgentName: (channelId: string) =>
         channelHandler.resolveAgentName(channelId),
+      getAvailableAgentNames: () => channelHandler.getAvailableAgentNames(),
     });
 
     // --- TUI setup ---
@@ -138,6 +139,8 @@ export class TuiFrontend implements Frontend {
               config,
               resolveAgentName: (channelId: string) =>
                 channelHandler.resolveAgentName(channelId),
+              getAvailableAgentNames: () =>
+                channelHandler.getAvailableAgentNames(),
             });
             logger.info({}, "tui_command_reload");
             return undefined;

@@ -42,6 +42,7 @@ memory   # owner only in Discord; available in the TUI; unavailable when memory.
   show [scope]
   search <query>
   remember <text>
+  remember-scope <scope> <text>
   forget <id>
   export [scope]
   stats
@@ -69,6 +70,7 @@ Examples:
 - Discord: `!backup export`
 - Discord: `!memory show`
 - Discord: `!memory remember The deploy key is in 1Password`
+- Discord: `!memory remember-scope global Production deploys go through GitHub Actions`
 - TUI: `/agent skills`
 - TUI: `/backup dryrun`
 - TUI: `/memory search coding style`

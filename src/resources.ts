@@ -66,11 +66,18 @@ const EmbeddingsConfigSchema = z
   })
   .strict();
 
+const MemorySeedConfigSchema = z
+  .object({
+    global: z.array(z.string().min(1)).optional(),
+  })
+  .strict();
+
 const MemoryConfigSchema = z
   .object({
     enabled: z.boolean().optional(),
     injection_budget_tokens: z.number().int().positive().optional(),
     embeddings: EmbeddingsConfigSchema.optional(),
+    seed: MemorySeedConfigSchema.optional(),
   })
   .strict();
 
@@ -160,6 +167,9 @@ export interface ResolvedMemoryConfig {
   embeddings: {
     enabled: boolean;
     model: string;
+  };
+  seed: {
+    global: string[];
   };
 }
 
@@ -646,6 +656,9 @@ export async function resolveConfig(
       embeddings: {
         enabled: rawConfig.memory?.embeddings?.enabled ?? false,
         model: rawConfig.memory?.embeddings?.model ?? "Xenova/all-MiniLM-L6-v2",
+      },
+      seed: {
+        global: rawConfig.memory?.seed?.global ?? [],
       },
     },
     defaultAgent: rawConfig.default_agent ?? Defaults.AGENT,
