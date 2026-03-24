@@ -271,6 +271,25 @@ export function createChatCommandTree(): ChatCommandNode {
               return text(await rememberMemory(ctx.channelId, value));
             },
           },
+          "remember-scope": {
+            name: "remember-scope",
+            description: "Save a new memory to an explicit scope",
+            usage: "memory remember-scope <scope> <text>",
+            execute: async (ctx, args) => {
+              const scopeInput = args[0]?.trim();
+              const value = args.slice(1).join(" ").trim();
+              if (!scopeInput || !value) {
+                return text(ctx.formatHelp(["memory", "remember-scope"]));
+              }
+              const rememberScopedMemory = ctx.actions.rememberScopedMemory;
+              if (!rememberScopedMemory) {
+                return text("Memory commands are not available.");
+              }
+              return text(
+                await rememberScopedMemory(ctx.channelId, scopeInput, value),
+              );
+            },
+          },
           forget: {
             name: "forget",
             description: "Archive an existing memory entry",

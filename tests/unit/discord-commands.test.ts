@@ -52,6 +52,9 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
         enabled: false,
         model: "Xenova/all-MiniLM-L6-v2",
       },
+      seed: {
+        global: [],
+      },
     },
     defaultAgent: "default",
     defaultDriver: "mock",

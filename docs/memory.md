@@ -43,6 +43,8 @@ Entry statuses are:
 - `active` — normal memory entries
 - `archived` — soft-deleted entries
 
+SQLite is the runtime source of truth for memory. Config only provides optional startup seeds for global memory.
+
 ## Configuration
 
 Relevant config lives under `memory`:
@@ -55,6 +57,12 @@ Relevant config lives under `memory`:
     "embeddings": {
       "enabled": false,
       "model": "Xenova/all-MiniLM-L6-v2"
+    },
+    "seed": {
+      "global": [
+        "Production server runs Ubuntu 24.04",
+        "This repo uses Bun and Biome"
+      ]
     }
   }
 }
@@ -64,7 +72,7 @@ Meaning:
 
 - `memory.enabled`
   - global kill switch for the memory system
-  - when `false`, pug-claw does not initialize the memory store or embedding provider
+  - when `false`, pug-claw does not initialize the memory store, embedding provider, or config-backed memory seeding
   - interactive and scheduled runs do not receive injected memory or memory tool access
   - memory commands remain in the command tree, but report that memory is not available
 - `memory.injection_budget_tokens`
@@ -73,6 +81,12 @@ Meaning:
   - enables semantic / hybrid search support
 - `memory.embeddings.model`
   - embedding model used by the Hugging Face embedding provider
+- `memory.seed.global`
+  - one-way startup seed for stable shared global memory
+  - configured entries are inserted into SQLite only when missing from active global memory
+  - removing an item from config does not delete existing memory
+  - seeded entries behave like normal global memory after insertion
+  - seeded entries are still subject to normal retrieval and injection rules; they are not guaranteed to appear in every prompt
 
 ## Scopes
 
@@ -222,6 +236,7 @@ User-facing commands:
 - `memory show [scope]`
 - `memory search <query>`
 - `memory remember <text>`
+- `memory remember-scope <scope> <text>`
 - `memory forget <id>`
 - `memory export [scope]`
 - `memory stats`
@@ -240,6 +255,10 @@ Command behavior:
   - searches across agent, user, and global scopes
 - `memory remember <text>`
   - saves into the current agent scope
+- `memory remember-scope <scope> <text>`
+  - saves into an explicit scope
+  - supported scopes are `agent`, `agent:<name>`, `user`, and `global`
+  - `agent:<name>` must reference an existing agent
 - `memory forget <id>`
   - archives a memory entry; short unique ID prefixes are accepted
 - `memory export [scope]`
@@ -248,6 +267,12 @@ Command behavior:
   - shows counts by status and scope, plus embedding configuration status
 - `memory reindex`
   - rebuilds embeddings when embedding support is available
+
+Examples:
+
+- `memory remember-scope global Production deploys go through GitHub Actions`
+- `memory remember-scope user User prefers concise responses`
+- `memory remember-scope agent:researcher Prefer primary sources`
 
 ## Search behavior
 

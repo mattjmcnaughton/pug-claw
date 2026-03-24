@@ -23,6 +23,7 @@ import { TuiFrontend } from "./frontends/tui.ts";
 import type { Frontend } from "./frontends/types.ts";
 import { configureLogger, logger } from "./logger.ts";
 import { HuggingFaceEmbeddingProvider } from "./memory/embeddings.ts";
+import { seedConfiguredMemory } from "./memory/seed.ts";
 import { MemoryStore } from "./memory/store.ts";
 import { generateAgentPlugins } from "./plugins.ts";
 import type { ConfigOptions, ResolvedConfig } from "./resources.ts";
@@ -95,6 +96,16 @@ async function startFrontend(
       )
     : undefined;
   await memoryStore?.init();
+  if (memoryStore) {
+    const seedResult = await seedConfiguredMemory(memoryStore, config);
+    logger.info(
+      {
+        configured_global_seeds: seedResult.configuredGlobalSeeds,
+        created: seedResult.created,
+      },
+      "memory_seed_applied",
+    );
+  }
 
   const pluginsDir = resolve(config.internalDir, Paths.PLUGINS_DIR);
   const pluginDirs = generateAgentPlugins(

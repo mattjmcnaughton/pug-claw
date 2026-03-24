@@ -7,17 +7,50 @@ import {
   resolveMemoryIdPrefix,
 } from "./chat.ts";
 import { searchMemory } from "./tools.ts";
-import type { MemoryBackend } from "./types.ts";
-import type { ResolvedConfig } from "../resources.ts";
+import type { MemoryBackend, MemoryScope } from "./types.ts";
+import { toError, type ResolvedConfig } from "../resources.ts";
 
 interface MemoryCommandActionOptions {
   memoryBackend?: MemoryBackend;
   config: ResolvedConfig;
   resolveAgentName: (channelId: string) => string;
+  getAvailableAgentNames: () => string[];
+}
+
+function resolveWritableScope(
+  currentAgentName: string,
+  scopeInput: string,
+  availableAgentNames: string[],
+): MemoryScope {
+  const scope = parseMemoryScopeInput(currentAgentName, scopeInput);
+  if (!scope.startsWith("agent:")) {
+    return scope;
+  }
+
+  const agentName = scope.slice("agent:".length);
+  if (!availableAgentNames.includes(agentName)) {
+    throw new Error(`Unknown agent \`${agentName}\`.`);
+  }
+
+  return scope;
 }
 
 export function buildMemoryCommandActions(options: MemoryCommandActionOptions) {
-  const { memoryBackend, config, resolveAgentName } = options;
+  const { memoryBackend, config, resolveAgentName, getAvailableAgentNames } =
+    options;
+
+  const saveMemoryToScope = async (scope: MemoryScope, text: string) => {
+    if (!memoryBackend) {
+      return "Memory commands are not available.";
+    }
+    const entry = await memoryBackend.save({
+      scope,
+      content: text,
+      createdBy: "user",
+      source: "user",
+    });
+    return `Saved to ${scope} memory: \`${entry.id}\``;
+  };
 
   return {
     showMemory: async (channelId: string, scopeInput?: string) => {
@@ -38,13 +71,14 @@ export function buildMemoryCommandActions(options: MemoryCommandActionOptions) {
       if (!memoryBackend) {
         return "Memory commands are not available.";
       }
+      const agentName = resolveAgentName(channelId);
       const result = await searchMemory(
         {
           memoryBackend,
           actor: {
             type: "agent",
-            agentName: resolveAgentName(channelId),
-            createdBy: `agent:${resolveAgentName(channelId)}`,
+            agentName,
+            createdBy: `agent:${agentName}`,
             source: "agent",
             canManageAllScopes: true,
           },
@@ -60,14 +94,33 @@ export function buildMemoryCommandActions(options: MemoryCommandActionOptions) {
       if (!memoryBackend) {
         return "Memory commands are not available.";
       }
-      const scope = `agent:${resolveAgentName(channelId)}` as const;
-      const entry = await memoryBackend.save({
-        scope,
-        content: text,
-        createdBy: "user",
-        source: "user",
-      });
-      return `Saved to ${scope} memory: \`${entry.id}\``;
+
+      const scope = resolveWritableScope(
+        resolveAgentName(channelId),
+        "agent",
+        getAvailableAgentNames(),
+      );
+      return saveMemoryToScope(scope, text);
+    },
+    rememberScopedMemory: async (
+      channelId: string,
+      scopeInput: string,
+      text: string,
+    ) => {
+      if (!memoryBackend) {
+        return "Memory commands are not available.";
+      }
+
+      try {
+        const scope = resolveWritableScope(
+          resolveAgentName(channelId),
+          scopeInput,
+          getAvailableAgentNames(),
+        );
+        return saveMemoryToScope(scope, text);
+      } catch (err) {
+        return toError(err).message;
+      }
     },
     forgetMemory: async (_channelId: string, idOrPrefix: string) => {
       if (!memoryBackend) {

@@ -55,6 +55,9 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
         enabled: false,
         model: "Xenova/all-MiniLM-L6-v2",
       },
+      seed: {
+        global: [],
+      },
     },
     defaultAgent: "default",
     defaultDriver: "fake",
@@ -613,6 +616,7 @@ describe("chat commands", () => {
       config: makeConfig(),
       resolveAgentName: (channelId: string) =>
         handler.resolveAgentName(channelId),
+      getAvailableAgentNames: () => handler.getAvailableAgentNames(),
     });
 
     try {
@@ -643,6 +647,172 @@ describe("chat commands", () => {
     }
   });
 
+  test("!memory remember-scope global writes to global memory", async () => {
+    const memoryStore = new MemoryStore(":memory:", noopLogger);
+    await memoryStore.init();
+    const { handler } = makeHandler(
+      undefined,
+      undefined,
+      undefined,
+      memoryStore,
+    );
+    const memoryActions = buildMemoryCommandActions({
+      memoryBackend: memoryStore,
+      config: makeConfig(),
+      resolveAgentName: (channelId: string) =>
+        handler.resolveAgentName(channelId),
+      getAvailableAgentNames: () => handler.getAvailableAgentNames(),
+    });
+
+    try {
+      const result = await runCommand(
+        handler,
+        "memory remember-scope global Production deploys go through GitHub Actions",
+        {
+          actions: {
+            reload: async () => undefined,
+            ...memoryActions,
+          },
+        },
+      );
+      const entries = await memoryStore.peek({
+        scope: "global",
+        status: "active",
+      });
+
+      expect(result?.message).toContain("Saved to global memory");
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.content).toBe(
+        "Production deploys go through GitHub Actions",
+      );
+    } finally {
+      await memoryStore.close();
+    }
+  });
+
+  test("!memory remember-scope user writes to user:default", async () => {
+    const memoryStore = new MemoryStore(":memory:", noopLogger);
+    await memoryStore.init();
+    const { handler } = makeHandler(
+      undefined,
+      undefined,
+      undefined,
+      memoryStore,
+    );
+    const memoryActions = buildMemoryCommandActions({
+      memoryBackend: memoryStore,
+      config: makeConfig(),
+      resolveAgentName: (channelId: string) =>
+        handler.resolveAgentName(channelId),
+      getAvailableAgentNames: () => handler.getAvailableAgentNames(),
+    });
+
+    try {
+      const result = await runCommand(
+        handler,
+        "memory remember-scope user User prefers concise responses",
+        {
+          actions: {
+            reload: async () => undefined,
+            ...memoryActions,
+          },
+        },
+      );
+      const entries = await memoryStore.peek({
+        scope: "user:default",
+        status: "active",
+      });
+
+      expect(result?.message).toContain("Saved to user:default memory");
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.content).toBe("User prefers concise responses");
+    } finally {
+      await memoryStore.close();
+    }
+  });
+
+  test("!memory remember-scope agent:other writes to another known agent", async () => {
+    createAgentDir("other");
+    const memoryStore = new MemoryStore(":memory:", noopLogger);
+    await memoryStore.init();
+    const { handler } = makeHandler(
+      undefined,
+      undefined,
+      undefined,
+      memoryStore,
+    );
+    const memoryActions = buildMemoryCommandActions({
+      memoryBackend: memoryStore,
+      config: makeConfig(),
+      resolveAgentName: (channelId: string) =>
+        handler.resolveAgentName(channelId),
+      getAvailableAgentNames: () => handler.getAvailableAgentNames(),
+    });
+
+    try {
+      const result = await runCommand(
+        handler,
+        "memory remember-scope agent:other Prefer primary sources",
+        {
+          actions: {
+            reload: async () => undefined,
+            ...memoryActions,
+          },
+        },
+      );
+      const entries = await memoryStore.peek({
+        scope: "agent:other",
+        status: "active",
+      });
+
+      expect(result?.message).toContain("Saved to agent:other memory");
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.content).toBe("Prefer primary sources");
+    } finally {
+      await memoryStore.close();
+    }
+  });
+
+  test("!memory remember-scope rejects unknown agent scopes", async () => {
+    const memoryStore = new MemoryStore(":memory:", noopLogger);
+    await memoryStore.init();
+    const { handler } = makeHandler(
+      undefined,
+      undefined,
+      undefined,
+      memoryStore,
+    );
+    const memoryActions = buildMemoryCommandActions({
+      memoryBackend: memoryStore,
+      config: makeConfig(),
+      resolveAgentName: (channelId: string) =>
+        handler.resolveAgentName(channelId),
+      getAvailableAgentNames: () => handler.getAvailableAgentNames(),
+    });
+
+    try {
+      const result = await runCommand(
+        handler,
+        "memory remember-scope agent:missing Prefer primary sources",
+        {
+          actions: {
+            reload: async () => undefined,
+            ...memoryActions,
+          },
+        },
+      );
+      const entries = await memoryStore.peek({
+        scope: "agent:missing",
+        status: "active",
+      });
+
+      expect(result?.message).toBe("Unknown agent `missing`.");
+      expect(entries).toHaveLength(0);
+    } finally {
+      await memoryStore.close();
+    }
+  });
+
   test("!memory forget accepts a unique short prefix", async () => {
     const memoryStore = new MemoryStore(":memory:", noopLogger);
     await memoryStore.init();
@@ -663,6 +833,7 @@ describe("chat commands", () => {
       config: makeConfig(),
       resolveAgentName: (channelId: string) =>
         handler.resolveAgentName(channelId),
+      getAvailableAgentNames: () => handler.getAvailableAgentNames(),
     });
 
     try {
@@ -706,6 +877,7 @@ describe("chat commands", () => {
       config: makeConfig(),
       resolveAgentName: (channelId: string) =>
         handler.resolveAgentName(channelId),
+      getAvailableAgentNames: () => handler.getAvailableAgentNames(),
     });
 
     try {
@@ -744,6 +916,7 @@ describe("chat commands", () => {
       config: makeConfig(),
       resolveAgentName: (channelId: string) =>
         handler.resolveAgentName(channelId),
+      getAvailableAgentNames: () => handler.getAvailableAgentNames(),
     });
 
     try {
@@ -782,6 +955,7 @@ describe("chat commands", () => {
       config: makeConfig(),
       resolveAgentName: (channelId: string) =>
         handler.resolveAgentName(channelId),
+      getAvailableAgentNames: () => handler.getAvailableAgentNames(),
     });
 
     try {
