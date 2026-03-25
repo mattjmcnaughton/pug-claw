@@ -261,13 +261,14 @@ program
       path: string,
       opts: { dryRun?: boolean; force?: boolean; home?: string },
     ) => {
-      applyCommandResult(
-        await runImportCommand({
+      const importOptions = {
         path,
-        home: opts.home,
-        dryRun: opts.dryRun,
-        force: opts.force,
-      }),
+        ...(opts.home !== undefined ? { home: opts.home } : {}),
+        ...(opts.dryRun !== undefined ? { dryRun: opts.dryRun } : {}),
+        ...(opts.force !== undefined ? { force: opts.force } : {}),
+      };
+      applyCommandResult(
+        await runImportCommand(importOptions),
       );
     },
   );

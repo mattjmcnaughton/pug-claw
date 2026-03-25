@@ -26,9 +26,9 @@ import {
 
 export interface ImportBackupOptions {
   archivePath: string;
-  dryRun?: boolean;
-  force?: boolean;
-  homeDir?: string;
+  dryRun?: boolean | undefined;
+  force?: boolean | undefined;
+  homeDir?: string | undefined;
 }
 
 export interface ImportBackupResult {

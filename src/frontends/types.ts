@@ -10,7 +10,7 @@ export interface FrontendContext {
   pluginDirs: Map<string, string>;
   resolveAgent: (agentDir: string) => ResolvedAgent;
   logger: Logger;
-  memoryBackend?: MemoryBackend;
+  memoryBackend?: MemoryBackend | undefined;
   reloadConfig: () => Promise<{
     config: ResolvedConfig;
     pluginDirs: Map<string, string>;

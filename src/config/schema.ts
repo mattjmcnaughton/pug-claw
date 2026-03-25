@@ -160,14 +160,14 @@ export interface ResolvedMemoryConfig {
 }
 
 export interface ResolvedScheduleConfig {
-  description?: string;
+  description?: string | undefined;
   enabled: boolean;
   cron: string;
   agent: string;
-  driver?: string;
-  model?: string;
+  driver?: string | undefined;
+  model?: string | undefined;
   prompt: string;
-  output?: ResolvedScheduleOutput;
+  output?: ResolvedScheduleOutput | undefined;
 }
 
 export function loadAndValidateConfig(configPath: string): ConfigFile {

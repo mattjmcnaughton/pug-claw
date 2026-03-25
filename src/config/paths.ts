@@ -4,13 +4,13 @@ import { EnvVars, Paths } from "../constants.ts";
 import type { ConfigFile } from "./schema.ts";
 
 export interface ConfigOptions {
-  home?: string;
-  agentsDir?: string;
-  skillsDir?: string;
-  internalDir?: string;
-  dataDir?: string;
-  codeDir?: string;
-  logsDir?: string;
+  home?: string | undefined;
+  agentsDir?: string | undefined;
+  skillsDir?: string | undefined;
+  internalDir?: string | undefined;
+  dataDir?: string | undefined;
+  codeDir?: string | undefined;
+  logsDir?: string | undefined;
 }
 
 export interface ResolvedConfigPaths {

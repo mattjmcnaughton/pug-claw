@@ -171,8 +171,8 @@ export function buildEnvironmentBlock(): string {
 export interface ResolvedAgent {
   systemPrompt: string;
   skills: SkillSummary[];
-  driver?: string;
-  model?: string;
+  driver?: string | undefined;
+  model?: string | undefined;
   memory: boolean;
 }
 

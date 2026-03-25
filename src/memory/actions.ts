@@ -11,7 +11,7 @@ import type { MemoryBackend, MemoryScope } from "./types.ts";
 import { toError, type ResolvedConfig } from "../resources.ts";
 
 interface MemoryCommandActionOptions {
-  memoryBackend?: MemoryBackend;
+  memoryBackend?: MemoryBackend | undefined;
   config: ResolvedConfig;
   resolveAgentName: (channelId: string) => string;
   getAvailableAgentNames: () => string[];

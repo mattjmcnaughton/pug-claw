@@ -68,14 +68,14 @@ export interface ScheduleOutput {
 
 export interface ResolvedSchedule {
   name: string;
-  description?: string;
+  description?: string | undefined;
   enabled: boolean;
   cron: string;
   agent: string;
-  driver?: string;
-  model?: string;
+  driver?: string | undefined;
+  model?: string | undefined;
   prompt: string;
-  output?: ScheduleOutput;
+  output?: ScheduleOutput | undefined;
 }
 
 export interface ScheduleRunRecord {
@@ -84,47 +84,47 @@ export interface ScheduleRunRecord {
   triggerSource: ScheduleTriggerSource;
   status: ScheduleRunStatus;
   agent: string;
-  driver?: string;
-  model?: string;
+  driver?: string | undefined;
+  model?: string | undefined;
   cronExpression: string;
   timezone: string;
-  outputType?: ScheduleOutputType;
-  outputTarget?: string;
-  executionStatus?: ScheduleExecutionStatus;
+  outputType?: ScheduleOutputType | undefined;
+  outputTarget?: string | undefined;
+  executionStatus?: ScheduleExecutionStatus | undefined;
   deliveryStatus: ScheduleDeliveryStatus;
   startedAt: string;
-  finishedAt?: string;
-  errorMessage?: string;
+  finishedAt?: string | undefined;
+  errorMessage?: string | undefined;
 }
 
 export interface SchedulerAuditEvent {
   ts: string;
   event: SchedulerAuditEventName;
-  run_id?: string;
-  schedule_name?: string;
-  trigger_source?: ScheduleTriggerSource;
-  agent?: string;
-  driver?: string;
-  model?: string;
-  cron_expression?: string;
-  timezone?: string;
+  run_id?: string | undefined;
+  schedule_name?: string | undefined;
+  trigger_source?: ScheduleTriggerSource | undefined;
+  agent?: string | undefined;
+  driver?: string | undefined;
+  model?: string | undefined;
+  cron_expression?: string | undefined;
+  timezone?: string | undefined;
   output?: {
     type: ScheduleOutputType;
-    channel_id?: string;
-  } | null;
-  status?: ScheduleRunStatus;
-  delivery_status?: ScheduleDeliveryStatus;
-  channel_id?: string;
-  response_text?: string;
-  message?: string;
-  error?: string;
-  pid?: number;
-  hostname?: string;
+    channel_id?: string | undefined;
+  } | null | undefined;
+  status?: ScheduleRunStatus | undefined;
+  delivery_status?: ScheduleDeliveryStatus | undefined;
+  channel_id?: string | undefined;
+  response_text?: string | undefined;
+  message?: string | undefined;
+  error?: string | undefined;
+  pid?: number | undefined;
+  hostname?: string | undefined;
 }
 
 export interface ScheduleSummary {
   schedule: ResolvedSchedule;
   nextRunAt: Date | null;
   currentlyRunning: boolean;
-  lastRun?: ScheduleRunRecord;
+  lastRun?: ScheduleRunRecord | undefined;
 }

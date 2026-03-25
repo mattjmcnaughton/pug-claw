@@ -20,32 +20,32 @@ export type MemoryStatus = "active" | "archived";
 export interface NewMemoryEntry {
   scope: MemoryScope;
   content: string;
-  tags?: string[];
+  tags?: string[] | undefined;
   source: MemorySource;
   createdBy: string;
 }
 
 export interface MemoryEntryPatch {
-  content?: string;
-  tags?: string[];
-  status?: MemoryStatus;
+  content?: string | undefined;
+  tags?: string[] | undefined;
+  status?: MemoryStatus | undefined;
 }
 
 export interface MemoryFilter {
-  scope?: MemoryScope;
-  status?: MemoryStatus;
-  source?: MemorySource;
-  tags?: string[];
-  limit?: number;
-  offset?: number;
+  scope?: MemoryScope | undefined;
+  status?: MemoryStatus | undefined;
+  source?: MemorySource | undefined;
+  tags?: string[] | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
 }
 
 export interface MemorySearchQuery {
-  text?: string;
-  embedding?: number[];
-  scope?: MemoryScope;
-  status?: MemoryStatus;
-  limit?: number;
+  text?: string | undefined;
+  embedding?: number[] | undefined;
+  scope?: MemoryScope | undefined;
+  status?: MemoryStatus | undefined;
+  limit?: number | undefined;
 }
 
 export interface MemorySearchResult {

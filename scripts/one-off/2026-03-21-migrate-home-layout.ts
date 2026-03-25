@@ -20,9 +20,9 @@ export interface PlannedMove {
 }
 
 export interface MigrateHomeLayoutOptions {
-  dryRun?: boolean;
-  force?: boolean;
-  homeDir?: string;
+  dryRun?: boolean | undefined;
+  force?: boolean | undefined;
+  homeDir?: string | undefined;
 }
 
 export interface MigrateHomeLayoutResult {

@@ -26,7 +26,7 @@ interface SendableChannel {
 interface MessageScope {
   sessionChannelId: string;
   settingsChannelId: string;
-  bootstrapPrompt?: string;
+  bootstrapPrompt?: string | undefined;
 }
 
 const DiscordFrontendMessages = {

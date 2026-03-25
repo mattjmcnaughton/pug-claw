@@ -23,20 +23,20 @@ export interface MemoryToolContext {
 
 export interface SaveMemoryArgs {
   content: string;
-  scope?: "agent" | "global" | "user";
-  tags?: string[];
+  scope?: "agent" | "global" | "user" | undefined;
+  tags?: string[] | undefined;
 }
 
 export interface SearchMemoryArgs {
   query: string;
-  scope?: "agent" | "global" | "user";
-  limit?: number;
+  scope?: "agent" | "global" | "user" | undefined;
+  limit?: number | undefined;
 }
 
 export interface UpdateMemoryArgs {
   id: string;
-  content?: string;
-  tags?: string[];
+  content?: string | undefined;
+  tags?: string[] | undefined;
 }
 
 export interface DeleteMemoryArgs {
@@ -44,8 +44,8 @@ export interface DeleteMemoryArgs {
 }
 
 export interface ListMemoryArgs {
-  scope?: "agent" | "global" | "user";
-  limit?: number;
+  scope?: "agent" | "global" | "user" | undefined;
+  limit?: number | undefined;
 }
 
 function requireAgentScope(actor: MemoryToolActor): MemoryScope {

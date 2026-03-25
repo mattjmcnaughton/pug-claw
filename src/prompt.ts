@@ -3,10 +3,10 @@ import type { SkillSummary } from "./skills.ts";
 import { buildSkillCatalog } from "./skills.ts";
 
 export interface BuildFinalSystemPromptOptions {
-  skills?: SkillSummary[];
-  memoryBlock?: string;
-  pluginHint?: boolean;
-  skillMode?: "default" | "strict";
+  skills?: SkillSummary[] | undefined;
+  memoryBlock?: string | undefined;
+  pluginHint?: boolean | undefined;
+  skillMode?: "default" | "strict" | undefined;
 }
 
 function appendSkillCatalog(

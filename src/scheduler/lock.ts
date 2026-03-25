@@ -38,7 +38,7 @@ function isPidAlive(pid: number): boolean {
 export interface SchedulerLockAcquireResult {
   acquired: boolean;
   reclaimedStale: boolean;
-  owner?: LockOwner;
+  owner?: LockOwner | undefined;
 }
 
 export class SchedulerLock {

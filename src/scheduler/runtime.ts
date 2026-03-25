@@ -32,7 +32,7 @@ interface SchedulerRuntimeContext {
   resolveAgent: (agentDir: string) => ResolvedAgent;
   logger: Logger;
   outputSink: SchedulerOutputSink;
-  memoryBackend?: MemoryBackend;
+  memoryBackend?: MemoryBackend | undefined;
 }
 
 export type RunScheduleResult =
@@ -48,7 +48,7 @@ export class SchedulerRuntime {
   private readonly runner: SchedulerRunner;
   private readonly lock: SchedulerLock;
   private readonly schedules = new Map<string, ScheduleState>();
-  private interval?: ReturnType<typeof setInterval>;
+  private interval: ReturnType<typeof setInterval> | undefined;
   private active = false;
 
   constructor(private ctx: SchedulerRuntimeContext) {
