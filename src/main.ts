@@ -11,6 +11,7 @@ import {
   Drivers,
   EnvVars,
   Frontends,
+  type DriverName,
   type FrontendName,
   Paths,
   VERSION,
@@ -41,6 +42,16 @@ function getGitCommit(): string {
   } catch {
     return "unknown";
   }
+}
+
+interface SharedCliOptions {
+  home?: string;
+  agentsDir?: string;
+  skillsDir?: string;
+  internalDir?: string;
+  dataDir?: string;
+  codeDir?: string;
+  logsDir?: string;
 }
 
 async function startFrontend(
@@ -76,12 +87,15 @@ async function startFrontend(
 
   const piDefaultModel = config.drivers[Drivers.PI]?.defaultModel;
 
-  const drivers: Record<string, Driver> = {
+  const drivers = {
     [Drivers.CLAUDE]: new ClaudeDriver(),
     [Drivers.PI]: await PiDriver.create(piDefaultModel),
-  };
+  } satisfies Record<DriverName, Driver>;
 
-  logger.info({ drivers: Object.keys(drivers) }, "drivers_initialized");
+  logger.info(
+    { drivers: Object.keys(drivers) as DriverName[] },
+    "drivers_initialized",
+  );
 
   const memoryStore = config.memory.enabled
     ? new MemoryStore(
@@ -154,7 +168,7 @@ function addSharedOptions(cmd: Command): Command {
 }
 
 function optsToConfigOptions(
-  opts: Record<string, string | undefined>,
+  opts: SharedCliOptions,
 ): ConfigOptions {
   return {
     home: opts.home,
@@ -180,7 +194,7 @@ addSharedOptions(
   program
     .command("start")
     .description("Start with Discord frontend")
-    .action(async (opts) => {
+    .action(async (opts: SharedCliOptions) => {
       await startFrontend(
         new DiscordFrontend(),
         Frontends.DISCORD,
@@ -193,7 +207,7 @@ addSharedOptions(
   program
     .command("tui")
     .description("Start with TUI frontend")
-    .action(async (opts) => {
+    .action(async (opts: SharedCliOptions) => {
       await startFrontend(
         new TuiFrontend(),
         Frontends.TUI,

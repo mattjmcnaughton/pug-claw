@@ -51,6 +51,9 @@ export const CommandPrefixes = {
   TUI: "/",
 } as const;
 
+export type CommandPrefix =
+  (typeof CommandPrefixes)[keyof typeof CommandPrefixes];
+
 export const SessionScopePrefixes = {
   THREAD: "thread:",
   REPLY: "reply:",

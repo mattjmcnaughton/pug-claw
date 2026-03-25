@@ -1,8 +1,9 @@
-import type { FrontendName } from "../constants.ts";
+import type { CommandPrefix, FrontendName } from "../constants.ts";
 import type { SkillSummary } from "../skills.ts";
 
 export type ChatCommandFrontend = FrontendName;
 export type ChatCommandAction = "quit" | "restart";
+export type ModelAliasMap = Readonly<Record<string, string>>;
 
 export interface ChatCommandResult {
   message: string;
@@ -23,7 +24,7 @@ export interface ChatCommandHandler {
   resolveModelName(channelId: string): string;
   resolveAgentName(channelId: string): string;
   getAvailableDriverNames(): string[];
-  getAvailableModelAliases(channelId: string): Record<string, string>;
+  getAvailableModelAliases(channelId: string): ModelAliasMap;
   getAvailableAgentNames(): string[];
   getAgentSkills(channelId: string): {
     agentName: string;
@@ -57,7 +58,7 @@ export interface ChatCommandActions {
 
 export interface ChatCommandEnvironment {
   channelId: string;
-  commandPrefix: string;
+  commandPrefix: CommandPrefix;
   frontend: ChatCommandFrontend;
   isOwner: boolean;
   handler: ChatCommandHandler;
