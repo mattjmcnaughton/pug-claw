@@ -29,8 +29,8 @@ describe("discoverSkills", () => {
   test("finds skills with valid SKILL.md frontmatter", () => {
     const skills = discoverSkills(TEST_AGENT);
     expect(skills).toHaveLength(1);
-    expect(skills[0].name).toBe("greet");
-    expect(skills[0].description).toBe("Greet the user by name");
+    expect(skills[0]?.name).toBe("greet");
+    expect(skills[0]?.description).toBe("Greet the user by name");
   });
 
   test("returns empty array for agent with no skills dir", () => {
@@ -71,7 +71,7 @@ describe("discoverSkills", () => {
   test("works with globalSkillsDir but no global skills", () => {
     const skills = discoverSkills(TEST_AGENT, "/tmp/nonexistent-skills-dir");
     expect(skills).toHaveLength(1);
-    expect(skills[0].name).toBe("greet");
+    expect(skills[0]?.name).toBe("greet");
   });
 });
 
@@ -244,7 +244,7 @@ describe("resolveAgent", () => {
     expect(resolved.systemPrompt).toContain("You are a test agent.");
     expect(resolved.systemPrompt).not.toContain("<available-skills>");
     expect(resolved.skills).toHaveLength(1);
-    expect(resolved.skills[0].name).toBe("greet");
+    expect(resolved.skills[0]?.name).toBe("greet");
   });
 
   test("strips frontmatter from system prompt (body only)", () => {
