@@ -19,7 +19,7 @@ import {
   renderBackupDryRunMessage,
   renderBackupExportMessage,
 } from "../backup/render.ts";
-import { Frontends } from "../constants.ts";
+import { CommandPrefixes, Frontends } from "../constants.ts";
 import { ChannelHandler } from "../channel-handler.ts";
 import { buildMemoryCommandActions } from "../memory/actions.ts";
 import { toError } from "../resources.ts";
@@ -123,7 +123,7 @@ export class TuiFrontend implements Frontend {
     function makeCommandEnvironment(): ChatCommandEnvironment {
       return {
         channelId: TUI_CHANNEL_ID,
-        commandPrefix: "/",
+        commandPrefix: CommandPrefixes.TUI,
         frontend: Frontends.TUI,
         isOwner: true,
         handler: channelHandler,
@@ -184,8 +184,8 @@ export class TuiFrontend implements Frontend {
       if (!trimmed) return;
 
       // Handle slash commands
-      if (trimmed.startsWith("/")) {
-        const raw = trimmed.slice(1).trim();
+      if (trimmed.startsWith(CommandPrefixes.TUI)) {
+        const raw = trimmed.slice(CommandPrefixes.TUI.length).trim();
 
         try {
           const result = await commandRegistry.execute(
@@ -194,7 +194,7 @@ export class TuiFrontend implements Frontend {
           );
 
           if (result === null) {
-            showInfo(`Unknown command: \`/${raw}\``);
+            showInfo(`Unknown command: \`${CommandPrefixes.TUI}${raw}\``);
             return;
           }
 

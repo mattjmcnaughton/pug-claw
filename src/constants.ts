@@ -46,6 +46,21 @@ export const Frontends = {
 
 export type FrontendName = (typeof Frontends)[keyof typeof Frontends];
 
+export const CommandPrefixes = {
+  DISCORD: "!",
+  TUI: "/",
+} as const;
+
+export const SessionScopePrefixes = {
+  THREAD: "thread:",
+  REPLY: "reply:",
+} as const;
+
+export const SchedulerMessages = {
+  SCHEDULES_HEADER: "**Schedules**",
+  SCHEDULES_NONE_CONFIGURED: "**Schedules**\n(none configured)",
+} as const;
+
 export const Defaults = {
   AGENT: "default",
   DRIVER: "claude",

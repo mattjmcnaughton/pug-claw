@@ -4,7 +4,12 @@ import {
   renderBackupDryRunMessage,
   renderBackupExportMessage,
 } from "../backup/render.ts";
-import { Frontends } from "../constants.ts";
+import {
+  CommandPrefixes,
+  Frontends,
+  SchedulerMessages,
+  SessionScopePrefixes,
+} from "../constants.ts";
 import { ChannelHandler } from "../channel-handler.ts";
 import { ChatCommandRegistry } from "../chat-commands/registry.ts";
 import { createChatCommandTree } from "../chat-commands/tree.ts";
@@ -24,6 +29,35 @@ interface MessageScope {
   sessionChannelId: string;
   settingsChannelId: string;
   bootstrapPrompt?: string;
+}
+
+const DiscordFrontendMessages = {
+  THREAD_STARTER_PROMPT_PREFIX: "Thread starter message:\n",
+  REPLY_ROOT_PROMPT_PREFIX: "Reply root message:\n",
+  RELOAD_COMPLETED:
+    "Config, agents, skills, and schedules reloaded. All sessions reset.",
+  SCHEDULER_DISABLED:
+    "Scheduler is disabled on this instance (lock not acquired).\n",
+  SCHEDULER_NOT_ACTIVE: "Scheduler is not active on this instance.",
+} as const;
+
+function formatUnknownScheduleMessage(scheduleName: string): string {
+  return `Unknown schedule "${scheduleName}".`;
+}
+
+function formatScheduleAlreadyRunningMessage(scheduleName: string): string {
+  return `Schedule "${scheduleName}" is already running.`;
+}
+
+function formatTriggeredScheduleMessage(
+  scheduleName: string,
+  runId: string,
+): string {
+  return `Triggered schedule "${scheduleName}". run_id: ${runId}`;
+}
+
+function formatUnknownCommandMessage(raw: string): string {
+  return `Unknown command: \`${CommandPrefixes.DISCORD}${raw}\``;
 }
 
 function resolveMessageContent(message: Message): string {
@@ -55,7 +89,7 @@ async function resolveMessageScope(
 ): Promise<MessageScope> {
   if (message.channel.isThread()) {
     const threadId = message.channelId;
-    const threadScopeChannelId = `thread:${threadId}`;
+    const threadScopeChannelId = `${SessionScopePrefixes.THREAD}${threadId}`;
     const settingsChannelId = message.channel.parentId ?? threadId;
     let bootstrapPrompt: string | undefined;
 
@@ -65,7 +99,9 @@ async function resolveMessageScope(
         if (starterMessage) {
           const starterContent = resolveMessageContent(starterMessage);
           if (starterContent) {
-            bootstrapPrompt = `Thread starter message:\n${starterContent}`;
+            bootstrapPrompt =
+              DiscordFrontendMessages.THREAD_STARTER_PROMPT_PREFIX +
+              starterContent;
           }
         }
       } catch (err) {
@@ -103,10 +139,15 @@ async function resolveMessageScope(
     const rootMessage = await resolveReplyRootMessage(message);
     rootMessageId = rootMessage.id;
 
-    if (!channelHandler.hasSession(`reply:${rootMessageId}`)) {
+    if (
+      !channelHandler.hasSession(
+        `${SessionScopePrefixes.REPLY}${rootMessageId}`,
+      )
+    ) {
       const rootMessageContent = resolveMessageContent(rootMessage);
       if (rootMessageContent) {
-        bootstrapPrompt = `Reply root message:\n${rootMessageContent}`;
+        bootstrapPrompt =
+          DiscordFrontendMessages.REPLY_ROOT_PROMPT_PREFIX + rootMessageContent;
       }
     }
   } catch (err) {
@@ -122,7 +163,7 @@ async function resolveMessageScope(
   }
 
   return {
-    sessionChannelId: `reply:${rootMessageId}`,
+    sessionChannelId: `${SessionScopePrefixes.REPLY}${rootMessageId}`,
     settingsChannelId,
     bootstrapPrompt,
   };
@@ -153,17 +194,15 @@ function formatSchedulesMessages(
   const blocks: string[] = [];
 
   if (!schedulerActive) {
-    blocks.push(
-      "Scheduler is disabled on this instance (lock not acquired).\n",
-    );
+    blocks.push(DiscordFrontendMessages.SCHEDULER_DISABLED);
   }
 
   if (summaries.length === 0) {
-    blocks.push("**Schedules**\n(none configured)");
+    blocks.push(SchedulerMessages.SCHEDULES_NONE_CONFIGURED);
     return blocks;
   }
 
-  const lines = ["**Schedules**"];
+  const lines: string[] = [SchedulerMessages.SCHEDULES_HEADER];
   for (const summary of summaries) {
     const schedule = summary.schedule;
     const enabledText = schedule.enabled ? "enabled" : "disabled";
@@ -285,19 +324,19 @@ export class DiscordFrontend implements Frontend {
 
     async function handleCommand(message: Message): Promise<boolean> {
       const content = message.content.trim();
-      if (!content.startsWith("!")) return false;
+      if (!content.startsWith(CommandPrefixes.DISCORD)) return false;
       if (!("send" in message.channel)) return false;
 
       const channel = message.channel as SendableChannel;
       const channelId = message.channelId;
-      const raw = content.slice(1).trim();
+      const raw = content.slice(CommandPrefixes.DISCORD.length).trim();
       const isOwner = message.author.id === config.discord?.ownerId;
 
       try {
         const result = await commandRegistry.execute(
           {
             channelId,
-            commandPrefix: "!",
+            commandPrefix: CommandPrefixes.DISCORD,
             frontend: Frontends.DISCORD,
             isOwner,
             handler: channelHandler,
@@ -318,7 +357,7 @@ export class DiscordFrontend implements Frontend {
                 });
                 syncSchedulerRuntime();
                 logger.info({ channel_id: channelId }, "command_reload");
-                return "Config, agents, skills, and schedules reloaded. All sessions reset.";
+                return DiscordFrontendMessages.RELOAD_COMPLETED;
               },
               exportBackup: async () => {
                 const result = await exportBackup(config);
@@ -339,21 +378,21 @@ export class DiscordFrontend implements Frontend {
               },
               runSchedule: async (scheduleName: string) => {
                 if (!schedulerRuntime) {
-                  return `Unknown schedule "${scheduleName}".`;
+                  return formatUnknownScheduleMessage(scheduleName);
                 }
 
                 const result = schedulerRuntime.runSchedule(scheduleName);
                 if (!result.ok) {
                   if (result.reason === "inactive") {
-                    return "Scheduler is not active on this instance.";
+                    return DiscordFrontendMessages.SCHEDULER_NOT_ACTIVE;
                   }
                   if (result.reason === "already_running") {
-                    return `Schedule "${scheduleName}" is already running.`;
+                    return formatScheduleAlreadyRunningMessage(scheduleName);
                   }
-                  return `Unknown schedule "${scheduleName}".`;
+                  return formatUnknownScheduleMessage(scheduleName);
                 }
 
-                return `Triggered schedule "${scheduleName}". run_id: ${result.runId}`;
+                return formatTriggeredScheduleMessage(scheduleName, result.runId);
               },
             },
           },
@@ -361,7 +400,7 @@ export class DiscordFrontend implements Frontend {
         );
 
         if (result === null) {
-          await channel.send(`Unknown command: \`!${raw}\``);
+          await channel.send(formatUnknownCommandMessage(raw));
           return true;
         }
 
