@@ -22,6 +22,8 @@ export interface ResolvedConfigPaths {
   logsDir: string;
 }
 
+type EnvLookup = Record<string, string | undefined>;
+
 export function expandTilde(pathValue: string): string {
   if (pathValue.startsWith("~/") || pathValue === "~") {
     return resolve(homedir(), pathValue.slice(2));
@@ -54,12 +56,13 @@ export function resolveLogsDir(
   homeDir: string,
   rawConfig?: ConfigFile,
   opts: ConfigOptions = {},
+  env: EnvLookup = process.env,
 ): string {
   return resolvePathWithOverrides(
     homeDir,
     Paths.LOGS_DIR,
     rawConfig?.paths?.logs_dir,
-    process.env[EnvVars.LOGS_DIR],
+    env[EnvVars.LOGS_DIR],
     opts.logsDir,
   );
 }
@@ -68,12 +71,13 @@ export function resolveConfigPaths(
   homeDir: string,
   rawConfig: ConfigFile,
   opts: ConfigOptions = {},
+  env: EnvLookup = process.env,
 ): ResolvedConfigPaths {
   const agentsDir = resolvePathWithOverrides(
     homeDir,
     Paths.AGENTS_DIR,
     rawConfig.paths?.agents_dir,
-    process.env[EnvVars.AGENTS_DIR],
+    env[EnvVars.AGENTS_DIR],
     opts.agentsDir,
   );
 
@@ -81,7 +85,7 @@ export function resolveConfigPaths(
     homeDir,
     Paths.SKILLS_DIR,
     rawConfig.paths?.skills_dir,
-    process.env[EnvVars.SKILLS_DIR],
+    env[EnvVars.SKILLS_DIR],
     opts.skillsDir,
   );
 
@@ -89,7 +93,7 @@ export function resolveConfigPaths(
     homeDir,
     Paths.INTERNAL_DIR,
     rawConfig.paths?.internal_dir,
-    process.env[EnvVars.INTERNAL_DIR],
+    env[EnvVars.INTERNAL_DIR],
     opts.internalDir,
   );
 
@@ -97,7 +101,7 @@ export function resolveConfigPaths(
     homeDir,
     Paths.DATA_DIR,
     rawConfig.paths?.data_dir,
-    process.env[EnvVars.DATA_DIR],
+    env[EnvVars.DATA_DIR],
     opts.dataDir,
   );
 
@@ -105,11 +109,11 @@ export function resolveConfigPaths(
     homeDir,
     Paths.CODE_DIR,
     rawConfig.paths?.code_dir,
-    process.env[EnvVars.CODE_DIR],
+    env[EnvVars.CODE_DIR],
     opts.codeDir,
   );
 
-  const logsDir = resolveLogsDir(homeDir, rawConfig, opts);
+  const logsDir = resolveLogsDir(homeDir, rawConfig, opts, env);
 
   return {
     agentsDir,

@@ -38,6 +38,11 @@ export interface SchedulerRunnerContext {
   memoryBackend?: MemoryBackend;
 }
 
+export interface SchedulerRunnerRuntime {
+  makeRunId: () => string;
+  makeNowIso: () => string;
+}
+
 export interface StartScheduleRunResult {
   started: boolean;
   runId?: string;
@@ -105,7 +110,21 @@ function getInitialDeliveryStatus(
 export class SchedulerRunner {
   private runningSchedules = new Set<string>();
 
-  constructor(private ctx: SchedulerRunnerContext) {}
+  constructor(
+    private ctx: SchedulerRunnerContext,
+    private runtime: SchedulerRunnerRuntime = {
+      makeRunId,
+      makeNowIso,
+    },
+  ) {}
+
+  private getRunId(): string {
+    return this.runtime.makeRunId();
+  }
+
+  private nowIso(): string {
+    return this.runtime.makeNowIso();
+  }
 
   private getMemoryToolContext(
     schedule: ResolvedSchedule,
@@ -170,7 +189,7 @@ export class SchedulerRunner {
       };
     }
 
-    const runId = makeRunId();
+    const runId = this.getRunId();
     this.runningSchedules.add(schedule.name);
     void this.executeRun(runId, schedule, triggerSource)
       .catch((err) => {
@@ -198,8 +217,8 @@ export class SchedulerRunner {
     triggerSource: ScheduleTriggerSource,
     timezone: string,
   ): string {
-    const runId = makeRunId();
-    const nowIso = makeNowIso();
+    const runId = this.getRunId();
+    const nowIso = this.nowIso();
     const record: ScheduleRunRecord = {
       runId,
       scheduleName: schedule.name,
@@ -285,7 +304,7 @@ export class SchedulerRunner {
       driverDefault: driver.defaultModel,
     });
 
-    const startedAt = makeNowIso();
+    const startedAt = this.nowIso();
     const deliveryStatus = getInitialDeliveryStatus(schedule);
     const initialRecord: ScheduleRunRecord = {
       runId,
@@ -375,7 +394,7 @@ export class SchedulerRunner {
         (event) => {
           if (event.type === "tool_use") {
             this.ctx.auditLog.append({
-              ts: makeNowIso(),
+              ts: this.nowIso(),
               event: SchedulerAuditEvents.SCHEDULE_RUN_OUTPUT,
               run_id: ctx.runId,
               schedule_name: ctx.schedule.name,
@@ -398,7 +417,7 @@ export class SchedulerRunner {
       executionStatus = ScheduleExecutionStatuses.SUCCEEDED;
 
       this.ctx.auditLog.append({
-        ts: makeNowIso(),
+        ts: this.nowIso(),
         event: SchedulerAuditEvents.SCHEDULE_RUN_OUTPUT,
         run_id: ctx.runId,
         schedule_name: ctx.schedule.name,
@@ -421,7 +440,7 @@ export class SchedulerRunner {
         "schedule_run_execution_error",
       );
       this.ctx.auditLog.append({
-        ts: makeNowIso(),
+        ts: this.nowIso(),
         event: SchedulerAuditEvents.SCHEDULE_RUN_FAILED,
         run_id: ctx.runId,
         schedule_name: ctx.schedule.name,
@@ -450,7 +469,7 @@ export class SchedulerRunner {
             executionStatus = ScheduleExecutionStatuses.FAILED;
             errorMessage = error.message;
             this.ctx.auditLog.append({
-              ts: makeNowIso(),
+              ts: this.nowIso(),
               event: SchedulerAuditEvents.SCHEDULE_RUN_FAILED,
               run_id: ctx.runId,
               schedule_name: ctx.schedule.name,
@@ -495,7 +514,7 @@ export class SchedulerRunner {
     ) {
       deliveryStatus = ScheduleDeliveryStatuses.NOT_APPLICABLE;
       this.ctx.auditLog.append({
-        ts: makeNowIso(),
+        ts: this.nowIso(),
         event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_SUCCEEDED,
         run_id: ctx.runId,
         schedule_name: ctx.schedule.name,
@@ -522,7 +541,7 @@ export class SchedulerRunner {
         : buildFailureMessage(ctx.schedule.name, ctx.runId);
 
     this.ctx.auditLog.append({
-      ts: makeNowIso(),
+      ts: this.nowIso(),
       event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_STARTED,
       run_id: ctx.runId,
       schedule_name: ctx.schedule.name,
@@ -548,7 +567,7 @@ export class SchedulerRunner {
       );
       deliveryStatus = ScheduleDeliveryStatuses.SUCCEEDED;
       this.ctx.auditLog.append({
-        ts: makeNowIso(),
+        ts: this.nowIso(),
         event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_SUCCEEDED,
         run_id: ctx.runId,
         schedule_name: ctx.schedule.name,
@@ -577,7 +596,7 @@ export class SchedulerRunner {
         "schedule_run_delivery_error",
       );
       this.ctx.auditLog.append({
-        ts: makeNowIso(),
+        ts: this.nowIso(),
         event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_FAILED,
         run_id: ctx.runId,
         schedule_name: ctx.schedule.name,
@@ -613,7 +632,7 @@ export class SchedulerRunner {
         ? ScheduleRunStatuses.SUCCEEDED
         : ScheduleRunStatuses.FAILED;
 
-    const finishedAt = makeNowIso();
+    const finishedAt = this.nowIso();
     this.ctx.store.updateRun(ctx.runId, {
       status: overallStatus,
       executionStatus,
