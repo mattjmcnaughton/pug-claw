@@ -1,16 +1,18 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { ZodError } from "zod";
+import { CommandResults, type CommandResult } from "./types.ts";
 import { Paths } from "../constants.ts";
 import {
   type ConfigFile,
   ConfigFileSchema,
   expandTilde,
   resolveConfigPaths,
+  toError,
   validateConfigSemantics,
 } from "../resources.ts";
 
-export function runCheckConfig(path?: string): void {
+export function runCheckConfig(path?: string): CommandResult {
   const configPath = path
     ? resolve(expandTilde(path))
     : resolve(expandTilde(Paths.DEFAULT_HOME), Paths.CONFIG_FILE);
@@ -18,7 +20,7 @@ export function runCheckConfig(path?: string): void {
   // Check file exists
   if (!existsSync(configPath)) {
     console.error(`Error: File not found: ${configPath}`);
-    process.exit(1);
+    return CommandResults.error;
   }
 
   // Try to read and parse JSON
@@ -27,10 +29,10 @@ export function runCheckConfig(path?: string): void {
     const content = readFileSync(configPath, "utf-8");
     parsed = JSON.parse(content);
   } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err));
+    const error = toError(err);
     console.error(`Error: Invalid JSON in ${configPath}: ${error.message}`);
     console.error(error.stack);
-    process.exit(1);
+    return CommandResults.error;
   }
 
   // Validate against schema
@@ -41,7 +43,7 @@ export function runCheckConfig(path?: string): void {
       const path = issue.path.length > 0 ? issue.path.join(".") : "(root)";
       console.error(`  - ${path}: ${issue.message}`);
     }
-    process.exit(1);
+    return CommandResults.error;
   }
 
   const data = result.data as ConfigFile;
@@ -51,10 +53,10 @@ export function runCheckConfig(path?: string): void {
     const paths = resolveConfigPaths(homeDir, data);
     validateConfigSemantics(data, homeDir, paths);
   } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err));
+    const error = toError(err);
     console.error(`Error: Config validation failed for ${configPath}:`);
     console.error(`  - ${error.message}`);
-    process.exit(1);
+    return CommandResults.error;
   }
 
   console.log(`Config OK: ${configPath}`);
@@ -66,4 +68,5 @@ export function runCheckConfig(path?: string): void {
     `  schedules: ${data.schedules ? Object.keys(data.schedules).length : 0}`,
   ];
   console.log(summary.join("\n"));
+  return CommandResults.success;
 }

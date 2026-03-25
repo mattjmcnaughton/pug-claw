@@ -21,6 +21,7 @@ import {
 import { logger } from "../logger.ts";
 import type { ConfigFile } from "../resources.ts";
 import { expandTilde } from "../resources.ts";
+import { CommandResults, type CommandResult } from "./types.ts";
 
 function isManagedByPugClaw(filePath: string): boolean {
   try {
@@ -130,7 +131,12 @@ export function installBuiltins(homeDir: string): {
   return { installed, updated, skipped };
 }
 
-export async function runInit(builtinsOnly = false): Promise<void> {
+function cancelInit(): CommandResult {
+  p.cancel("Init cancelled.");
+  return CommandResults.cancelled;
+}
+
+export async function runInit(builtinsOnly = false): Promise<CommandResult> {
   if (builtinsOnly) {
     p.intro("pug-claw init --builtins-only");
     const envHome = process.env[EnvVars.HOME];
@@ -141,7 +147,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
       p.cancel(
         `Home directory not found: ${resolvedHome}\nRun \`pug-claw init\` first.`,
       );
-      process.exit(1);
+      return CommandResults.error;
     }
 
     ensureHomeDirectories(resolvedHome);
@@ -156,7 +162,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
       "Built-in skills and agents",
     );
     p.outro("Done!");
-    return;
+    return CommandResults.success;
   }
 
   p.intro("pug-claw init");
@@ -172,8 +178,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
   });
 
   if (p.isCancel(homeDir)) {
-    p.cancel("Init cancelled.");
-    process.exit(0);
+    return cancelInit();
   }
 
   const resolvedHome = resolve(expandTilde(homeDir));
@@ -185,8 +190,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
     });
 
     if (p.isCancel(overwrite) || !overwrite) {
-      p.cancel("Init cancelled.");
-      process.exit(0);
+      return cancelInit();
     }
   }
 
@@ -200,8 +204,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
   });
 
   if (p.isCancel(defaultAgent)) {
-    p.cancel("Init cancelled.");
-    process.exit(0);
+    return cancelInit();
   }
 
   const defaultDriver = await p.select({
@@ -218,8 +221,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
   });
 
   if (p.isCancel(defaultDriver)) {
-    p.cancel("Init cancelled.");
-    process.exit(0);
+    return cancelInit();
   }
 
   const secretsProvider = await p.select({
@@ -240,8 +242,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
   });
 
   if (p.isCancel(secretsProvider)) {
-    p.cancel("Init cancelled.");
-    process.exit(0);
+    return cancelInit();
   }
 
   const enableMemoryEmbeddings = await p.confirm({
@@ -250,8 +251,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
   });
 
   if (p.isCancel(enableMemoryEmbeddings)) {
-    p.cancel("Init cancelled.");
-    process.exit(0);
+    return cancelInit();
   }
 
   let dotenvPath: string = Paths.DOT_ENV;
@@ -265,8 +265,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
     });
 
     if (p.isCancel(dotenvInput)) {
-      p.cancel("Init cancelled.");
-      process.exit(0);
+      return cancelInit();
     }
     dotenvPath = dotenvInput;
   }
@@ -277,8 +276,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
   });
 
   if (p.isCancel(backupOutputDir)) {
-    p.cancel("Init cancelled.");
-    process.exit(0);
+    return cancelInit();
   }
 
   const guildId = await p.text({
@@ -287,8 +285,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
   });
 
   if (p.isCancel(guildId)) {
-    p.cancel("Init cancelled.");
-    process.exit(0);
+    return cancelInit();
   }
 
   let ownerId = "";
@@ -299,8 +296,7 @@ export async function runInit(builtinsOnly = false): Promise<void> {
     });
 
     if (p.isCancel(ownerInput)) {
-      p.cancel("Init cancelled.");
-      process.exit(0);
+      return cancelInit();
     }
     ownerId = ownerInput;
   }
@@ -424,4 +420,5 @@ export async function runInit(builtinsOnly = false): Promise<void> {
   );
 
   p.outro("Done! Run `pug-claw start` or `pug-claw tui` to get started.");
+  return CommandResults.success;
 }

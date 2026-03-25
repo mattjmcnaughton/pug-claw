@@ -7,6 +7,7 @@ import { runExportCommand } from "./commands/export.ts";
 import { runImportCommand } from "./commands/import.ts";
 import { runInit } from "./commands/init.ts";
 import { runInitService } from "./commands/init-service.ts";
+import type { CommandResult } from "./commands/types.ts";
 import {
   Drivers,
   EnvVars,
@@ -186,6 +187,10 @@ function collectStringValues(value: string, previous: string[] = []): string[] {
   return previous;
 }
 
+function applyCommandResult(result: CommandResult): void {
+  process.exitCode = result.exitCode;
+}
+
 const program = new Command();
 
 program.name("pug-claw").description("AI bot framework").version(VERSION);
@@ -256,12 +261,14 @@ program
       path: string,
       opts: { dryRun?: boolean; force?: boolean; home?: string },
     ) => {
-      await runImportCommand({
+      applyCommandResult(
+        await runImportCommand({
         path,
         home: opts.home,
         dryRun: opts.dryRun,
         force: opts.force,
-      });
+      }),
+      );
     },
   );
 
@@ -270,21 +277,21 @@ program
   .description("Initialize pug-claw configuration")
   .option("--builtins-only", "Only install/update built-in skills and agents")
   .action(async (opts: { builtinsOnly?: boolean }) => {
-    await runInit(opts.builtinsOnly ?? false);
+    applyCommandResult(await runInit(opts.builtinsOnly ?? false));
   });
 
 program
   .command("check-config [path]")
   .description("Validate a pug-claw config file")
   .action((path?: string) => {
-    runCheckConfig(path);
+    applyCommandResult(runCheckConfig(path));
   });
 
 program
   .command("init-service")
   .description("Generate a systemd service unit file")
   .action(async () => {
-    await runInitService();
+    applyCommandResult(await runInitService());
   });
 
 await program.parseAsync();

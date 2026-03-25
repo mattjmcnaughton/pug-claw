@@ -38,7 +38,7 @@ Hotspot list based on line-count concentration and cross-cutting responsibility.
 | 3 | Frontend duplication extraction | Done | Added shared frontend command action helpers and consolidated reload flow glue. | da59e7e |
 | 4 | SchedulerRunner phase decomposition | Done | Split run lifecycle into phase methods while preserving status transitions and output. | 6b61e33 |
 | 5 | Config module decomposition | Done | Split config concerns into `src/config/*` modules with `resources.ts` acting as facade. | 5441744 |
-| 6 | Command exit behavior refactor | Planned |  |  |
+| 6 | Command exit behavior refactor | Done | Replaced command-level `process.exit(...)` in target modules with typed command results; main now applies exit codes. | pending |
 | 7 | Driver tool schema consolidation | Planned |  |  |
 | 8 | Testability infrastructure | Planned |  |  |
 
