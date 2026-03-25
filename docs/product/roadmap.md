@@ -1,32 +1,8 @@
-# Roadmap
-
-## Completed
-
-- [x] Multi-driver architecture (Claude, Pi)
-- [x] Discord and TUI frontends
-- [x] Per-channel agent/driver/model configuration
-- [x] Pluggable agent/skills system
-- [x] CI pipeline (lint, format, typecheck, tests)
-- [x] Semantic-release with GitHub Releases
-- [x] Standalone binary builds (Linux x86_64, macOS ARM64) — **paused** (CI workflow disabled; flip `publish-binaries` flag in CI config to re-enable)
-- [x] Resource discovery: `~/.pug-claw` home directory with consolidated `config.json`
-- [x] CLI framework (Commander.js) with `start`, `tui`, `init` subcommands
-- [x] Interactive `pug-claw init` wizard (@clack/prompts)
-- [x] Global + agent-specific skills with merge and precedence
-- [x] Secrets provider abstraction (`env`, `dotenv`)
-- [x] Discord guild filtering and owner identity config
-- [x] Global CLI install via `bun link`
-- [x] Built-in skills (7 foundational skills) with agentskills.io format
-- [x] Built-in agents (default, pug-claw-manager)
-- [x] SYSTEM.md frontmatter with per-agent skill filtering (`allowed-skills`)
-- [x] `pug-claw init --builtins-only` for updating built-in content
-- [x] Cron / scheduler v1 for Discord-hosted recurring agent jobs
+# Product Roadmap
 
 ---
 
-## Phase 0: Foundation
-
-Core infrastructure that unblocks everything else.
+## Core
 
 ### Resource Discovery
 
@@ -61,7 +37,7 @@ Agents have zero awareness of who they're talking to. Needed by memory, permissi
 - [ ] Toggle visibility of agent thinking (show/hide reasoning traces per agent or frontend)
 - [ ] Toggle visibility of agent tool calls (show/hide tool invocations and results per agent or frontend) — *partial: Discord shows tool events via `onEvent` callback; TUI does not; no per-agent/frontend config toggle*
 
-### Sessions & Threads
+### Sessions
 
 Refine the "session" primitive — a context window with an agent, regardless of frontend (Discord, TUI, future frontends).
 
@@ -71,27 +47,9 @@ Refine the "session" primitive — a context window with an agent, regardless of
 - [ ] Session persistence: survive process restarts (ties into Safe Restart snapshot/restore)
 - [ ] Session API: unified interface that frontends implement
 
-### Storage & Persistence
+---
 
-Pluggable backends for databases and file stores.
-
-- [ ] Storage provider interface: abstract over where data lives
-- [ ] Database backends: SQLite (default/local), PostgreSQL (production) — *partial: SQLite runtime DB added for scheduler metadata only*
-- [ ] File store backends: local filesystem (default), S3-compatible
-- [ ] Prisma for schema management and migrations (introduce when DB schemas stabilize)
-- [ ] Configuration in `config.json` under a `[storage]` section
-
-### Command Framework
-
-Extend the existing `!command` pattern into a general-purpose `!namespace:command` system. Users and skills can register custom commands as lightweight shortcuts for invoking skills or agents with preset prompts/config.
-
-- [ ] `!namespace:command` invocation pattern (e.g., `!brain:search`, `!ops:restart`, `!memory:forget`)
-- [ ] Command registration: skills and agents can declare commands they provide
-- [ ] Built-in commands ship with pug-claw (extend existing `!help`, `!agent`, etc.)
-- [ ] Top-level `!command` sugar for global/common commands (e.g., `!help` as shorthand for `!pug-claw:help`)
-- [ ] Command discovery: `!help` lists namespaces, `!help <namespace>` lists commands in that namespace
-- [ ] Per-agent command filtering (consistent with existing `allowed-skills` pattern)
-- [ ] User-defined commands via config (name, description, skill/agent to invoke, default prompt)
+## Drivers & Frontends
 
 ### Streaming Responses
 
@@ -110,72 +68,15 @@ Allow agents to pause execution and ask the user for confirmation before taking 
 - [ ] Driver integration: surface confirmation requests from underlying agent SDKs (Claude tool approval, etc.) — *partial: Claude driver detects elicitation messages but only logs them; not surfaced to user*
 - [ ] Configurable confirmation policies per agent (always confirm, never confirm, confirm destructive only)
 
-### Type Normalization
+### Additional Frontends
 
-- [ ] Audit and tighten core types (`DriverResponse`, `DriverOptions`, `FrontendContext`)
-- [x] Shared constants for driver names, tool names, command prefixes
-
----
-
-## Phase 1: Deployment
-
-Get pug-claw running on a real server as early as possible. Everything else gets more useful once it's always-on.
-
-### Process Management
-
-- [x] SystemD unit file generation (`pug-claw init-service`)
-- [ ] Graceful shutdown: drain sessions, flush logs — *partial: frontends call `destroySession()` on quit/Ctrl+C; no system-wide signal handlers or log flushing*
-- [ ] Health check endpoint (for systemd watchdog, uptime monitoring)
-- [ ] JSONL structured logs from all agent interactions (audit trail) — *partial: scheduler JSONL audit logs implemented; full conversation audit trail still pending*
-
-### Safe Restart
-
-Ability to restart the process cleanly, and to roll back to the last known good state if something goes wrong.
-
-- [ ] Graceful restart command / signal handler (finish in-flight work, then restart)
-- [ ] State snapshot on shutdown (active sessions, pending jobs, config version)
-- [ ] Restore from snapshot on startup (resume where we left off)
-- [ ] Last-known-good config: persist last config that booted successfully
-- [ ] `pug-claw rollback` — restart using last-known-good config + binary
-- [ ] Automatic rollback on crash loop (N crashes in M minutes → revert)
-
-### Management Web UI
-
-Standalone web server (separate process) for managing pug-claw out-of-band. Critical for recovery when the main process crashes or a bad config/update breaks things.
-
-- [ ] Standalone HTTP server (`pug-claw admin`) — runs independently of the main process
-- [ ] Process monitor: show main process status (running, crashed, PID, uptime)
-- [ ] Log viewer: stream and search JSONL logs from the browser
-- [ ] Config viewer: display current config with validation status and diagnostics
-- [ ] Start / stop / restart controls for the main pug-claw process
-- [ ] Configurable process command (so the admin server knows how to launch pug-claw)
-- [ ] Last-known-good config display and one-click rollback
-- [ ] Auth: at minimum, bind to localhost only; optionally token-based access
-
-### Deploy Pipeline
-
-- [ ] Deploy to VM (manual first run)
-- [ ] Automated deploy script or CI job (build → scp/rsync → restart service)
-- [ ] Smoke test after deploy (health check passes before marking deploy as good)
-
-### Containerization
-
-- [ ] Dockerfile and docker-compose for local/dev deployment (get mounts right for `~/.pug-claw`)
-- [ ] Helm chart for Kubernetes deployment
-- [ ] Singleton enforcement: only one pug-claw instance should run at a time (shared filesystem lock, DynamoDB lease, or similar)
-- [ ] Document volume mount strategy for config, data, and logs
+- [ ] Slack frontend
+- [ ] Telegram frontend
+- [ ] Shared frontend logic extraction (reduce duplication between Discord/TUI/new frontends)
 
 ---
 
-## Phase 2: Memory, Knowledge, and Cron
-
-### Conversation Log
-
-Append-only JSONL log of all conversations. Source of truth for everything downstream.
-
-- [ ] JSONL conversation logger (one file per agent per day)
-- [ ] Log schema: timestamp, agent, user, role, content, metadata
-- [ ] Log rotation / retention policy
+## Memory & Knowledge
 
 ### Working Memory
 
@@ -185,7 +86,15 @@ Per-agent scratchpad the agent can read/write during a session. Persists across 
 - [ ] `SaveMemory` / `ReadMemory` tools for agents
 - [ ] `!remember` / `!forget` / `!memory` user commands
 
-### MEMORY.md and Conversation Summaries
+### Conversation Log
+
+Append-only JSONL log of all conversations. Source of truth for everything downstream.
+
+- [ ] JSONL conversation logger (one file per agent per day)
+- [ ] Log schema: timestamp, agent, user, role, content, metadata
+- [ ] Log rotation / retention policy
+
+### Conversation Summaries
 
 Batch job (cron) that processes JSONL logs into usable artifacts. Runs as a skill.
 
@@ -197,7 +106,7 @@ Batch job (cron) that processes JSONL logs into usable artifacts. Runs as a skil
 
 ### Second Brain
 
-Agents can search and write to your personal knowledge base.
+Agents can search and write to a personal knowledge base.
 
 - [ ] Brain config: source paths, inbox path, index path (`[brain]` in config)
 - [ ] `brain-search` tool: full-text search (ripgrep) across configured source paths
@@ -209,32 +118,7 @@ Agents can search and write to your personal knowledge base.
 - [ ] File watcher for live reindex during long-running processes
 - [ ] `pug-claw reindex` CLI command
 
-### Jobs
-
-A job is anything running outside the main execution thread. Covers both timer-based scheduled work and agent-spawned background tasks.
-
-#### Cron Jobs
-
-Simple timer-based agent actions. Enables conversation capture, brain reindexing, and daily summaries without full workflow infrastructure.
-
-- [x] Schedule config in `config.json`
-- [x] Timer runtime (polling loop + cron parsing, runs inside the main Discord process)
-- [ ] Each job: agent + prompt + output target (Discord channel, brain, log only) — *partial: Discord channel output + built-in logging implemented*
-- [x] `!schedules` command to list active jobs — *TUI command intentionally out of scope for v1*
-- [ ] Built-in jobs: brain reindex
-- [ ] Memory compaction — "one-day" feature. Add a lightweight maintenance job that reviews stored memory, merges obvious duplicates or stale entries, and writes back a smaller distilled set. This is intentionally deferred until the core memory write/retrieval/editing flow is stable.
-
-#### Agent-Spawned Jobs
-
-Background tasks kicked off by a main agent during a session.
-
-- [ ] Integration with Pi/Claude Agent SDK primitives (sub-agents, tool calls)
-- [ ] Job lifecycle: submit, running, completed, failed
-- [ ] Job monitoring: status, logs, cancellation
-- [ ] `job-management` skill for agents to create/monitor/cancel jobs
-- [ ] Notification when jobs complete (back to originating session/channel)
-
-### Semantic Embeddings (optional, later)
+### Semantic Embeddings
 
 Optional layer on top of conversation logs and memory. Enables similarity search across all stored content.
 
@@ -245,79 +129,52 @@ Optional layer on top of conversation logs and memory. Enables similarity search
 - [ ] Pluggable vector store backend (sqlite-vec, pgvector, Pinecone, etc.)
 - [ ] Vector store configuration in `config.json`
 
-### Second Brain - Advanced (later)
+---
 
-- [ ] Connection discovery ("notes related to X")
-- [ ] Spaced repetition surfacing ("you wrote about this 3 months ago")
-- [ ] Ingest pipeline: PDF extraction, web clips, email import, voice transcription
+## Jobs & Scheduling
+
+### Cron Jobs
+
+Simple timer-based agent actions. Enables conversation capture, brain reindexing, and daily summaries without full workflow infrastructure.
+
+- [x] Schedule config in `config.json`
+- [x] Timer runtime (polling loop + cron parsing, runs inside the main Discord process)
+- [ ] Each job: agent + prompt + output target (Discord channel, brain, log only) — *partial: Discord channel output + built-in logging implemented*
+- [x] `!schedules` command to list active jobs — *TUI command intentionally out of scope for v1*
+- [ ] Built-in jobs: brain reindex
+- [ ] Memory compaction — "one-day" feature. Was implemented and then intentionally removed (commit `8274794`). Deferred until the core memory write/retrieval/editing flow is stable.
+
+### Agent-Spawned Jobs
+
+Background tasks kicked off by a main agent during a session.
+
+- [ ] Integration with Pi/Claude Agent SDK primitives (sub-agents, tool calls)
+- [ ] Job lifecycle: submit, running, completed, failed
+- [ ] Job monitoring: status, logs, cancellation
+- [ ] `job-management` skill for agents to create/monitor/cancel jobs
+- [ ] Notification when jobs complete (back to originating session/channel)
 
 ---
 
-## Phase 3: Agent Ecosystem
+## Agent Framework
 
-### Core Agents
+### Command Framework
 
-- [ ] `coder` - coding-focused, full tool access, opinionated about style
-- [ ] `ops` - DevOps/infra, knows your VM, can check services and logs
-- [ ] `researcher` - deep research with web search + brain search combined
-- [ ] `writer` - content creation: blog posts, docs, READMEs
-- [ ] `archivist` - knowledge management, indexes and organizes the brain
-- [ ] `triage` - lightweight router, classifies messages and delegates to the right agent
-- [ ] `reviewer` - code review, reads diffs, gives structured feedback
-- [ ] `scheduler` - manages recurring tasks, reminders, check-ins
+Extend the existing `!command` pattern into a general-purpose `!namespace:command` system. Users and skills can register custom commands as lightweight shortcuts for invoking skills or agents with preset prompts/config.
 
-### Core Skills
-
-Coding:
-- [ ] `code-review` - review code for bugs, style, security
-- [ ] `explain-code` - explain what code does in plain language
-- [ ] `debug` - diagnose bugs from error output
-- [ ] `write-tests` - generate tests for given code
-- [ ] `git-summary` - summarize recent git activity
-
-Knowledge:
-- [ ] `recall` - search the brain for relevant knowledge
-- [ ] `remember` - save a fact or insight to the brain
-- [ ] `capture` - save a web page, PDF, or excerpt to the brain
-- [ ] `web-search` - search the web and return summarized results
-- [ ] `research` - web search + brain search, what do I know vs. what's new
-
-Content:
-- [ ] `draft-post` - draft a blog post or social media post
-- [ ] `edit-prose` - improve clarity, tone, grammar
-- [ ] `write-docs` - generate documentation from code
-
-Ops:
-- [ ] `check-service` - check status of a systemd service
-- [ ] `tail-logs` - tail and summarize recent logs
-- [ ] `deploy` - guide or execute deployment steps
-
-Utility:
-- [ ] `delegate` - hand off a subtask to another agent
-- [ ] `classify` - classify a message by intent/topic
+- [ ] `!namespace:command` invocation pattern (e.g., `!brain:search`, `!ops:restart`, `!memory:forget`)
+- [ ] Command registration: skills and agents can declare commands they provide
+- [ ] Built-in commands ship with pug-claw (extend existing `!help`, `!agent`, etc.)
+- [ ] Top-level `!command` sugar for global/common commands (e.g., `!help` as shorthand for `!pug-claw:help`)
+- [ ] Command discovery: `!help` lists namespaces, `!help <namespace>` lists commands in that namespace
+- [ ] Per-agent command filtering (consistent with existing `allowed-skills` pattern)
+- [ ] User-defined commands via config (name, description, skill/agent to invoke, default prompt)
 
 ### Agent-to-Agent Delegation
 
 - [ ] `delegate` tool: create temp session with target agent, send prompt, return result
 - [ ] Recursion depth limit
 - [ ] Context passing controls (full conversation vs. subtask only)
-
-### Additional Frontends
-
-- [ ] Slack frontend
-- [ ] Telegram frontend
-- [ ] Webhook / HTTP API frontend
-- [ ] Shared frontend logic extraction (reduce duplication between Discord/TUI/new frontends)
-
-### Admin Dashboard
-
-Broader web UI for managing pug-claw beyond process recovery (the Management Web UI in Phase 1 covers the standalone recovery server).
-
-- [ ] Agent management: view, configure, enable/disable agents
-- [ ] Session viewer: active sessions, history, replay
-- [ ] Job dashboard: running/completed/failed jobs, logs, retry
-- [ ] Config editor: edit config.json from the browser with validation
-- [ ] Metrics overview: message counts, token usage, error rates
 
 ### Message Routing
 
@@ -327,24 +184,52 @@ Broader web UI for managing pug-claw beyond process recovery (the Management Web
 
 ---
 
-## Phase 4: Advanced Automation and Workflows
+## API
+
+Programmatic interface for interacting with pug-claw. Ordered by value.
+
+**Agent Invocation API** — The core primitive. Invoke agents programmatically over HTTP. Unlocks scripting, CI/CD integration, webhooks, mobile/web UIs, Shortcuts/Raycast, and inter-service communication.
+
+- [ ] `POST /api/v1/agent/invoke` — send a prompt to a named agent, get a response
+- [ ] Auth (API key or token-based)
+- [ ] Async mode: submit a job, poll or receive callback on completion
+- [ ] Webhook ingestion: accept events from external services (GitHub, Linear, etc.) and route to agents
+
+**Management API** — CRUD for config, agents, sessions, and jobs. Backend for the Management & Admin UI.
+
+- [ ] Agent endpoints: list, inspect, enable/disable
+- [ ] Session endpoints: list active, inspect, close
+- [ ] Job endpoints: list, inspect, cancel
+- [ ] Config endpoints: view, validate, update
+
+**Event Streaming** — Real-time agent activity for live dashboards and custom UIs.
+
+- [ ] WebSocket or SSE endpoint for agent events (tool use, status changes, completions)
+- [ ] Filterable by agent, session, or event type
+
+---
+
+## Automation
 
 ### Workflow Chaining
 
-Multi-step pipelines built on top of the Command Framework (Phase 0). Commands are single-action shortcuts; workflows chain multiple commands/agents together declaratively.
+Multi-step pipelines built on top of the Command Framework. Commands are single-action shortcuts; workflows chain multiple commands/agents together declaratively.
 
 - [ ] Workflow definitions (YAML): sequential steps with agent + input/output mapping
 - [ ] Trigger types: message, cron, webhook, agent output
 - [ ] Variable interpolation between steps
 
-### VM Coding Agent + Tailscale
+### Sandbox Execution
 
-- [ ] `vm-code` skill: launch a coding agent (Claude Code / Codex) in a sandboxed workspace
-- [ ] Monitor agent progress, report status back to user
-- [ ] Serve output over Tailscale (bind to port, or `tailscale serve`)
-- [ ] Port tracking and cleanup
-- [ ] Workspace lifecycle: auto-cleanup after timeout or `!stop` command
-- [ ] Resource limits (Docker container option)
+Run agent workloads (coding agents, long-running tasks) in isolated environments. Platform-level infrastructure that agents and skills can leverage.
+
+- [ ] Sandbox provider interface: abstract over execution backends (Docker, VM, local)
+- [ ] Docker sandbox: launch containers with mounted workspaces, resource limits, auto-cleanup
+- [ ] VM sandbox: provision and manage lightweight VMs for heavier workloads
+- [ ] Agent progress monitoring: status callbacks from sandbox to originating session
+- [ ] Workspace lifecycle: create, monitor, timeout, cleanup
+- [ ] Network access controls: expose sandbox services via Tailscale or port forwarding
+- [ ] Integration with coding agent SDKs (Claude Code, Codex, Pi) as sandbox workloads
 
 ### Event-Driven Triggers
 
@@ -354,14 +239,24 @@ Multi-step pipelines built on top of the Command Framework (Phase 0). Commands a
 
 ---
 
-## Phase 5: Operations and Polish
+## Operations
 
-### Distribution
+### Management & Admin UI
 
-- [ ] Homebrew tap formula
-- [ ] npm package (if requested)
-- [ ] Getting started guide / quickstart walkthrough
-- [ ] Blog post / launch announcement
+Standalone web server (separate process) for managing pug-claw out-of-band. Critical for recovery when the main process crashes or a bad config/update breaks things.
+
+- [ ] Standalone HTTP server (`pug-claw admin`) — runs independently of the main process
+- [ ] Process monitor: show main process status (running, crashed, PID, uptime)
+- [ ] Log viewer: stream and search JSONL logs from the browser
+- [ ] Config viewer / editor: display and edit config with validation status and diagnostics
+- [ ] Start / stop / restart controls for the main pug-claw process
+- [ ] Configurable process command (so the admin server knows how to launch pug-claw)
+- [ ] Last-known-good config display and one-click rollback
+- [ ] Auth: at minimum, bind to localhost only; optionally token-based access
+- [ ] Agent management: view, configure, enable/disable agents
+- [ ] Session viewer: active sessions, history, replay
+- [ ] Job dashboard: running/completed/failed jobs, logs, retry
+- [ ] Metrics overview: message counts, token usage, error rates
 
 ### Export and Backup
 
@@ -371,27 +266,12 @@ Multi-step pipelines built on top of the Command Framework (Phase 0). Commands a
 - [ ] `pug-claw inspect memory|data|agents|brain` - show what's stored
 - [ ] Systemd timer or cron for nightly backups
 
-### Quality
+### Distribution
 
-- [ ] Better test coverage (frontends, drivers, integration with real APIs)
-- [ ] Refactoring pass on shared frontend logic (Discord + TUI command handling is still duplicated; agent resolution extracted to `src/agents.ts`)
-- [ ] Error recovery and retry logic for drivers
-- [ ] Dev mode hot reload (`bun --watch`)
-- [ ] Agent/skill scaffolding CLI (`pug-claw new-agent`, `pug-claw new-skill`)
-
-### Port OpenClaw Workflows
-
-- [ ] Identify and list OpenClaw workflows to port
-- [ ] PR review pipeline (GitHub webhook -> reviewer agent -> post comment)
-- [ ] Daily standup bot (cron -> summarize activity -> post to channel)
-- [ ] On-call assistant (alert -> ops agent triages)
-- [ ] Knowledge capture (conversation -> archivist extracts key facts)
-
----
-
-## Known Bugs
-
-- [ ] Claude driver `tool_progress` events never fire in `bypassPermissions` mode — `onEvent` callback receives no tool-use events, so Discord tool-use notifications and structured logging of tool calls are silently broken. Discovered during e2e testing. Likely an SDK limitation or missing event subscription.
+- [ ] Homebrew tap formula
+- [ ] npm package (if requested)
+- [ ] Getting started guide / quickstart walkthrough
+- [ ] Blog post / launch announcement
 
 ---
 
@@ -401,7 +281,6 @@ Multi-step pipelines built on top of the Command Framework (Phase 0). Commands a
 - [ ] Multi-user permissions model
 - [ ] Cost / token tracking per user and per agent
 - [ ] Rate limiting and per-user quotas
-- [ ] Observability: metrics (Prometheus), tracing (OpenTelemetry)
 - [ ] Artifact / file sharing (surface agent outputs cleanly per frontend)
 - [ ] Knowledge graph (entities + relationships across notes)
 - [ ] Output formatters / renderers per frontend
