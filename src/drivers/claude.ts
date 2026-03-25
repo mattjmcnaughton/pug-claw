@@ -3,16 +3,9 @@ import {
   query,
   tool,
 } from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod/v4";
 import { Drivers } from "../constants.ts";
 import { logger } from "../logger.ts";
-import {
-  deleteMemory,
-  listMemory,
-  saveMemory,
-  searchMemory,
-  updateMemory,
-} from "../memory/tools.ts";
+import { memoryToolSchemas } from "../memory/tool-schema.ts";
 import { buildFinalSystemPrompt } from "../prompt.ts";
 import type {
   Driver,
@@ -49,72 +42,20 @@ function createMemoryMcpServer(
 ) {
   return createSdkMcpServer({
     name: "memory",
-    tools: [
+    tools: memoryToolSchemas.map((memoryTool) =>
       tool(
-        "SaveMemory",
-        "Save a piece of information to memory for future reference.",
-        {
-          content: z.string(),
-          scope: z.enum(["agent", "global", "user"]).optional(),
-          tags: z.array(z.string()).optional(),
-        },
+        memoryTool.name,
+        memoryTool.description,
+        memoryTool.claudeParameters,
         async (args) => {
-          const result = await saveMemory(memoryToolContext, args);
-          return textResult(
-            `Saved memory ${result.entry.id} in ${result.entry.scope}.`,
-          );
+          const result = await memoryTool.execute(memoryToolContext, args);
+          const text = memoryTool.formatClaudeResult
+            ? memoryTool.formatClaudeResult(result)
+            : JSON.stringify(result);
+          return textResult(text);
         },
       ),
-      tool(
-        "SearchMemory",
-        "Search memory for relevant information.",
-        {
-          query: z.string(),
-          scope: z.enum(["agent", "global", "user"]).optional(),
-          limit: z.number().int().positive().optional(),
-        },
-        async (args) => {
-          const result = await searchMemory(memoryToolContext, args);
-          return textResult(JSON.stringify(result));
-        },
-      ),
-      tool(
-        "UpdateMemory",
-        "Update an existing memory entry.",
-        {
-          id: z.string(),
-          content: z.string().optional(),
-          tags: z.array(z.string()).optional(),
-        },
-        async (args) => {
-          const result = await updateMemory(memoryToolContext, args);
-          return textResult(JSON.stringify(result));
-        },
-      ),
-      tool(
-        "DeleteMemory",
-        "Archive a memory entry.",
-        {
-          id: z.string(),
-        },
-        async (args) => {
-          const result = await deleteMemory(memoryToolContext, args);
-          return textResult(JSON.stringify(result));
-        },
-      ),
-      tool(
-        "ListMemory",
-        "List memory entries, optionally filtered.",
-        {
-          scope: z.enum(["agent", "global", "user"]).optional(),
-          limit: z.number().int().positive().optional(),
-        },
-        async (args) => {
-          const result = await listMemory(memoryToolContext, args);
-          return textResult(JSON.stringify(result));
-        },
-      ),
-    ],
+    ),
   });
 }
 
