@@ -10,16 +10,9 @@ import {
   SettingsManager,
   type ToolDefinition,
 } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
 import { Drivers } from "../constants.ts";
 import { logger } from "../logger.ts";
-import {
-  deleteMemory,
-  listMemory,
-  saveMemory,
-  searchMemory,
-  updateMemory,
-} from "../memory/tools.ts";
+import { memoryToolSchemas } from "../memory/tool-schema.ts";
 import { buildFinalSystemPrompt } from "../prompt.ts";
 import { toError } from "../resources.ts";
 import type {
@@ -65,149 +58,24 @@ export function buildPiSystemPrompt(
 function createPiMemoryTools(
   memoryToolContext: NonNullable<DriverOptions["memoryToolContext"]>,
 ): ToolDefinition[] {
-  return [
-    {
-      name: "SaveMemory",
-      label: "SaveMemory",
-      description:
-        "Save a piece of information to memory for future reference.",
-      parameters: Type.Object({
-        content: Type.String(),
-        scope: Type.Optional(
-          Type.Union([
-            Type.Literal("agent"),
-            Type.Literal("global"),
-            Type.Literal("user"),
-          ]),
-        ),
-        tags: Type.Optional(Type.Array(Type.String())),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await saveMemory(
-          memoryToolContext,
-          args as Parameters<typeof saveMemory>[1],
-        );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result),
-            },
-          ],
-          details: undefined,
-        };
-      },
+  return memoryToolSchemas.map((memoryTool) => ({
+    name: memoryTool.name,
+    label: memoryTool.name,
+    description: memoryTool.description,
+    parameters: memoryTool.piParameters,
+    async execute(_toolCallId, args) {
+      const result = await memoryTool.execute(memoryToolContext, args);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result),
+          },
+        ],
+        details: undefined,
+      };
     },
-    {
-      name: "SearchMemory",
-      label: "SearchMemory",
-      description: "Search memory for relevant information.",
-      parameters: Type.Object({
-        query: Type.String(),
-        scope: Type.Optional(
-          Type.Union([
-            Type.Literal("agent"),
-            Type.Literal("global"),
-            Type.Literal("user"),
-          ]),
-        ),
-        limit: Type.Optional(Type.Number()),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await searchMemory(
-          memoryToolContext,
-          args as Parameters<typeof searchMemory>[1],
-        );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result),
-            },
-          ],
-          details: undefined,
-        };
-      },
-    },
-    {
-      name: "UpdateMemory",
-      label: "UpdateMemory",
-      description: "Update an existing memory entry.",
-      parameters: Type.Object({
-        id: Type.String(),
-        content: Type.Optional(Type.String()),
-        tags: Type.Optional(Type.Array(Type.String())),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await updateMemory(
-          memoryToolContext,
-          args as Parameters<typeof updateMemory>[1],
-        );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result),
-            },
-          ],
-          details: undefined,
-        };
-      },
-    },
-    {
-      name: "DeleteMemory",
-      label: "DeleteMemory",
-      description: "Archive a memory entry.",
-      parameters: Type.Object({
-        id: Type.String(),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await deleteMemory(
-          memoryToolContext,
-          args as Parameters<typeof deleteMemory>[1],
-        );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result),
-            },
-          ],
-          details: undefined,
-        };
-      },
-    },
-    {
-      name: "ListMemory",
-      label: "ListMemory",
-      description: "List memory entries, optionally filtered.",
-      parameters: Type.Object({
-        scope: Type.Optional(
-          Type.Union([
-            Type.Literal("agent"),
-            Type.Literal("global"),
-            Type.Literal("user"),
-          ]),
-        ),
-        limit: Type.Optional(Type.Number()),
-      }),
-      async execute(_toolCallId, args) {
-        const result = await listMemory(
-          memoryToolContext,
-          args as Parameters<typeof listMemory>[1],
-        );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result),
-            },
-          ],
-          details: undefined,
-        };
-      },
-    },
-  ];
+  }));
 }
 
 export interface PiEventHandlerResult {
