@@ -32,12 +32,12 @@ Hotspot list based on line-count concentration and cross-cutting responsibility.
 
 | Chunk | Theme | Status | Notes | Commit |
 | --- | --- | --- | --- | --- |
-| 0 | Baseline and safety net | Done | Tracker created; baseline checklist + hotspots documented. | pending |
-| 1 | Constants and message templates | Planned |  |  |
-| 2 | Type strictness (low risk first) | Planned |  |  |
-| 3 | Frontend duplication extraction | Planned |  |  |
-| 4 | SchedulerRunner phase decomposition | Planned |  |  |
-| 5 | Config module decomposition | Planned |  |  |
+| 0 | Baseline and safety net | Done | Tracker created; baseline checklist + hotspots documented. | 14e66a5 |
+| 1 | Constants and message templates | Done | Extracted shared command/scheduler message constants and replaced duplicated inline strings. | e39798e |
+| 2 | Type strictness (low risk first) | Done | Tightened command/driver typing and reduced broad map usage in entrypoint wiring. | be7a703 |
+| 3 | Frontend duplication extraction | Done | Added shared frontend command action helpers and consolidated reload flow glue. | da59e7e |
+| 4 | SchedulerRunner phase decomposition | Done | Split run lifecycle into phase methods while preserving status transitions and output. | 6b61e33 |
+| 5 | Config module decomposition | Done | Split config concerns into `src/config/*` modules with `resources.ts` acting as facade. | 5441744 |
 | 6 | Command exit behavior refactor | Planned |  |  |
 | 7 | Driver tool schema consolidation | Planned |  |  |
 | 8 | Testability infrastructure | Planned |  |  |
