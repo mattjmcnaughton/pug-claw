@@ -212,7 +212,36 @@ function createPiMemoryTools(
 
 export interface PiEventHandlerResult {
   getText: () => string;
-  handleEvent: (event: { type: string; [key: string]: unknown }) => void;
+  handleEvent: (event: PiDriverEventPayload) => void;
+}
+
+export interface PiDriverEventPayload {
+  type: string;
+  assistantMessageEvent?: unknown;
+  toolName?: unknown;
+  toolCallId?: unknown;
+  args?: unknown;
+  isError?: unknown;
+}
+
+function getTextDeltaFromEvent(event: PiDriverEventPayload): string | undefined {
+  if (event.type !== "message_update") {
+    return undefined;
+  }
+
+  if (
+    !event.assistantMessageEvent ||
+    typeof event.assistantMessageEvent !== "object"
+  ) {
+    return undefined;
+  }
+
+  const assistantEvent = event.assistantMessageEvent as Record<string, unknown>;
+  if (assistantEvent.type !== "text_delta") {
+    return undefined;
+  }
+
+  return typeof assistantEvent.delta === "string" ? assistantEvent.delta : "";
 }
 
 export function createPiEventHandler(
@@ -221,30 +250,30 @@ export function createPiEventHandler(
 ): PiEventHandlerResult {
   let responseText = "";
 
-  function handleEvent(event: { type: string; [key: string]: unknown }): void {
-    if (
-      event.type === "message_update" &&
-      (event.assistantMessageEvent as { type: string } | undefined)?.type ===
-        "text_delta"
-    ) {
-      responseText +=
-        (event.assistantMessageEvent as { delta: string }).delta ?? "";
+  function handleEvent(event: PiDriverEventPayload): void {
+    const textDelta = getTextDeltaFromEvent(event);
+    if (textDelta !== undefined) {
+      responseText += textDelta;
     } else if (event.type === "tool_execution_start") {
+      const toolName =
+        typeof event.toolName === "string" ? event.toolName : "unknown";
       logger.info(
         {
           session_id: sessionId,
-          tool: event.toolName,
+          tool: toolName,
           tool_call_id: event.toolCallId,
           args: event.args,
         },
         "pi_tool_call_start",
       );
-      onEvent?.({ type: "tool_use", tool: String(event.toolName) });
+      onEvent?.({ type: "tool_use", tool: toolName });
     } else if (event.type === "tool_execution_end") {
+      const toolName =
+        typeof event.toolName === "string" ? event.toolName : "unknown";
       logger.info(
         {
           session_id: sessionId,
-          tool: event.toolName,
+          tool: toolName,
           tool_call_id: event.toolCallId,
           is_error: event.isError,
         },

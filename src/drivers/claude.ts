@@ -164,8 +164,15 @@ export function buildClaudeSdkOptions(
   };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Claude SDK message types are untyped
-type SdkMessage = any;
+type SdkMessage = Record<string, unknown>;
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function readMessageField(msg: SdkMessage, key: string): string | undefined {
+  return readString(msg[key]);
+}
 
 export interface ClaudeEventResult {
   text: string;
@@ -182,51 +189,48 @@ export async function processClaudeEvents(
   const toolsSeen = new Set<string>();
 
   for await (const msg of messages) {
-    const msgType =
-      "type" in msg ? String(msg.type) : "result" in msg ? "result" : "unknown";
+    const msgTypeValue = readMessageField(msg, "type");
+    const msgType = msgTypeValue ?? (readMessageField(msg, "result") ? "result" : "unknown");
     logger.debug({ msg_type: msgType }, "claude_sdk_message");
 
-    if ("result" in msg) {
-      responseText = msg.result;
+    const resultText = readMessageField(msg, "result");
+    if (resultText !== undefined) {
+      responseText = resultText;
     } else if (
-      "type" in msg &&
-      msg.type === "system" &&
-      "subtype" in msg &&
-      msg.subtype === "init" &&
-      "session_id" in msg
+      msgTypeValue === "system" &&
+      readMessageField(msg, "subtype") === "init"
     ) {
-      extractedSessionId = msg.session_id as string;
-    } else if (
-      "type" in msg &&
-      msg.type === "tool_progress" &&
-      "tool_name" in msg
-    ) {
-      const toolUseId = "tool_use_id" in msg ? String(msg.tool_use_id) : "";
+      extractedSessionId = readMessageField(msg, "session_id");
+    } else if (msgTypeValue === "tool_progress") {
+      const toolName = readMessageField(msg, "tool_name");
+      if (!toolName) {
+        continue;
+      }
+
+      const toolUseId = readMessageField(msg, "tool_use_id") ?? "";
       if (toolUseId && !toolsSeen.has(toolUseId)) {
         toolsSeen.add(toolUseId);
         logger.info(
           {
             session_id: sessionId,
-            tool: String(msg.tool_name),
+            tool: toolName,
             tool_use_id: toolUseId,
           },
           "claude_tool_call_start",
         );
       }
-      onEvent?.({ type: "tool_use", tool: String(msg.tool_name) });
+      onEvent?.({ type: "tool_use", tool: toolName });
     } else if (
-      "type" in msg &&
-      msg.type === "system" &&
-      "subtype" in msg &&
-      msg.subtype === "status" &&
-      "status" in msg
+      msgTypeValue === "system" &&
+      readMessageField(msg, "subtype") === "status"
     ) {
-      onEvent?.({ type: "status", message: String(msg.status) });
+      const statusMessage = readMessageField(msg, "status");
+      if (statusMessage) {
+        onEvent?.({ type: "status", message: statusMessage });
+      }
     } else if (
-      "type" in msg &&
-      msg.type === "system" &&
-      "subtype" in msg &&
-      String(msg.subtype) === "elicitation"
+      msgTypeValue === "system" &&
+      readMessageField(msg, "subtype") === "elicitation"
     ) {
       logger.warn({ msg_type: msgType }, "claude_elicitation_message");
     }
