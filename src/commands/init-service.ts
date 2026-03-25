@@ -4,8 +4,14 @@ import { homedir, userInfo } from "node:os";
 import * as p from "@clack/prompts";
 import { EnvVars, Paths } from "../constants.ts";
 import { expandTilde } from "../resources.ts";
+import { CommandResults, type CommandResult } from "./types.ts";
 
-export async function runInitService(): Promise<void> {
+function cancelInitService(): CommandResult {
+  p.cancel("Cancelled.");
+  return CommandResults.cancelled;
+}
+
+export async function runInitService(): Promise<CommandResult> {
   p.intro("pug-claw init-service");
 
   const detectedUser = userInfo().username;
@@ -21,8 +27,7 @@ export async function runInitService(): Promise<void> {
   });
 
   if (p.isCancel(user)) {
-    p.cancel("Cancelled.");
-    process.exit(0);
+    return cancelInitService();
   }
 
   const home = await p.text({
@@ -34,8 +39,7 @@ export async function runInitService(): Promise<void> {
   });
 
   if (p.isCancel(home)) {
-    p.cancel("Cancelled.");
-    process.exit(0);
+    return cancelInitService();
   }
 
   const runMode = await p.select({
@@ -47,8 +51,7 @@ export async function runInitService(): Promise<void> {
   });
 
   if (p.isCancel(runMode)) {
-    p.cancel("Cancelled.");
-    process.exit(0);
+    return cancelInitService();
   }
 
   let execStart: string;
@@ -64,8 +67,7 @@ export async function runInitService(): Promise<void> {
     });
 
     if (p.isCancel(binaryPath)) {
-      p.cancel("Cancelled.");
-      process.exit(0);
+      return cancelInitService();
     }
 
     const wd = await p.text({
@@ -77,8 +79,7 @@ export async function runInitService(): Promise<void> {
     });
 
     if (p.isCancel(wd)) {
-      p.cancel("Cancelled.");
-      process.exit(0);
+      return cancelInitService();
     }
 
     execStart = `${binaryPath} start`;
@@ -93,8 +94,7 @@ export async function runInitService(): Promise<void> {
     });
 
     if (p.isCancel(bunPath)) {
-      p.cancel("Cancelled.");
-      process.exit(0);
+      return cancelInitService();
     }
 
     const wd = await p.text({
@@ -106,8 +106,7 @@ export async function runInitService(): Promise<void> {
     });
 
     if (p.isCancel(wd)) {
-      p.cancel("Cancelled.");
-      process.exit(0);
+      return cancelInitService();
     }
 
     execStart = `${bunPath} ${mainScript} start`;
@@ -123,8 +122,7 @@ export async function runInitService(): Promise<void> {
   });
 
   if (p.isCancel(pathEnv)) {
-    p.cancel("Cancelled.");
-    process.exit(0);
+    return cancelInitService();
   }
 
   const outputPath = await p.text({
@@ -136,8 +134,7 @@ export async function runInitService(): Promise<void> {
   });
 
   if (p.isCancel(outputPath)) {
-    p.cancel("Cancelled.");
-    process.exit(0);
+    return cancelInitService();
   }
 
   // Resolve to absolute path so systemd doesn't need tilde expansion
@@ -183,4 +180,5 @@ WantedBy=multi-user.target
   );
 
   p.outro("Done!");
+  return CommandResults.success;
 }

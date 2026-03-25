@@ -1,13 +1,14 @@
 import * as p from "@clack/prompts";
 import { importBackup } from "../backup/import.ts";
 import { toError } from "../resources.ts";
+import { CommandResults, type CommandResult } from "./types.ts";
 
 export async function runImportCommand(opts: {
   dryRun?: boolean;
   force?: boolean;
   home?: string;
   path: string;
-}): Promise<void> {
+}): Promise<CommandResult> {
   try {
     const inspection = await importBackup({
       archivePath: opts.path,
@@ -23,7 +24,7 @@ export async function runImportCommand(opts: {
 
     if (opts.dryRun) {
       console.log(summary);
-      return;
+      return CommandResults.success;
     }
 
     if (inspection.existingTargets.length > 0 && !opts.force) {
@@ -34,7 +35,7 @@ export async function runImportCommand(opts: {
 
       if (p.isCancel(confirmed) || !confirmed) {
         p.cancel("Import cancelled.");
-        process.exit(0);
+        return CommandResults.cancelled;
       }
     }
 
@@ -46,9 +47,10 @@ export async function runImportCommand(opts: {
 
     console.log(`Backup restored to: ${result.targetHomeDir}`);
     console.log(summary);
+    return CommandResults.success;
   } catch (err) {
     const error = toError(err);
     console.error(`Backup import failed: ${error.message}`);
-    process.exit(1);
+    return CommandResults.error;
   }
 }
