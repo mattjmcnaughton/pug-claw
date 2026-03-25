@@ -18,9 +18,11 @@ export interface ResolvedSessionOptions {
   model: string;
   tools: string[];
   systemPrompt: string;
-  cwd?: string;
-  plugins?: { type: "local"; path: string }[];
-  mcpServers?: Record<string, ReturnType<typeof createSdkMcpServer>>;
+  cwd?: string | undefined;
+  plugins?: { type: "local"; path: string }[] | undefined;
+  mcpServers?:
+    | Record<string, ReturnType<typeof createSdkMcpServer>>
+    | undefined;
 }
 
 interface SessionState {
@@ -99,9 +101,9 @@ export function buildClaudeSdkOptions(
     allowDangerouslySkipPermissions: true,
     model: resolved.model,
     systemPrompt: resolved.systemPrompt,
-    cwd: resolved.cwd,
-    plugins: resolved.plugins,
-    mcpServers: resolved.mcpServers,
+    ...(resolved.cwd ? { cwd: resolved.cwd } : {}),
+    ...(resolved.plugins ? { plugins: resolved.plugins } : {}),
+    ...(resolved.mcpServers ? { mcpServers: resolved.mcpServers } : {}),
   };
 }
 
@@ -117,7 +119,7 @@ function readMessageField(msg: SdkMessage, key: string): string | undefined {
 
 export interface ClaudeEventResult {
   text: string;
-  sessionId?: string;
+  sessionId?: string | undefined;
 }
 
 export async function processClaudeEvents(

@@ -57,16 +57,16 @@ export interface BackupSectionsSummary {
 }
 
 export interface CreateBackupManifestOptions {
-  createdAt?: string;
-  hostname?: string;
-  pugClawVersion?: string;
+  createdAt?: string | undefined;
+  hostname?: string | undefined;
+  pugClawVersion?: string | undefined;
   sections: BackupSectionsSummary;
 }
 
 export interface ExportBackupOptions {
-  includeDirs?: BackupIncludeDirKey[];
-  outputPath?: string;
-  outputDir?: string;
+  includeDirs?: BackupIncludeDirKey[] | undefined;
+  outputPath?: string | undefined;
+  outputDir?: string | undefined;
 }
 
 export interface ExportBackupResult {

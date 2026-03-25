@@ -21,7 +21,7 @@ interface FrontendCommandActionsControllerOptions {
   initialRuntimeState: FrontendRuntimeState;
   setRuntimeState: (state: FrontendRuntimeState) => void;
   channelHandler: ChannelHandler;
-  memoryBackend?: MemoryBackend;
+  memoryBackend?: MemoryBackend | undefined;
   reloadConfig: FrontendContext["reloadConfig"];
 }
 

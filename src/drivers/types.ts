@@ -5,13 +5,15 @@ export interface DriverResponse {
 
 export interface DriverOptions {
   systemPrompt: string;
-  model?: string;
-  tools?: string[];
-  skills?: import("../skills.ts").SkillSummary[];
-  memoryBlock?: string;
-  memoryToolContext?: import("../memory/tools.ts").MemoryToolContext;
-  pluginDir?: string;
-  cwd?: string;
+  model?: string | undefined;
+  tools?: string[] | undefined;
+  skills?: import("../skills.ts").SkillSummary[] | undefined;
+  memoryBlock?: string | undefined;
+  memoryToolContext?:
+    | import("../memory/tools.ts").MemoryToolContext
+    | undefined;
+  pluginDir?: string | undefined;
+  cwd?: string | undefined;
 }
 
 export type DriverEvent =

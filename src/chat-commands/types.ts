@@ -7,8 +7,8 @@ export type ModelAliasMap = Readonly<Record<string, string>>;
 
 export interface ChatCommandResult {
   message: string;
-  messages?: string[];
-  action?: ChatCommandAction;
+  messages?: string[] | undefined;
+  action?: ChatCommandAction | undefined;
 }
 
 export interface ChatCommandStatus {

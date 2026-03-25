@@ -22,18 +22,18 @@ import type { ResolvedAgent, SkillSummary } from "./skills.ts";
 import { discoverSkills } from "./skills.ts";
 
 export interface ChannelState {
-  driverOverride?: string;
-  modelOverride?: string;
-  agentOverride?: string;
-  sessionId?: string;
-  sessionDriverName?: string;
-  resolvedAgentName?: string;
-  resolvedAgent?: ResolvedAgent;
+  driverOverride?: string | undefined;
+  modelOverride?: string | undefined;
+  agentOverride?: string | undefined;
+  sessionId?: string | undefined;
+  sessionDriverName?: string | undefined;
+  resolvedAgentName?: string | undefined;
+  resolvedAgent?: ResolvedAgent | undefined;
 }
 
 export interface HandleMessageOptions {
-  settingsChannelId?: string;
-  bootstrapPrompt?: string;
+  settingsChannelId?: string | undefined;
+  bootstrapPrompt?: string | undefined;
 }
 
 export class ChannelHandler {

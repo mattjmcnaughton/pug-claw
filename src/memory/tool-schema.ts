@@ -15,7 +15,7 @@ interface MemoryToolSchemaDefinition {
   claudeParameters: z.ZodRawShape;
   piParameters: TObject;
   execute: (memoryToolContext: MemoryToolContext, args: unknown) => Promise<unknown>;
-  formatClaudeResult?: (result: unknown) => string;
+  formatClaudeResult?: ((result: unknown) => string) | undefined;
 }
 
 function createMemoryToolSchema<TArgs>(config: {

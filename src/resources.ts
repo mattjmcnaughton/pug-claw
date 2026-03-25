@@ -47,8 +47,8 @@ export type {
 export { ConfigFileSchema, expandTilde, loadAndValidateConfig, resolveConfigPaths, resolveLogsDir };
 
 export interface DiscordIdentity {
-  guildId?: string;
-  ownerId?: string;
+  guildId?: string | undefined;
+  ownerId?: string | undefined;
 }
 
 export interface ResolvedConfig {
@@ -60,17 +60,23 @@ export interface ResolvedConfig {
   codeDir: string;
   logsDir: string;
   backupIncludeDirs: BackupIncludeDirKey[];
-  backupOutputDir?: string;
+  backupOutputDir?: string | undefined;
   memory: ResolvedMemoryConfig;
 
   defaultAgent: string;
   defaultDriver: string;
-  drivers: Record<string, { defaultModel?: string; cwd?: string }>;
+  drivers: Record<
+    string,
+    {
+      defaultModel?: string | undefined;
+      cwd?: string | undefined;
+    }
+  >;
   channels: Record<string, ChannelConfig>;
-  scheduler?: ResolvedSchedulerConfig;
+  scheduler?: ResolvedSchedulerConfig | undefined;
   schedules: Record<string, ResolvedScheduleConfig>;
 
-  discord?: DiscordIdentity;
+  discord?: DiscordIdentity | undefined;
 
   secrets: SecretsProvider;
 }
@@ -149,7 +155,7 @@ export async function resolveConfig(
     };
   }
 
-  const drivers: Record<string, { defaultModel?: string; cwd?: string }> = {};
+  const drivers: ResolvedConfig["drivers"] = {};
   if (rawConfig.drivers) {
     for (const [name, driverConfig] of Object.entries(rawConfig.drivers)) {
       drivers[name] = {

@@ -35,7 +35,7 @@ export interface SchedulerRunnerContext {
   store: SchedulerStore;
   auditLog: SchedulerAuditLog;
   outputSink: SchedulerOutputSink;
-  memoryBackend?: MemoryBackend;
+  memoryBackend?: MemoryBackend | undefined;
 }
 
 export interface SchedulerRunnerRuntime {
@@ -65,12 +65,12 @@ interface ExecutionOutcome {
   responseText: string;
   emptyResponse: boolean;
   executionStatus: ScheduleExecutionStatus;
-  errorMessage?: string;
+  errorMessage?: string | undefined;
 }
 
 interface DeliveryOutcome {
   deliveryStatus: ScheduleDeliveryStatus;
-  errorMessage?: string;
+  errorMessage?: string | undefined;
 }
 
 const SchedulerRunnerMessages = {

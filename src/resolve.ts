@@ -1,7 +1,7 @@
 export interface ResolutionInputs {
-  runtimeOverride?: string;
-  channelConfig?: string;
-  agentFrontmatter?: string;
+  runtimeOverride?: string | undefined;
+  channelConfig?: string | undefined;
+  agentFrontmatter?: string | undefined;
   globalDefault: string;
 }
 
@@ -15,9 +15,9 @@ export function resolveDriverName(inputs: ResolutionInputs): string {
 }
 
 export interface ModelResolutionInputs {
-  runtimeOverride?: string;
-  channelConfig?: string;
-  agentFrontmatter?: string;
+  runtimeOverride?: string | undefined;
+  channelConfig?: string | undefined;
+  agentFrontmatter?: string | undefined;
   driverDefault: string;
 }
 

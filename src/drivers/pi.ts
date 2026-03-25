@@ -249,9 +249,11 @@ export class PiDriver implements Driver {
       settingsManager,
       resourceLoader: loader,
       tools: codingTools,
-      customTools: options.memoryToolContext
-        ? createPiMemoryTools(options.memoryToolContext)
-        : undefined,
+      ...(options.memoryToolContext
+        ? {
+            customTools: createPiMemoryTools(options.memoryToolContext),
+          }
+        : {}),
     });
 
     const sessionId = `pi-${++this.sessionCounter}`;
