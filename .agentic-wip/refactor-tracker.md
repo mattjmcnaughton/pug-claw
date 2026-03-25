@@ -39,8 +39,8 @@ Hotspot list based on line-count concentration and cross-cutting responsibility.
 | 4 | SchedulerRunner phase decomposition | Done | Split run lifecycle into phase methods while preserving status transitions and output. | 6b61e33 |
 | 5 | Config module decomposition | Done | Split config concerns into `src/config/*` modules with `resources.ts` acting as facade. | 5441744 |
 | 6 | Command exit behavior refactor | Done | Replaced command-level `process.exit(...)` in target modules with typed command results; main now applies exit codes. | 2093883 |
-| 7 | Driver tool schema consolidation | Done | Introduced shared memory tool schema metadata and generated Claude/Pi tool adapters from it. | pending |
-| 8 | Testability infrastructure | Planned |  |  |
+| 7 | Driver tool schema consolidation | Done | Introduced shared memory tool schema metadata and generated Claude/Pi tool adapters from it. | f2cd744 |
+| 8 | Testability infrastructure | Done | Added deterministic run-id/time and config-env seams plus focused unit tests for scheduler runner and config path resolution. | pending |
 
 ## Per-Chunk Issue Template
 
