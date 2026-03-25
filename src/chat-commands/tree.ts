@@ -1,9 +1,20 @@
-import { Frontends } from "../constants.ts";
+import { Frontends, SchedulerMessages } from "../constants.ts";
 import type {
   ChatCommandContext,
   ChatCommandNode,
   ChatCommandResult,
 } from "./types.ts";
+
+const ChatCommandMessages = {
+  BACKUP_COMMANDS_NOT_AVAILABLE: "Backup commands are not available.",
+  MEMORY_COMMANDS_NOT_AVAILABLE: "Memory commands are not available.",
+  SCHEDULER_COMMANDS_NOT_AVAILABLE: "Scheduler commands are not available.",
+  SESSION_RESET_NEXT_MESSAGE:
+    "Session reset. Next message starts a fresh conversation.",
+  RELOAD_COMPLETED_DEFAULT:
+    "Config, agents, and skills reloaded. All sessions reset.",
+  RAW_MODEL_HINT: "Or use a raw model ID.",
+} as const;
 
 function text(
   message: string,
@@ -134,7 +145,7 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const exportBackup = ctx.actions.exportBackup;
               if (!exportBackup) {
-                return text("Backup commands are not available.");
+                return text(ChatCommandMessages.BACKUP_COMMANDS_NOT_AVAILABLE);
               }
               return text(await exportBackup());
             },
@@ -148,7 +159,7 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const dryRunBackup = ctx.actions.dryRunBackup;
               if (!dryRunBackup) {
-                return text("Backup commands are not available.");
+                return text(ChatCommandMessages.BACKUP_COMMANDS_NOT_AVAILABLE);
               }
               return text(await dryRunBackup());
             },
@@ -234,7 +245,7 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const showMemory = ctx.actions.showMemory;
               if (!showMemory) {
-                return text("Memory commands are not available.");
+                return text(ChatCommandMessages.MEMORY_COMMANDS_NOT_AVAILABLE);
               }
               return text(await showMemory(ctx.channelId, args[0]));
             },
@@ -250,7 +261,7 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const searchMemory = ctx.actions.searchMemory;
               if (!searchMemory) {
-                return text("Memory commands are not available.");
+                return text(ChatCommandMessages.MEMORY_COMMANDS_NOT_AVAILABLE);
               }
               return text(await searchMemory(ctx.channelId, query));
             },
@@ -266,7 +277,7 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const rememberMemory = ctx.actions.rememberMemory;
               if (!rememberMemory) {
-                return text("Memory commands are not available.");
+                return text(ChatCommandMessages.MEMORY_COMMANDS_NOT_AVAILABLE);
               }
               return text(await rememberMemory(ctx.channelId, value));
             },
@@ -283,7 +294,7 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const rememberScopedMemory = ctx.actions.rememberScopedMemory;
               if (!rememberScopedMemory) {
-                return text("Memory commands are not available.");
+                return text(ChatCommandMessages.MEMORY_COMMANDS_NOT_AVAILABLE);
               }
               return text(
                 await rememberScopedMemory(ctx.channelId, scopeInput, value),
@@ -301,7 +312,7 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const forgetMemory = ctx.actions.forgetMemory;
               if (!forgetMemory) {
-                return text("Memory commands are not available.");
+                return text(ChatCommandMessages.MEMORY_COMMANDS_NOT_AVAILABLE);
               }
               return text(await forgetMemory(ctx.channelId, idOrPrefix));
             },
@@ -316,7 +327,7 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const exportMemory = ctx.actions.exportMemory;
               if (!exportMemory) {
-                return text("Memory commands are not available.");
+                return text(ChatCommandMessages.MEMORY_COMMANDS_NOT_AVAILABLE);
               }
               return text(await exportMemory(ctx.channelId, args[0]));
             },
@@ -330,7 +341,7 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const memoryStats = ctx.actions.memoryStats;
               if (!memoryStats) {
-                return text("Memory commands are not available.");
+                return text(ChatCommandMessages.MEMORY_COMMANDS_NOT_AVAILABLE);
               }
               return text(await memoryStats());
             },
@@ -344,7 +355,7 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const reindexMemory = ctx.actions.reindexMemory;
               if (!reindexMemory) {
-                return text("Memory commands are not available.");
+                return text(ChatCommandMessages.MEMORY_COMMANDS_NOT_AVAILABLE);
               }
               return text(await reindexMemory());
             },
@@ -364,7 +375,7 @@ export function createChatCommandTree(): ChatCommandNode {
                 ctx.channelId,
               );
               return text(
-                `Available aliases:\n${formatModelAliases(aliases)}\n\nOr use a raw model ID.`,
+                `Available aliases:\n${formatModelAliases(aliases)}\n\n${ChatCommandMessages.RAW_MODEL_HINT}`,
               );
             },
           },
@@ -393,7 +404,7 @@ export function createChatCommandTree(): ChatCommandNode {
                 ctx.channelId,
               );
               return text(
-                `Current model: \`${current}\`\nAvailable aliases:\n${formatModelAliases(aliases)}\n\nOr use a raw model ID.`,
+                `Current model: \`${current}\`\nAvailable aliases:\n${formatModelAliases(aliases)}\n\n${ChatCommandMessages.RAW_MODEL_HINT}`,
               );
             },
           },
@@ -415,10 +426,10 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const messages = await ctx.actions.listSchedules?.();
               if (!messages) {
-                return text("Scheduler commands are not available.");
+                return text(ChatCommandMessages.SCHEDULER_COMMANDS_NOT_AVAILABLE);
               }
               return {
-                message: messages[0] ?? "**Schedules**\n(none configured)",
+                message: messages[0] ?? SchedulerMessages.SCHEDULES_NONE_CONFIGURED,
                 messages,
               };
             },
@@ -436,7 +447,7 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const runSchedule = ctx.actions.runSchedule;
               if (!runSchedule) {
-                return text("Scheduler commands are not available.");
+                return text(ChatCommandMessages.SCHEDULER_COMMANDS_NOT_AVAILABLE);
               }
               return text(await runSchedule(scheduleName));
             },
@@ -459,9 +470,7 @@ export function createChatCommandTree(): ChatCommandNode {
                 return unknownSubcommand(ctx, ["session", "new"], args);
               }
               await ctx.handler.resetSession(ctx.channelId);
-              return text(
-                "Session reset. Next message starts a fresh conversation.",
-              );
+              return text(ChatCommandMessages.SESSION_RESET_NEXT_MESSAGE);
             },
           },
           status: {
@@ -506,7 +515,7 @@ export function createChatCommandTree(): ChatCommandNode {
               const message = await ctx.actions.reload();
               return text(
                 message ??
-                  "Config, agents, and skills reloaded. All sessions reset.",
+                  ChatCommandMessages.RELOAD_COMPLETED_DEFAULT,
               );
             },
           },

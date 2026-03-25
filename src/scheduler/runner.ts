@@ -45,6 +45,20 @@ export interface StartScheduleRunResult {
   reason?: "already_running";
 }
 
+const SchedulerRunnerMessages = {
+  OVERLAP_SKIP_ERROR:
+    "Skipped because the previous run was still in progress.",
+  OVERLAP_SKIP_AUDIT: "Skipped due to overlapping run.",
+  TIMEZONE_REQUIRED: "scheduler.timezone is required for scheduled runs",
+  EMPTY_RESPONSE: "(no response)",
+  RUN_COMPLETED_SUCCESS: "Schedule run completed successfully.",
+  RUN_COMPLETED_FAILURE: "Schedule run finished with failure.",
+} as const;
+
+function formatUnknownDriverMessage(driverName: string): string {
+  return `Unknown driver: ${driverName}`;
+}
+
 function makeRunId(): string {
   return `sched_${randomUUID()}`;
 }
@@ -178,7 +192,7 @@ export class SchedulerRunner {
       deliveryStatus: getInitialDeliveryStatus(schedule),
       startedAt: nowIso,
       finishedAt: nowIso,
-      errorMessage: "Skipped because the previous run was still in progress.",
+      errorMessage: SchedulerRunnerMessages.OVERLAP_SKIP_ERROR,
     };
 
     this.ctx.store.insertRun(record);
@@ -200,7 +214,7 @@ export class SchedulerRunner {
           }
         : null,
       status: ScheduleRunStatuses.SKIPPED,
-      message: "Skipped due to overlapping run.",
+      message: SchedulerRunnerMessages.OVERLAP_SKIP_AUDIT,
     });
     return runId;
   }
@@ -214,7 +228,7 @@ export class SchedulerRunner {
   ): Promise<void> {
     const timezone = this.ctx.config.scheduler?.timezone;
     if (!timezone) {
-      throw new Error("scheduler.timezone is required for scheduled runs");
+      throw new Error(SchedulerRunnerMessages.TIMEZONE_REQUIRED);
     }
 
     const startedAt = makeNowIso();
@@ -227,7 +241,7 @@ export class SchedulerRunner {
     });
     const driver = this.ctx.drivers[driverName];
     if (!driver) {
-      throw new Error(`Unknown driver: ${driverName}`);
+      throw new Error(formatUnknownDriverMessage(driverName));
     }
 
     const modelName = resolveModelName({
@@ -340,7 +354,9 @@ export class SchedulerRunner {
         },
       );
       emptyResponse = !response.text.trim();
-      responseText = emptyResponse ? "(no response)" : response.text;
+      responseText = emptyResponse
+        ? SchedulerRunnerMessages.EMPTY_RESPONSE
+        : response.text;
       executionStatus = ScheduleExecutionStatuses.SUCCEEDED;
 
       this.ctx.auditLog.append({
@@ -581,8 +597,8 @@ export class SchedulerRunner {
       error: errorMessage,
       message:
         overallStatus === ScheduleRunStatuses.SUCCEEDED
-          ? "Schedule run completed successfully."
-          : "Schedule run finished with failure.",
+          ? SchedulerRunnerMessages.RUN_COMPLETED_SUCCESS
+          : SchedulerRunnerMessages.RUN_COMPLETED_FAILURE,
     });
   }
 }
