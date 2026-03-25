@@ -23,7 +23,6 @@ import {
   type ResolvedSchedule,
   type ScheduleRunRecord,
   ScheduleRunStatuses,
-  type ScheduleRunStatus,
   type ScheduleTriggerSource,
 } from "./types.ts";
 
@@ -43,6 +42,30 @@ export interface StartScheduleRunResult {
   started: boolean;
   runId?: string;
   reason?: "already_running";
+}
+
+interface PreparedRunContext {
+  runId: string;
+  schedule: ResolvedSchedule;
+  triggerSource: ScheduleTriggerSource;
+  timezone: string;
+  driver: Driver;
+  driverName: string;
+  modelName: string;
+  resolvedAgent: ResolvedAgent;
+  deliveryStatus: ScheduleDeliveryStatus;
+}
+
+interface ExecutionOutcome {
+  responseText: string;
+  emptyResponse: boolean;
+  executionStatus: ScheduleExecutionStatus;
+  errorMessage?: string;
+}
+
+interface DeliveryOutcome {
+  deliveryStatus: ScheduleDeliveryStatus;
+  errorMessage?: string;
 }
 
 const SchedulerRunnerMessages = {
@@ -219,19 +242,31 @@ export class SchedulerRunner {
     return runId;
   }
 
-  // TODO: split executeRun into smaller methods (execute, deliver, finalize)
-  // so each phase can be unit-tested independently.
-  private async executeRun(
+
+  private buildAuditOutput(schedule: ResolvedSchedule): {
+    type: NonNullable<ResolvedSchedule["output"]>["type"];
+    channel_id: string;
+  } | null {
+    if (!schedule.output) {
+      return null;
+    }
+
+    return {
+      type: schedule.output.type,
+      channel_id: schedule.output.channelId,
+    };
+  }
+
+  private prepareRunContext(
     runId: string,
     schedule: ResolvedSchedule,
     triggerSource: ScheduleTriggerSource,
-  ): Promise<void> {
+  ): PreparedRunContext {
     const timezone = this.ctx.config.scheduler?.timezone;
     if (!timezone) {
       throw new Error(SchedulerRunnerMessages.TIMEZONE_REQUIRED);
     }
 
-    const startedAt = makeNowIso();
     const agentDir = resolve(this.ctx.config.agentsDir, schedule.agent);
     const resolvedAgent = this.ctx.resolveAgent(agentDir);
     const driverName = resolveDriverName({
@@ -250,9 +285,8 @@ export class SchedulerRunner {
       driverDefault: driver.defaultModel,
     });
 
-    const outputTarget = schedule.output?.channelId;
-    const outputType = schedule.output?.type;
-
+    const startedAt = makeNowIso();
+    const deliveryStatus = getInitialDeliveryStatus(schedule);
     const initialRecord: ScheduleRunRecord = {
       runId,
       scheduleName: schedule.name,
@@ -263,10 +297,10 @@ export class SchedulerRunner {
       model: modelName,
       cronExpression: schedule.cron,
       timezone,
-      outputType,
-      outputTarget,
+      outputType: schedule.output?.type,
+      outputTarget: schedule.output?.channelId,
       executionStatus: ScheduleExecutionStatuses.RUNNING,
-      deliveryStatus: getInitialDeliveryStatus(schedule),
+      deliveryStatus,
       startedAt,
     };
     this.ctx.store.insertRun(initialRecord);
@@ -282,72 +316,76 @@ export class SchedulerRunner {
       model: modelName,
       cron_expression: schedule.cron,
       timezone,
-      output: schedule.output
-        ? {
-            type: schedule.output.type,
-            channel_id: schedule.output.channelId,
-          }
-        : null,
+      output: this.buildAuditOutput(schedule),
       status: ScheduleRunStatuses.RUNNING,
       message: "Schedule run started.",
     });
 
+    return {
+      runId,
+      schedule,
+      triggerSource,
+      timezone,
+      driver,
+      driverName,
+      modelName,
+      resolvedAgent,
+      deliveryStatus,
+    };
+  }
+
+  private async executeAgentRun(ctx: PreparedRunContext): Promise<ExecutionOutcome> {
     let sessionId: string | undefined;
     let responseText = "";
     let emptyResponse = false;
     let executionStatus: ScheduleExecutionStatus =
       ScheduleExecutionStatuses.RUNNING;
-    let deliveryStatus: ScheduleDeliveryStatus =
-      getInitialDeliveryStatus(schedule);
-    let overallStatus: ScheduleRunStatus = ScheduleRunStatuses.RUNNING;
     let errorMessage: string | undefined;
 
     try {
-      const driverCwd = this.ctx.config.drivers[driverName]?.cwd;
+      const driverCwd = this.ctx.config.drivers[ctx.driverName]?.cwd;
       const cwd = driverCwd
         ? resolve(expandTilde(driverCwd))
         : this.ctx.config.homeDir;
       const memoryToolContext = this.getMemoryToolContext(
-        schedule,
-        resolvedAgent,
+        ctx.schedule,
+        ctx.resolvedAgent,
       );
-      const memoryBlock = await this.buildMemoryBlock(schedule, resolvedAgent);
+      const memoryBlock = await this.buildMemoryBlock(
+        ctx.schedule,
+        ctx.resolvedAgent,
+      );
       const systemPrompt = memoryToolContext
-        ? `${resolvedAgent.systemPrompt}\n\n${buildMemoryToolInstructions()}`
-        : resolvedAgent.systemPrompt;
+        ? `${ctx.resolvedAgent.systemPrompt}\n\n${buildMemoryToolInstructions()}`
+        : ctx.resolvedAgent.systemPrompt;
 
-      sessionId = await driver.createSession({
+      sessionId = await ctx.driver.createSession({
         systemPrompt,
-        model: modelName,
-        skills: resolvedAgent.skills,
+        model: ctx.modelName,
+        skills: ctx.resolvedAgent.skills,
         memoryBlock,
         memoryToolContext,
-        pluginDir: this.ctx.pluginDirs.get(schedule.agent),
+        pluginDir: this.ctx.pluginDirs.get(ctx.schedule.agent),
         cwd,
       });
 
-      const response = await driver.query(
+      const response = await ctx.driver.query(
         sessionId,
-        schedule.prompt,
+        ctx.schedule.prompt,
         (event) => {
           if (event.type === "tool_use") {
             this.ctx.auditLog.append({
               ts: makeNowIso(),
               event: SchedulerAuditEvents.SCHEDULE_RUN_OUTPUT,
-              run_id: runId,
-              schedule_name: schedule.name,
-              trigger_source: triggerSource,
-              agent: schedule.agent,
-              driver: driverName,
-              model: modelName,
-              cron_expression: schedule.cron,
-              timezone,
-              output: schedule.output
-                ? {
-                    type: schedule.output.type,
-                    channel_id: schedule.output.channelId,
-                  }
-                : null,
+              run_id: ctx.runId,
+              schedule_name: ctx.schedule.name,
+              trigger_source: ctx.triggerSource,
+              agent: ctx.schedule.agent,
+              driver: ctx.driverName,
+              model: ctx.modelName,
+              cron_expression: ctx.schedule.cron,
+              timezone: ctx.timezone,
+              output: this.buildAuditOutput(ctx.schedule),
               message: `Tool used: ${event.tool}`,
             });
           }
@@ -362,20 +400,15 @@ export class SchedulerRunner {
       this.ctx.auditLog.append({
         ts: makeNowIso(),
         event: SchedulerAuditEvents.SCHEDULE_RUN_OUTPUT,
-        run_id: runId,
-        schedule_name: schedule.name,
-        trigger_source: triggerSource,
-        agent: schedule.agent,
-        driver: driverName,
-        model: modelName,
-        cron_expression: schedule.cron,
-        timezone,
-        output: schedule.output
-          ? {
-              type: schedule.output.type,
-              channel_id: schedule.output.channelId,
-            }
-          : null,
+        run_id: ctx.runId,
+        schedule_name: ctx.schedule.name,
+        trigger_source: ctx.triggerSource,
+        agent: ctx.schedule.agent,
+        driver: ctx.driverName,
+        model: ctx.modelName,
+        cron_expression: ctx.schedule.cron,
+        timezone: ctx.timezone,
+        output: this.buildAuditOutput(ctx.schedule),
         response_text: responseText,
         message: "Schedule run produced output.",
       });
@@ -384,26 +417,21 @@ export class SchedulerRunner {
       executionStatus = ScheduleExecutionStatuses.FAILED;
       errorMessage = error.message;
       this.ctx.logger.error(
-        { err: error, run_id: runId, schedule_name: schedule.name },
+        { err: error, run_id: ctx.runId, schedule_name: ctx.schedule.name },
         "schedule_run_execution_error",
       );
       this.ctx.auditLog.append({
         ts: makeNowIso(),
         event: SchedulerAuditEvents.SCHEDULE_RUN_FAILED,
-        run_id: runId,
-        schedule_name: schedule.name,
-        trigger_source: triggerSource,
-        agent: schedule.agent,
-        driver: driverName,
-        model: modelName,
-        cron_expression: schedule.cron,
-        timezone,
-        output: schedule.output
-          ? {
-              type: schedule.output.type,
-              channel_id: schedule.output.channelId,
-            }
-          : null,
+        run_id: ctx.runId,
+        schedule_name: ctx.schedule.name,
+        trigger_source: ctx.triggerSource,
+        agent: ctx.schedule.agent,
+        driver: ctx.driverName,
+        model: ctx.modelName,
+        cron_expression: ctx.schedule.cron,
+        timezone: ctx.timezone,
+        output: this.buildAuditOutput(ctx.schedule),
         status: ScheduleRunStatuses.FAILED,
         error: error.message,
         message: "Schedule run failed during execution.",
@@ -411,11 +439,11 @@ export class SchedulerRunner {
     } finally {
       if (sessionId) {
         try {
-          await driver.destroySession(sessionId);
+          await ctx.driver.destroySession(sessionId);
         } catch (err) {
           const error = toError(err);
           this.ctx.logger.error(
-            { err: error, run_id: runId, schedule_name: schedule.name },
+            { err: error, run_id: ctx.runId, schedule_name: ctx.schedule.name },
             "schedule_run_destroy_session_error",
           );
           if (executionStatus === ScheduleExecutionStatuses.SUCCEEDED) {
@@ -424,20 +452,15 @@ export class SchedulerRunner {
             this.ctx.auditLog.append({
               ts: makeNowIso(),
               event: SchedulerAuditEvents.SCHEDULE_RUN_FAILED,
-              run_id: runId,
-              schedule_name: schedule.name,
-              trigger_source: triggerSource,
-              agent: schedule.agent,
-              driver: driverName,
-              model: modelName,
-              cron_expression: schedule.cron,
-              timezone,
-              output: schedule.output
-                ? {
-                    type: schedule.output.type,
-                    channel_id: schedule.output.channelId,
-                  }
-                : null,
+              run_id: ctx.runId,
+              schedule_name: ctx.schedule.name,
+              trigger_source: ctx.triggerSource,
+              agent: ctx.schedule.agent,
+              driver: ctx.driverName,
+              model: ctx.modelName,
+              cron_expression: ctx.schedule.cron,
+              timezone: ctx.timezone,
+              output: this.buildAuditOutput(ctx.schedule),
               status: ScheduleRunStatuses.FAILED,
               error: error.message,
               message: "Schedule run failed while destroying session.",
@@ -447,124 +470,151 @@ export class SchedulerRunner {
       }
     }
 
-    if (schedule.output) {
-      if (
-        emptyResponse &&
-        executionStatus === ScheduleExecutionStatuses.SUCCEEDED
-      ) {
-        deliveryStatus = ScheduleDeliveryStatuses.NOT_APPLICABLE;
-        this.ctx.auditLog.append({
-          ts: makeNowIso(),
-          event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_SUCCEEDED,
-          run_id: runId,
-          schedule_name: schedule.name,
-          trigger_source: triggerSource,
-          agent: schedule.agent,
-          driver: driverName,
-          model: modelName,
-          cron_expression: schedule.cron,
-          timezone,
-          output: {
-            type: schedule.output.type,
-            channel_id: schedule.output.channelId,
-          },
-          delivery_status: ScheduleDeliveryStatuses.NOT_APPLICABLE,
-          channel_id: schedule.output.channelId,
-          message: "Delivery skipped: agent returned empty response.",
-        });
-      } else {
-        const messageToSend =
-          executionStatus === ScheduleExecutionStatuses.SUCCEEDED
-            ? responseText
-            : buildFailureMessage(schedule.name, runId);
+    return {
+      responseText,
+      emptyResponse,
+      executionStatus,
+      errorMessage,
+    };
+  }
 
-        this.ctx.auditLog.append({
-          ts: makeNowIso(),
-          event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_STARTED,
-          run_id: runId,
-          schedule_name: schedule.name,
-          trigger_source: triggerSource,
-          agent: schedule.agent,
-          driver: driverName,
-          model: modelName,
-          cron_expression: schedule.cron,
-          timezone,
-          output: {
-            type: schedule.output.type,
-            channel_id: schedule.output.channelId,
-          },
-          delivery_status: ScheduleDeliveryStatuses.PENDING,
-          channel_id: schedule.output.channelId,
-          message: "Schedule run delivery started.",
-        });
+  private async deliverRunOutput(
+    ctx: PreparedRunContext,
+    execution: ExecutionOutcome,
+  ): Promise<DeliveryOutcome> {
+    let deliveryStatus = ctx.deliveryStatus;
+    let errorMessage = execution.errorMessage;
 
-        try {
-          await this.ctx.outputSink.sendDiscordMessage(
-            schedule.output.channelId,
-            messageToSend,
-          );
-          deliveryStatus = ScheduleDeliveryStatuses.SUCCEEDED;
-          this.ctx.auditLog.append({
-            ts: makeNowIso(),
-            event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_SUCCEEDED,
-            run_id: runId,
-            schedule_name: schedule.name,
-            trigger_source: triggerSource,
-            agent: schedule.agent,
-            driver: driverName,
-            model: modelName,
-            cron_expression: schedule.cron,
-            timezone,
-            output: {
-              type: schedule.output.type,
-              channel_id: schedule.output.channelId,
-            },
-            delivery_status: ScheduleDeliveryStatuses.SUCCEEDED,
-            channel_id: schedule.output.channelId,
-            message: "Schedule run delivery succeeded.",
-          });
-        } catch (err) {
-          const error = toError(err);
-          deliveryStatus = ScheduleDeliveryStatuses.FAILED;
-          if (executionStatus === ScheduleExecutionStatuses.SUCCEEDED) {
-            errorMessage = error.message;
-          }
-          this.ctx.logger.error(
-            { err: error, run_id: runId, schedule_name: schedule.name },
-            "schedule_run_delivery_error",
-          );
-          this.ctx.auditLog.append({
-            ts: makeNowIso(),
-            event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_FAILED,
-            run_id: runId,
-            schedule_name: schedule.name,
-            trigger_source: triggerSource,
-            agent: schedule.agent,
-            driver: driverName,
-            model: modelName,
-            cron_expression: schedule.cron,
-            timezone,
-            output: {
-              type: schedule.output.type,
-              channel_id: schedule.output.channelId,
-            },
-            delivery_status: ScheduleDeliveryStatuses.FAILED,
-            channel_id: schedule.output.channelId,
-            error: error.message,
-            message: "Schedule run delivery failed.",
-          });
-        }
-      }
+    if (!ctx.schedule.output) {
+      return { deliveryStatus, errorMessage };
     }
 
-    overallStatus =
+    if (
+      execution.emptyResponse &&
+      execution.executionStatus === ScheduleExecutionStatuses.SUCCEEDED
+    ) {
+      deliveryStatus = ScheduleDeliveryStatuses.NOT_APPLICABLE;
+      this.ctx.auditLog.append({
+        ts: makeNowIso(),
+        event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_SUCCEEDED,
+        run_id: ctx.runId,
+        schedule_name: ctx.schedule.name,
+        trigger_source: ctx.triggerSource,
+        agent: ctx.schedule.agent,
+        driver: ctx.driverName,
+        model: ctx.modelName,
+        cron_expression: ctx.schedule.cron,
+        timezone: ctx.timezone,
+        output: {
+          type: ctx.schedule.output.type,
+          channel_id: ctx.schedule.output.channelId,
+        },
+        delivery_status: ScheduleDeliveryStatuses.NOT_APPLICABLE,
+        channel_id: ctx.schedule.output.channelId,
+        message: "Delivery skipped: agent returned empty response.",
+      });
+      return { deliveryStatus, errorMessage };
+    }
+
+    const messageToSend =
+      execution.executionStatus === ScheduleExecutionStatuses.SUCCEEDED
+        ? execution.responseText
+        : buildFailureMessage(ctx.schedule.name, ctx.runId);
+
+    this.ctx.auditLog.append({
+      ts: makeNowIso(),
+      event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_STARTED,
+      run_id: ctx.runId,
+      schedule_name: ctx.schedule.name,
+      trigger_source: ctx.triggerSource,
+      agent: ctx.schedule.agent,
+      driver: ctx.driverName,
+      model: ctx.modelName,
+      cron_expression: ctx.schedule.cron,
+      timezone: ctx.timezone,
+      output: {
+        type: ctx.schedule.output.type,
+        channel_id: ctx.schedule.output.channelId,
+      },
+      delivery_status: ScheduleDeliveryStatuses.PENDING,
+      channel_id: ctx.schedule.output.channelId,
+      message: "Schedule run delivery started.",
+    });
+
+    try {
+      await this.ctx.outputSink.sendDiscordMessage(
+        ctx.schedule.output.channelId,
+        messageToSend,
+      );
+      deliveryStatus = ScheduleDeliveryStatuses.SUCCEEDED;
+      this.ctx.auditLog.append({
+        ts: makeNowIso(),
+        event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_SUCCEEDED,
+        run_id: ctx.runId,
+        schedule_name: ctx.schedule.name,
+        trigger_source: ctx.triggerSource,
+        agent: ctx.schedule.agent,
+        driver: ctx.driverName,
+        model: ctx.modelName,
+        cron_expression: ctx.schedule.cron,
+        timezone: ctx.timezone,
+        output: {
+          type: ctx.schedule.output.type,
+          channel_id: ctx.schedule.output.channelId,
+        },
+        delivery_status: ScheduleDeliveryStatuses.SUCCEEDED,
+        channel_id: ctx.schedule.output.channelId,
+        message: "Schedule run delivery succeeded.",
+      });
+    } catch (err) {
+      const error = toError(err);
+      deliveryStatus = ScheduleDeliveryStatuses.FAILED;
+      if (execution.executionStatus === ScheduleExecutionStatuses.SUCCEEDED) {
+        errorMessage = error.message;
+      }
+      this.ctx.logger.error(
+        { err: error, run_id: ctx.runId, schedule_name: ctx.schedule.name },
+        "schedule_run_delivery_error",
+      );
+      this.ctx.auditLog.append({
+        ts: makeNowIso(),
+        event: SchedulerAuditEvents.SCHEDULE_RUN_DELIVERY_FAILED,
+        run_id: ctx.runId,
+        schedule_name: ctx.schedule.name,
+        trigger_source: ctx.triggerSource,
+        agent: ctx.schedule.agent,
+        driver: ctx.driverName,
+        model: ctx.modelName,
+        cron_expression: ctx.schedule.cron,
+        timezone: ctx.timezone,
+        output: {
+          type: ctx.schedule.output.type,
+          channel_id: ctx.schedule.output.channelId,
+        },
+        delivery_status: ScheduleDeliveryStatuses.FAILED,
+        channel_id: ctx.schedule.output.channelId,
+        error: error.message,
+        message: "Schedule run delivery failed.",
+      });
+    }
+
+    return { deliveryStatus, errorMessage };
+  }
+
+  private finalizeRun(
+    ctx: PreparedRunContext,
+    executionStatus: ScheduleExecutionStatus,
+    deliveryStatus: ScheduleDeliveryStatus,
+    errorMessage?: string,
+  ): void {
+    const overallStatus =
       executionStatus === ScheduleExecutionStatuses.SUCCEEDED &&
       deliveryStatus !== ScheduleDeliveryStatuses.FAILED
         ? ScheduleRunStatuses.SUCCEEDED
         : ScheduleRunStatuses.FAILED;
 
     const finishedAt = makeNowIso();
-    this.ctx.store.updateRun(runId, {
+    this.ctx.store.updateRun(ctx.runId, {
       status: overallStatus,
       executionStatus,
       deliveryStatus,
@@ -578,20 +628,15 @@ export class SchedulerRunner {
         overallStatus === ScheduleRunStatuses.SUCCEEDED
           ? SchedulerAuditEvents.SCHEDULE_RUN_COMPLETED
           : SchedulerAuditEvents.SCHEDULE_RUN_FAILED,
-      run_id: runId,
-      schedule_name: schedule.name,
-      trigger_source: triggerSource,
-      agent: schedule.agent,
-      driver: driverName,
-      model: modelName,
-      cron_expression: schedule.cron,
-      timezone,
-      output: schedule.output
-        ? {
-            type: schedule.output.type,
-            channel_id: schedule.output.channelId,
-          }
-        : null,
+      run_id: ctx.runId,
+      schedule_name: ctx.schedule.name,
+      trigger_source: ctx.triggerSource,
+      agent: ctx.schedule.agent,
+      driver: ctx.driverName,
+      model: ctx.modelName,
+      cron_expression: ctx.schedule.cron,
+      timezone: ctx.timezone,
+      output: this.buildAuditOutput(ctx.schedule),
       status: overallStatus,
       delivery_status: deliveryStatus,
       error: errorMessage,
@@ -600,5 +645,21 @@ export class SchedulerRunner {
           ? SchedulerRunnerMessages.RUN_COMPLETED_SUCCESS
           : SchedulerRunnerMessages.RUN_COMPLETED_FAILURE,
     });
+  }
+
+  private async executeRun(
+    runId: string,
+    schedule: ResolvedSchedule,
+    triggerSource: ScheduleTriggerSource,
+  ): Promise<void> {
+    const prepared = this.prepareRunContext(runId, schedule, triggerSource);
+    const execution = await this.executeAgentRun(prepared);
+    const delivery = await this.deliverRunOutput(prepared, execution);
+    this.finalizeRun(
+      prepared,
+      execution.executionStatus,
+      delivery.deliveryStatus,
+      delivery.errorMessage,
+    );
   }
 }
