@@ -1,193 +1,50 @@
-import { existsSync, copyFileSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { homedir } from "node:os";
-import { Cron } from "croner";
-import { z } from "zod";
-import {
-  BackupIncludeDirKeySchema,
-  type BackupIncludeDirKey,
-} from "./backup/types.ts";
-import {
-  Defaults,
-  Drivers,
-  EnvVars,
-  Paths,
-  SecretsProviders,
-} from "./constants.ts";
+import { Defaults, EnvVars, Paths } from "./constants.ts";
 import { logger } from "./logger.ts";
-import { ScheduleOutputTypes } from "./scheduler/types.ts";
+import {
+  type ConfigOptions,
+  expandTilde,
+  type ResolvedConfigPaths,
+  resolveConfigPaths,
+  resolveConfigRelativePath,
+  resolveLogsDir,
+} from "./config/paths.ts";
+import { createSecretsProvider, type SecretsProvider } from "./config/secrets.ts";
+import {
+  type BackupIncludeDirKey,
+  type ChannelConfig,
+  type ConfigFile,
+  ConfigFileSchema,
+  loadAndValidateConfig,
+  type ResolvedMemoryConfig,
+  type ResolvedScheduleConfig,
+  type ResolvedSchedulerConfig,
+  type ScheduleConfig,
+  type ScheduleOutputConfig,
+  type SchedulerConfig,
+} from "./config/schema.ts";
+import {
+  normalizeSchedules,
+  validateConfigSemantics as validateConfigSemanticsInternal,
+} from "./config/validation.ts";
 
-const SCHEDULE_NAME_REGEX = /^[a-z0-9][a-z0-9_-]*$/;
+export type {
+  BackupIncludeDirKey,
+  ChannelConfig,
+  ConfigFile,
+  ConfigOptions,
+  ResolvedConfigPaths,
+  ResolvedMemoryConfig,
+  ResolvedScheduleConfig,
+  ResolvedSchedulerConfig,
+  ScheduleConfig,
+  ScheduleOutputConfig,
+  SchedulerConfig,
+  SecretsProvider,
+};
 
-// --- Zod Schemas ---
-
-const DriverConfigSchema = z.object({
-  default_model: z.string().optional(),
-  cwd: z.string().optional(),
-});
-
-const ChannelConfigSchema = z.object({
-  agent: z.string().optional(),
-  driver: z.string().optional(),
-  model: z.string().optional(),
-  tools: z.array(z.string()).optional(),
-});
-
-const PathsConfigSchema = z.object({
-  agents_dir: z.string().optional(),
-  skills_dir: z.string().optional(),
-  internal_dir: z.string().optional(),
-  data_dir: z.string().optional(),
-  code_dir: z.string().optional(),
-  logs_dir: z.string().optional(),
-});
-
-const SecretsConfigSchema = z.object({
-  provider: z.enum([SecretsProviders.ENV, SecretsProviders.DOTENV]).optional(),
-  dotenv_path: z.string().optional(),
-});
-
-const BackupConfigSchema = z
-  .object({
-    include_dirs: z.array(BackupIncludeDirKeySchema).optional(),
-    output_dir: z.string().optional(),
-  })
-  .strict();
-
-const DiscordConfigSchema = z.object({
-  guild_id: z.string().optional(),
-  owner_id: z.string().optional(),
-});
-
-const EmbeddingsConfigSchema = z
-  .object({
-    enabled: z.boolean().optional(),
-    model: z.string().optional(),
-  })
-  .strict();
-
-const MemorySeedConfigSchema = z
-  .object({
-    global: z.array(z.string().min(1)).optional(),
-  })
-  .strict();
-
-const MemoryConfigSchema = z
-  .object({
-    enabled: z.boolean().optional(),
-    injection_budget_tokens: z.number().int().positive().optional(),
-    embeddings: EmbeddingsConfigSchema.optional(),
-    seed: MemorySeedConfigSchema.optional(),
-  })
-  .strict();
-
-const SchedulerConfigSchema = z
-  .object({
-    timezone: z.string().min(1),
-  })
-  .strict();
-
-const ScheduleOutputConfigSchema = z
-  .object({
-    type: z.literal(ScheduleOutputTypes.DISCORD_CHANNEL),
-    channel_id: z.string().min(1),
-  })
-  .strict();
-
-const ScheduleConfigSchema = z
-  .object({
-    description: z.string().optional(),
-    enabled: z.boolean().optional(),
-    cron: z.string().min(1),
-    agent: z.string().min(1),
-    driver: z.string().optional(),
-    model: z.string().optional(),
-    prompt: z.string().min(1),
-    output: ScheduleOutputConfigSchema.optional(),
-  })
-  .strict();
-
-export const ConfigFileSchema = z
-  .object({
-    paths: PathsConfigSchema.optional(),
-    secrets: SecretsConfigSchema.optional(),
-    backup: BackupConfigSchema.optional(),
-    discord: DiscordConfigSchema.optional(),
-    memory: MemoryConfigSchema.optional(),
-    scheduler: SchedulerConfigSchema.optional(),
-    default_agent: z.string().optional(),
-    default_driver: z.string().optional(),
-    drivers: z.record(z.string(), DriverConfigSchema).optional(),
-    channels: z.record(z.string(), ChannelConfigSchema).optional(),
-    schedules: z.record(z.string(), ScheduleConfigSchema).optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.schedules && Object.keys(data.schedules).length > 0) {
-      if (!data.scheduler?.timezone) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["scheduler", "timezone"],
-          message:
-            "scheduler.timezone is required when schedules are configured",
-        });
-      }
-
-      for (const name of Object.keys(data.schedules)) {
-        if (!SCHEDULE_NAME_REGEX.test(name)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["schedules", name],
-            message: "schedule name must match ^[a-z0-9][a-z0-9_-]*$",
-          });
-        }
-      }
-    }
-  });
-
-// --- Exported Types ---
-
-export type ConfigFile = z.infer<typeof ConfigFileSchema>;
-export type ChannelConfig = z.infer<typeof ChannelConfigSchema>;
-export type SchedulerConfig = z.infer<typeof SchedulerConfigSchema>;
-export type ScheduleConfig = z.infer<typeof ScheduleConfigSchema>;
-export type ScheduleOutputConfig = z.infer<typeof ScheduleOutputConfigSchema>;
-
-export interface ResolvedSchedulerConfig {
-  timezone: string;
-}
-
-export interface ResolvedScheduleOutput {
-  type: typeof ScheduleOutputTypes.DISCORD_CHANNEL;
-  channelId: string;
-}
-
-export interface ResolvedMemoryConfig {
-  enabled: boolean;
-  injectionBudgetTokens: number;
-  embeddings: {
-    enabled: boolean;
-    model: string;
-  };
-  seed: {
-    global: string[];
-  };
-}
-
-export interface ResolvedScheduleConfig {
-  description?: string;
-  enabled: boolean;
-  cron: string;
-  agent: string;
-  driver?: string;
-  model?: string;
-  prompt: string;
-  output?: ResolvedScheduleOutput;
-}
-
-export interface SecretsProvider {
-  get(key: string): string | undefined;
-  require(key: string): string;
-}
+export { ConfigFileSchema, expandTilde, loadAndValidateConfig, resolveConfigPaths, resolveLogsDir };
 
 export interface DiscordIdentity {
   guildId?: string;
@@ -218,228 +75,8 @@ export interface ResolvedConfig {
   secrets: SecretsProvider;
 }
 
-export interface ResolvedConfigPaths {
-  agentsDir: string;
-  skillsDir: string;
-  internalDir: string;
-  dataDir: string;
-  codeDir: string;
-  logsDir: string;
-}
-
-// --- Secrets Providers ---
-
-class EnvSecretsProvider implements SecretsProvider {
-  get(key: string): string | undefined {
-    return process.env[key];
-  }
-
-  require(key: string): string {
-    const value = this.get(key);
-    if (value === undefined || value === "") {
-      throw new Error(`Required secret "${key}" is not set`);
-    }
-    return value;
-  }
-}
-
-class DotenvSecretsProvider implements SecretsProvider {
-  private vars: Record<string, string>;
-
-  constructor(dotenvPath: string) {
-    this.vars = {};
-    if (existsSync(dotenvPath)) {
-      const content = readFileSync(dotenvPath, "utf-8");
-      for (const line of content.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) continue;
-        const eqIndex = trimmed.indexOf("=");
-        if (eqIndex === -1) continue;
-        const key = trimmed.slice(0, eqIndex).trim();
-        let value = trimmed.slice(eqIndex + 1).trim();
-        if (
-          (value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))
-        ) {
-          value = value.slice(1, -1);
-        }
-        this.vars[key] = value;
-      }
-    }
-
-    for (const [key, value] of Object.entries(this.vars)) {
-      if (process.env[key] === undefined) {
-        process.env[key] = value;
-      }
-    }
-  }
-
-  get(key: string): string | undefined {
-    return process.env[key] ?? this.vars[key];
-  }
-
-  require(key: string): string {
-    const value = this.get(key);
-    if (value === undefined || value === "") {
-      throw new Error(`Required secret "${key}" is not set`);
-    }
-    return value;
-  }
-}
-
-// --- Error Helpers ---
-
 export function toError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
-}
-
-// --- Path Resolution Helpers ---
-
-export function expandTilde(p: string): string {
-  if (p.startsWith("~/") || p === "~") {
-    return resolve(homedir(), p.slice(2));
-  }
-  return p;
-}
-
-function resolvePathWithOverrides(
-  homeDir: string,
-  defaultRelative: string,
-  configValue: string | undefined,
-  envVar: string | undefined,
-  cliFlag: string | undefined,
-): string {
-  if (cliFlag) return resolve(expandTilde(cliFlag));
-  if (envVar) {
-    const expanded = expandTilde(envVar);
-    if (expanded.startsWith("/")) return expanded;
-    return resolve(homeDir, expanded);
-  }
-  if (configValue) {
-    const expanded = expandTilde(configValue);
-    if (expanded.startsWith("/")) return expanded;
-    return resolve(homeDir, expanded);
-  }
-  return resolve(homeDir, defaultRelative);
-}
-
-export function resolveLogsDir(
-  homeDir: string,
-  rawConfig?: ConfigFile,
-  opts: ConfigOptions = {},
-): string {
-  return resolvePathWithOverrides(
-    homeDir,
-    Paths.LOGS_DIR,
-    rawConfig?.paths?.logs_dir,
-    process.env[EnvVars.LOGS_DIR],
-    opts.logsDir,
-  );
-}
-
-export function resolveConfigPaths(
-  homeDir: string,
-  rawConfig: ConfigFile,
-  opts: ConfigOptions = {},
-): ResolvedConfigPaths {
-  const agentsDir = resolvePathWithOverrides(
-    homeDir,
-    Paths.AGENTS_DIR,
-    rawConfig.paths?.agents_dir,
-    process.env[EnvVars.AGENTS_DIR],
-    opts.agentsDir,
-  );
-
-  const skillsDir = resolvePathWithOverrides(
-    homeDir,
-    Paths.SKILLS_DIR,
-    rawConfig.paths?.skills_dir,
-    process.env[EnvVars.SKILLS_DIR],
-    opts.skillsDir,
-  );
-
-  const internalDir = resolvePathWithOverrides(
-    homeDir,
-    Paths.INTERNAL_DIR,
-    rawConfig.paths?.internal_dir,
-    process.env[EnvVars.INTERNAL_DIR],
-    opts.internalDir,
-  );
-
-  const dataDir = resolvePathWithOverrides(
-    homeDir,
-    Paths.DATA_DIR,
-    rawConfig.paths?.data_dir,
-    process.env[EnvVars.DATA_DIR],
-    opts.dataDir,
-  );
-
-  const codeDir = resolvePathWithOverrides(
-    homeDir,
-    Paths.CODE_DIR,
-    rawConfig.paths?.code_dir,
-    process.env[EnvVars.CODE_DIR],
-    opts.codeDir,
-  );
-
-  const logsDir = resolveLogsDir(homeDir, rawConfig, opts);
-
-  return {
-    agentsDir,
-    skillsDir,
-    internalDir,
-    dataDir,
-    codeDir,
-    logsDir,
-  };
-}
-
-function resolveConfigRelativePath(
-  homeDir: string,
-  configValue: string | undefined,
-): string | undefined {
-  if (!configValue) {
-    return undefined;
-  }
-
-  const expanded = expandTilde(configValue);
-  if (expanded.startsWith("/")) {
-    return expanded;
-  }
-  return resolve(homeDir, expanded);
-}
-
-function validateTimezone(timezone: string): void {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
-  } catch (err) {
-    throw new Error(
-      `Invalid scheduler timezone "${timezone}": ${toError(err).message}`,
-    );
-  }
-}
-
-function validateCronExpression(
-  cronExpression: string,
-  timezone: string,
-): void {
-  try {
-    new Cron(cronExpression, {
-      paused: true,
-      timezone,
-      mode: "5-part",
-    });
-  } catch (err) {
-    throw new Error(
-      `Invalid cron expression "${cronExpression}": ${toError(err).message}`,
-    );
-  }
-}
-
-function isKnownDriverName(driverName: string): boolean {
-  return Object.values(Drivers).includes(
-    driverName as (typeof Drivers)[keyof typeof Drivers],
-  );
 }
 
 export function validateConfigSemantics(
@@ -447,112 +84,10 @@ export function validateConfigSemantics(
   homeDir: string,
   paths: ResolvedConfigPaths,
 ): void {
-  const defaultDriver = rawConfig.default_driver ?? Defaults.DRIVER;
-  if (!isKnownDriverName(defaultDriver)) {
-    throw new Error(`Unknown default driver: ${defaultDriver}`);
-  }
-
-  const timezone = rawConfig.scheduler?.timezone;
-  if (timezone) {
-    validateTimezone(timezone);
-  }
-
-  for (const [channelId, channel] of Object.entries(rawConfig.channels ?? {})) {
-    if (channel.driver && !isKnownDriverName(channel.driver)) {
-      throw new Error(
-        `Channel "${channelId}" references unknown driver "${channel.driver}"`,
-      );
-    }
-  }
-
-  for (const [name, schedule] of Object.entries(rawConfig.schedules ?? {})) {
-    if (!timezone) {
-      throw new Error(
-        `scheduler.timezone is required when schedules are configured (missing for schedule "${name}")`,
-      );
-    }
-
-    validateCronExpression(schedule.cron, timezone);
-
-    const agentSystemPath = resolve(
-      paths.agentsDir,
-      schedule.agent,
-      Paths.SYSTEM_MD,
-    );
-    if (!existsSync(agentSystemPath)) {
-      throw new Error(
-        `Schedule "${name}" references unknown agent "${schedule.agent}" at ${agentSystemPath}`,
-      );
-    }
-
-    const driverName = schedule.driver ?? defaultDriver;
-    if (!isKnownDriverName(driverName)) {
-      throw new Error(
-        `Schedule "${name}" references unknown driver "${driverName}"`,
-      );
-    }
-  }
-
-  const dotenvPath = rawConfig.secrets?.dotenv_path;
-  if (dotenvPath) {
-    const expanded = expandTilde(dotenvPath);
-    if (!expanded.startsWith("/")) {
-      resolve(homeDir, expanded);
-    }
-  }
+  validateConfigSemanticsInternal(rawConfig, homeDir, paths, toError);
 }
 
-function normalizeSchedules(
-  rawSchedules: ConfigFile["schedules"],
-): Record<string, ResolvedScheduleConfig> {
-  const schedules: Record<string, ResolvedScheduleConfig> = {};
-
-  for (const [name, schedule] of Object.entries(rawSchedules ?? {})) {
-    schedules[name] = {
-      description: schedule.description,
-      enabled: schedule.enabled ?? true,
-      cron: schedule.cron,
-      agent: schedule.agent,
-      driver: schedule.driver,
-      model: schedule.model,
-      prompt: schedule.prompt,
-      output: schedule.output
-        ? {
-            type: schedule.output.type,
-            channelId: schedule.output.channel_id,
-          }
-        : undefined,
-    };
-  }
-
-  return schedules;
-}
-
-// --- Config Options ---
-
-export interface ConfigOptions {
-  home?: string;
-  agentsDir?: string;
-  skillsDir?: string;
-  internalDir?: string;
-  dataDir?: string;
-  codeDir?: string;
-  logsDir?: string;
-}
-
-// --- Config Loading Helpers ---
-
-export function loadAndValidateConfig(
-  configPath: string,
-): z.infer<typeof ConfigFileSchema> {
-  const content = readFileSync(configPath, "utf-8");
-  return ConfigFileSchema.parse(JSON.parse(content));
-}
-
-function loadConfigWithFallback(
-  configPath: string,
-  fallbackPath: string,
-): z.infer<typeof ConfigFileSchema> {
+function loadConfigWithFallback(configPath: string, fallbackPath: string): ConfigFile {
   let primaryError: Error | undefined;
 
   if (existsSync(configPath)) {
@@ -588,8 +123,6 @@ function loadConfigWithFallback(
   throw primaryError;
 }
 
-// --- Main Entry Point ---
-
 export async function resolveConfig(
   opts: ConfigOptions = {},
 ): Promise<ResolvedConfig> {
@@ -608,20 +141,6 @@ export async function resolveConfig(
   const paths = resolveConfigPaths(homeDir, rawConfig, opts);
   validateConfigSemantics(rawConfig, homeDir, paths);
 
-  const secretsConfig = rawConfig.secrets;
-  let secrets: SecretsProvider;
-  if (secretsConfig?.provider === SecretsProviders.DOTENV) {
-    const rawDotenvPath = expandTilde(
-      secretsConfig.dotenv_path ?? Paths.DOT_ENV,
-    );
-    const dotenvPath = rawDotenvPath.startsWith("/")
-      ? rawDotenvPath
-      : resolve(homeDir, rawDotenvPath);
-    secrets = new DotenvSecretsProvider(dotenvPath);
-  } else {
-    secrets = new EnvSecretsProvider();
-  }
-
   let discord: DiscordIdentity | undefined;
   if (rawConfig.discord?.guild_id || rawConfig.discord?.owner_id) {
     discord = {
@@ -632,8 +151,11 @@ export async function resolveConfig(
 
   const drivers: Record<string, { defaultModel?: string; cwd?: string }> = {};
   if (rawConfig.drivers) {
-    for (const [name, dc] of Object.entries(rawConfig.drivers)) {
-      drivers[name] = { defaultModel: dc.default_model, cwd: dc.cwd };
+    for (const [name, driverConfig] of Object.entries(rawConfig.drivers)) {
+      drivers[name] = {
+        defaultModel: driverConfig.default_model,
+        cwd: driverConfig.cwd,
+      };
     }
   }
 
@@ -646,10 +168,7 @@ export async function resolveConfig(
     codeDir: paths.codeDir,
     logsDir: paths.logsDir,
     backupIncludeDirs: rawConfig.backup?.include_dirs ?? [],
-    backupOutputDir: resolveConfigRelativePath(
-      homeDir,
-      rawConfig.backup?.output_dir,
-    ),
+    backupOutputDir: resolveConfigRelativePath(homeDir, rawConfig.backup?.output_dir),
     memory: {
       enabled: rawConfig.memory?.enabled ?? true,
       injectionBudgetTokens: rawConfig.memory?.injection_budget_tokens ?? 2000,
@@ -672,7 +191,7 @@ export async function resolveConfig(
       : undefined,
     schedules: normalizeSchedules(rawConfig.schedules),
     discord,
-    secrets,
+    secrets: createSecretsProvider(homeDir, rawConfig.secrets),
   };
 
   logger.info(
