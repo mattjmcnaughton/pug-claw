@@ -14,18 +14,16 @@ import {
   TUI,
 } from "@mariozechner/pi-tui";
 import chalk from "chalk";
-import { dryRunBackup, exportBackup } from "../backup/export.ts";
-import {
-  renderBackupDryRunMessage,
-  renderBackupExportMessage,
-} from "../backup/render.ts";
 import { CommandPrefixes, Frontends } from "../constants.ts";
 import { ChannelHandler } from "../channel-handler.ts";
-import { buildMemoryCommandActions } from "../memory/actions.ts";
 import { toError } from "../resources.ts";
 import { ChatCommandRegistry } from "../chat-commands/registry.ts";
 import { createChatCommandTree } from "../chat-commands/tree.ts";
 import type { ChatCommandEnvironment } from "../chat-commands/types.ts";
+import {
+  createFrontendCommandActionsController,
+  type FrontendRuntimeState,
+} from "./command-actions.ts";
 import type { Frontend, FrontendContext } from "./types.ts";
 
 const TUI_CHANNEL_ID = "tui";
@@ -63,23 +61,29 @@ const markdownTheme: MarkdownTheme = {
 export class TuiFrontend implements Frontend {
   async start(ctx: FrontendContext): Promise<void> {
     const { drivers, logger } = ctx;
-    let { config, resolveAgent, pluginDirs } = ctx;
+    let runtimeState: FrontendRuntimeState = {
+      config: ctx.config,
+      pluginDirs: ctx.pluginDirs,
+      resolveAgent: ctx.resolveAgent,
+    };
 
     const channelHandler = new ChannelHandler(
       drivers,
-      config,
-      pluginDirs,
-      resolveAgent,
+      runtimeState.config,
+      runtimeState.pluginDirs,
+      runtimeState.resolveAgent,
       logger,
       ctx.memoryBackend,
     );
     const commandRegistry = new ChatCommandRegistry(createChatCommandTree());
-    let memoryCommandActions = buildMemoryCommandActions({
+    const commandActionsController = createFrontendCommandActionsController({
+      initialRuntimeState: runtimeState,
+      setRuntimeState: (nextRuntimeState: FrontendRuntimeState) => {
+        runtimeState = nextRuntimeState;
+      },
+      channelHandler,
       memoryBackend: ctx.memoryBackend,
-      config,
-      resolveAgentName: (channelId: string) =>
-        channelHandler.resolveAgentName(channelId),
-      getAvailableAgentNames: () => channelHandler.getAvailableAgentNames(),
+      reloadConfig: ctx.reloadConfig,
     });
 
     // --- TUI setup ---
@@ -127,33 +131,13 @@ export class TuiFrontend implements Frontend {
         frontend: Frontends.TUI,
         isOwner: true,
         handler: channelHandler,
-        actions: {
+        actions: commandActionsController.buildActions({
           reload: async () => {
-            const reloaded = await ctx.reloadConfig();
-            config = reloaded.config;
-            resolveAgent = reloaded.resolveAgent;
-            pluginDirs = reloaded.pluginDirs;
-            await channelHandler.reload(config, pluginDirs, resolveAgent);
-            memoryCommandActions = buildMemoryCommandActions({
-              memoryBackend: ctx.memoryBackend,
-              config,
-              resolveAgentName: (channelId: string) =>
-                channelHandler.resolveAgentName(channelId),
-              getAvailableAgentNames: () =>
-                channelHandler.getAvailableAgentNames(),
-            });
+            await commandActionsController.reload();
             logger.info({}, "tui_command_reload");
             return undefined;
           },
-          exportBackup: async () => {
-            const result = await exportBackup(config);
-            return renderBackupExportMessage(result);
-          },
-          dryRunBackup: async () => {
-            return renderBackupDryRunMessage(dryRunBackup(config));
-          },
-          ...memoryCommandActions,
-        },
+        }),
       };
     }
 

@@ -1,9 +1,4 @@
 import { Client, GatewayIntentBits, type Message } from "discord.js";
-import { dryRunBackup, exportBackup } from "../backup/export.ts";
-import {
-  renderBackupDryRunMessage,
-  renderBackupExportMessage,
-} from "../backup/render.ts";
 import {
   CommandPrefixes,
   Frontends,
@@ -13,13 +8,16 @@ import {
 import { ChannelHandler } from "../channel-handler.ts";
 import { ChatCommandRegistry } from "../chat-commands/registry.ts";
 import { createChatCommandTree } from "../chat-commands/tree.ts";
-import { toError } from "../resources.ts";
-import { DiscordSchedulerOutputSink } from "../scheduler/discord-output.ts";
-import { buildMemoryCommandActions } from "../memory/actions.ts";
+import {
+  createFrontendCommandActionsController,
+  type FrontendRuntimeState,
+} from "./command-actions.ts";
+import type { Frontend, FrontendContext } from "./types.ts";
 import { chunkMessage } from "../scheduler/output.ts";
 import { SchedulerRuntime } from "../scheduler/runtime.ts";
+import { toError } from "../resources.ts";
+import { DiscordSchedulerOutputSink } from "../scheduler/discord-output.ts";
 import type { ScheduleSummary } from "../scheduler/types.ts";
-import type { Frontend, FrontendContext } from "./types.ts";
 
 interface SendableChannel {
   send(text: string): Promise<unknown>;
@@ -252,7 +250,11 @@ async function sendText(channel: SendableChannel, text: string): Promise<void> {
 export class DiscordFrontend implements Frontend {
   async start(ctx: FrontendContext): Promise<void> {
     const { drivers, logger } = ctx;
-    let { config, resolveAgent, pluginDirs } = ctx;
+    let runtimeState: FrontendRuntimeState = {
+      config: ctx.config,
+      pluginDirs: ctx.pluginDirs,
+      resolveAgent: ctx.resolveAgent,
+    };
 
     const client = new Client({
       intents: [
@@ -264,26 +266,28 @@ export class DiscordFrontend implements Frontend {
 
     const channelHandler = new ChannelHandler(
       drivers,
-      config,
-      pluginDirs,
-      resolveAgent,
+      runtimeState.config,
+      runtimeState.pluginDirs,
+      runtimeState.resolveAgent,
       logger,
       ctx.memoryBackend,
     );
     const commandRegistry = new ChatCommandRegistry(createChatCommandTree());
-    let memoryCommandActions = buildMemoryCommandActions({
+    const commandActionsController = createFrontendCommandActionsController({
+      initialRuntimeState: runtimeState,
+      setRuntimeState: (nextRuntimeState: FrontendRuntimeState) => {
+        runtimeState = nextRuntimeState;
+      },
+      channelHandler,
       memoryBackend: ctx.memoryBackend,
-      config,
-      resolveAgentName: (channelId: string) =>
-        channelHandler.resolveAgentName(channelId),
-      getAvailableAgentNames: () => channelHandler.getAvailableAgentNames(),
+      reloadConfig: ctx.reloadConfig,
     });
 
     const outputSink = new DiscordSchedulerOutputSink(client);
     let schedulerRuntime: SchedulerRuntime | undefined;
 
     function hasSchedules(): boolean {
-      return Object.keys(config.schedules).length > 0;
+      return Object.keys(runtimeState.config.schedules).length > 0;
     }
 
     function ensureSchedulerRuntime(): void {
@@ -295,9 +299,9 @@ export class DiscordFrontend implements Frontend {
       }
       schedulerRuntime = new SchedulerRuntime({
         drivers,
-        config,
-        pluginDirs,
-        resolveAgent,
+        config: runtimeState.config,
+        pluginDirs: runtimeState.pluginDirs,
+        resolveAgent: runtimeState.resolveAgent,
         logger,
         outputSink,
         memoryBackend: ctx.memoryBackend,
@@ -319,7 +323,11 @@ export class DiscordFrontend implements Frontend {
         return;
       }
 
-      schedulerRuntime.reload(config, pluginDirs, resolveAgent);
+      schedulerRuntime.reload(
+        runtimeState.config,
+        runtimeState.pluginDirs,
+        runtimeState.resolveAgent,
+      );
     }
 
     async function handleCommand(message: Message): Promise<boolean> {
@@ -330,7 +338,8 @@ export class DiscordFrontend implements Frontend {
       const channel = message.channel as SendableChannel;
       const channelId = message.channelId;
       const raw = content.slice(CommandPrefixes.DISCORD.length).trim();
-      const isOwner = message.author.id === config.discord?.ownerId;
+      const isOwner =
+        message.author.id === runtimeState.config.discord?.ownerId;
 
       try {
         const result = await commandRegistry.execute(
@@ -340,35 +349,15 @@ export class DiscordFrontend implements Frontend {
             frontend: Frontends.DISCORD,
             isOwner,
             handler: channelHandler,
-            actions: {
+            actions: commandActionsController.buildActions({
               reload: async () => {
-                const reloaded = await ctx.reloadConfig();
-                config = reloaded.config;
-                resolveAgent = reloaded.resolveAgent;
-                pluginDirs = reloaded.pluginDirs;
-                await channelHandler.reload(config, pluginDirs, resolveAgent);
-                memoryCommandActions = buildMemoryCommandActions({
-                  memoryBackend: ctx.memoryBackend,
-                  config,
-                  resolveAgentName: (channelId: string) =>
-                    channelHandler.resolveAgentName(channelId),
-                  getAvailableAgentNames: () =>
-                    channelHandler.getAvailableAgentNames(),
-                });
+                await commandActionsController.reload();
                 syncSchedulerRuntime();
                 logger.info({ channel_id: channelId }, "command_reload");
                 return DiscordFrontendMessages.RELOAD_COMPLETED;
               },
-              exportBackup: async () => {
-                const result = await exportBackup(config);
-                return renderBackupExportMessage(result);
-              },
-              dryRunBackup: async () => {
-                return renderBackupDryRunMessage(dryRunBackup(config));
-              },
-              ...memoryCommandActions,
               listSchedules: async () => {
-                const timezone = config.scheduler?.timezone ?? "UTC";
+                const timezone = runtimeState.config.scheduler?.timezone ?? "UTC";
                 const summaries = schedulerRuntime?.listSchedules() ?? [];
                 return formatSchedulesMessages(
                   summaries,
@@ -394,7 +383,7 @@ export class DiscordFrontend implements Frontend {
 
                 return formatTriggeredScheduleMessage(scheduleName, result.runId);
               },
-            },
+            }),
           },
           raw,
         );
@@ -428,10 +417,10 @@ export class DiscordFrontend implements Frontend {
           bot_user: client.user?.tag,
           bot_id: client.user?.id,
           guilds: client.guilds.cache.map((g) => ({ id: g.id, name: g.name })),
-          default_driver: config.defaultDriver,
-          default_agent: config.defaultAgent,
-          owner_id: config.discord?.ownerId,
-          guild_filter: config.discord?.guildId,
+          default_driver: runtimeState.config.defaultDriver,
+          default_agent: runtimeState.config.defaultAgent,
+          owner_id: runtimeState.config.discord?.ownerId,
+          guild_filter: runtimeState.config.discord?.guildId,
         },
         "bot_ready",
       );
@@ -441,8 +430,8 @@ export class DiscordFrontend implements Frontend {
       if (message.author.bot) return;
 
       if (
-        config.discord?.guildId &&
-        message.guildId !== config.discord.guildId
+        runtimeState.config.discord?.guildId &&
+        message.guildId !== runtimeState.config.discord.guildId
       ) {
         return;
       }
@@ -513,7 +502,7 @@ export class DiscordFrontend implements Frontend {
 
     ensureSchedulerRuntime();
 
-    const token = config.secrets.require("DISCORD_BOT_TOKEN");
+    const token = runtimeState.config.secrets.require("DISCORD_BOT_TOKEN");
     await client.login(token);
   }
 }
