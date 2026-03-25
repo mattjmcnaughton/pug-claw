@@ -1,0 +1,80 @@
+# Refactor Tracker
+
+This tracker supports the incremental refactor plan in `@.agentic-wip/refactor.md`.
+
+## Baseline Smoke Checklist
+
+Run this checklist before and after each chunk.
+
+1. `bun src/main.ts check-config tests/fixtures/valid-config.json` exits successfully.
+2. `bun src/main.ts check-config tests/fixtures/invalid-config.json` fails with a validation error.
+3. `bun run tui -- --home tests/fixtures/pug-claw-home` starts the TUI and reaches the prompt (stop with `Ctrl+C`).
+4. `bun run start -- --home tests/fixtures/pug-claw-home` starts startup flow and reaches Discord login attempt (for local smoke, expected to fail without a real token).
+5. `bun test tests/unit/chat-command-registry.test.ts` passes.
+6. `bun test tests/integration/channel-handler.test.ts` passes.
+
+## Complexity Hotspots And Ownership
+
+Hotspot list based on line-count concentration and cross-cutting responsibility.
+
+| File | Approx lines | Ownership area | Why this is a hotspot |
+| --- | ---: | --- | --- |
+| `src/resources.ts` | 705 | Config/runtime bootstrap | Mixes schema, path resolution, validation, and secrets logic.
+| `src/scheduler/runner.ts` | 588 | Scheduler execution | Coordinates run lifecycle, delivery, status transitions, and logging.
+| `src/chat-commands/tree.ts` | 529 | Shared command UX | Large command tree with many user-facing strings and action bindings.
+| `src/frontends/discord.ts` | 480 | Discord frontend | Frontend runtime, command dispatch glue, and scheduler hooks.
+| `src/drivers/pi.ts` | 415 | Pi driver adapter | Driver tool declaration, event parsing, and session orchestration.
+| `src/drivers/claude.ts` | 303 | Claude driver adapter | Driver-specific event handling and tool integration.
+| `src/frontends/tui.ts` | 284 | TUI frontend | TUI command handling and frontend-specific behavior.
+| `src/main.ts` | 276 | CLI entrypoint | Driver/frontend wiring and command registration.
+
+## Chunk Tracking Table
+
+| Chunk | Theme | Status | Notes | Commit |
+| --- | --- | --- | --- | --- |
+| 0 | Baseline and safety net | Done | Tracker created; baseline checklist + hotspots documented. | pending |
+| 1 | Constants and message templates | Planned |  |  |
+| 2 | Type strictness (low risk first) | Planned |  |  |
+| 3 | Frontend duplication extraction | Planned |  |  |
+| 4 | SchedulerRunner phase decomposition | Planned |  |  |
+| 5 | Config module decomposition | Planned |  |  |
+| 6 | Command exit behavior refactor | Planned |  |  |
+| 7 | Driver tool schema consolidation | Planned |  |  |
+| 8 | Testability infrastructure | Planned |  |  |
+
+## Per-Chunk Issue Template
+
+Use this template when creating a tracking issue for each chunk.
+
+```md
+## Refactor Chunk <N>: <Title>
+
+### Scope
+- <single-theme scope item>
+- <single-theme scope item>
+
+### Files In Scope
+- <path>
+- <path>
+
+### Constraints
+- No user-facing behavior changes.
+- Preserve output text and command behavior.
+- Keep PR focused and small.
+
+### Validation
+- [ ] `just lint`
+- [ ] `just typecheck`
+- [ ] Targeted tests:
+  - [ ] <test command>
+  - [ ] <test command>
+- [ ] `just gate`
+
+### Exit Criteria
+- [ ] <criterion>
+- [ ] <criterion>
+
+### Notes
+- Risks:
+- Follow-ups:
+```
