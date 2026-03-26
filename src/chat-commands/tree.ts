@@ -426,10 +426,13 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const messages = await ctx.actions.listSchedules?.();
               if (!messages) {
-                return text(ChatCommandMessages.SCHEDULER_COMMANDS_NOT_AVAILABLE);
+                return text(
+                  ChatCommandMessages.SCHEDULER_COMMANDS_NOT_AVAILABLE,
+                );
               }
               return {
-                message: messages[0] ?? SchedulerMessages.SCHEDULES_NONE_CONFIGURED,
+                message:
+                  messages[0] ?? SchedulerMessages.SCHEDULES_NONE_CONFIGURED,
                 messages,
               };
             },
@@ -447,7 +450,9 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const runSchedule = ctx.actions.runSchedule;
               if (!runSchedule) {
-                return text(ChatCommandMessages.SCHEDULER_COMMANDS_NOT_AVAILABLE);
+                return text(
+                  ChatCommandMessages.SCHEDULER_COMMANDS_NOT_AVAILABLE,
+                );
               }
               return text(await runSchedule(scheduleName));
             },
@@ -514,8 +519,7 @@ export function createChatCommandTree(): ChatCommandNode {
               }
               const message = await ctx.actions.reload();
               return text(
-                message ??
-                  ChatCommandMessages.RELOAD_COMPLETED_DEFAULT,
+                message ?? ChatCommandMessages.RELOAD_COMPLETED_DEFAULT,
               );
             },
           },

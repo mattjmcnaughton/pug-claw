@@ -14,7 +14,10 @@ interface MemoryToolSchemaDefinition {
   description: string;
   claudeParameters: z.ZodRawShape;
   piParameters: TObject;
-  execute: (memoryToolContext: MemoryToolContext, args: unknown) => Promise<unknown>;
+  execute: (
+    memoryToolContext: MemoryToolContext,
+    args: unknown,
+  ) => Promise<unknown>;
   formatClaudeResult?: ((result: unknown) => string) | undefined;
 }
 
@@ -24,7 +27,10 @@ function createMemoryToolSchema<TArgs>(config: {
   claudeParameters: z.ZodRawShape;
   piParameters: TObject;
   argsSchema: z.ZodType<TArgs>;
-  execute: (memoryToolContext: MemoryToolContext, args: TArgs) => Promise<unknown>;
+  execute: (
+    memoryToolContext: MemoryToolContext,
+    args: TArgs,
+  ) => Promise<unknown>;
   formatClaudeResult?: (result: unknown) => string;
 }): MemoryToolSchemaDefinition {
   return {

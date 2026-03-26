@@ -168,9 +168,7 @@ function addSharedOptions(cmd: Command): Command {
     .option("--logs-dir <path>", "Logs directory override");
 }
 
-function optsToConfigOptions(
-  opts: SharedCliOptions,
-): ConfigOptions {
+function optsToConfigOptions(opts: SharedCliOptions): ConfigOptions {
   return {
     home: opts.home,
     agentsDir: opts.agentsDir,
@@ -267,9 +265,7 @@ program
         ...(opts.dryRun !== undefined ? { dryRun: opts.dryRun } : {}),
         ...(opts.force !== undefined ? { force: opts.force } : {}),
       };
-      applyCommandResult(
-        await runImportCommand(importOptions),
-      );
+      applyCommandResult(await runImportCommand(importOptions));
     },
   );
 

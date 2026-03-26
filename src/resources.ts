@@ -10,7 +10,10 @@ import {
   resolveConfigRelativePath,
   resolveLogsDir,
 } from "./config/paths.ts";
-import { createSecretsProvider, type SecretsProvider } from "./config/secrets.ts";
+import {
+  createSecretsProvider,
+  type SecretsProvider,
+} from "./config/secrets.ts";
 import {
   type BackupIncludeDirKey,
   type ChannelConfig,
@@ -44,7 +47,13 @@ export type {
   SecretsProvider,
 };
 
-export { ConfigFileSchema, expandTilde, loadAndValidateConfig, resolveConfigPaths, resolveLogsDir };
+export {
+  ConfigFileSchema,
+  expandTilde,
+  loadAndValidateConfig,
+  resolveConfigPaths,
+  resolveLogsDir,
+};
 
 export interface DiscordIdentity {
   guildId?: string | undefined;
@@ -93,7 +102,10 @@ export function validateConfigSemantics(
   validateConfigSemanticsInternal(rawConfig, homeDir, paths, toError);
 }
 
-function loadConfigWithFallback(configPath: string, fallbackPath: string): ConfigFile {
+function loadConfigWithFallback(
+  configPath: string,
+  fallbackPath: string,
+): ConfigFile {
   let primaryError: Error | undefined;
 
   if (existsSync(configPath)) {
@@ -174,7 +186,10 @@ export async function resolveConfig(
     codeDir: paths.codeDir,
     logsDir: paths.logsDir,
     backupIncludeDirs: rawConfig.backup?.include_dirs ?? [],
-    backupOutputDir: resolveConfigRelativePath(homeDir, rawConfig.backup?.output_dir),
+    backupOutputDir: resolveConfigRelativePath(
+      homeDir,
+      rawConfig.backup?.output_dir,
+    ),
     memory: {
       enabled: rawConfig.memory?.enabled ?? true,
       injectionBudgetTokens: rawConfig.memory?.injection_budget_tokens ?? 2000,

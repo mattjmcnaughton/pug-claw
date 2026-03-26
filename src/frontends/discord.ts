@@ -357,7 +357,8 @@ export class DiscordFrontend implements Frontend {
                 return DiscordFrontendMessages.RELOAD_COMPLETED;
               },
               listSchedules: async () => {
-                const timezone = runtimeState.config.scheduler?.timezone ?? "UTC";
+                const timezone =
+                  runtimeState.config.scheduler?.timezone ?? "UTC";
                 const summaries = schedulerRuntime?.listSchedules() ?? [];
                 return formatSchedulesMessages(
                   summaries,
@@ -381,7 +382,10 @@ export class DiscordFrontend implements Frontend {
                   return formatUnknownScheduleMessage(scheduleName);
                 }
 
-                return formatTriggeredScheduleMessage(scheduleName, result.runId);
+                return formatTriggeredScheduleMessage(
+                  scheduleName,
+                  result.runId,
+                );
               },
             }),
           },
