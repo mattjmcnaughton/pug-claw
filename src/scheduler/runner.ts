@@ -74,8 +74,7 @@ interface DeliveryOutcome {
 }
 
 const SchedulerRunnerMessages = {
-  OVERLAP_SKIP_ERROR:
-    "Skipped because the previous run was still in progress.",
+  OVERLAP_SKIP_ERROR: "Skipped because the previous run was still in progress.",
   OVERLAP_SKIP_AUDIT: "Skipped due to overlapping run.",
   TIMEZONE_REQUIRED: "scheduler.timezone is required for scheduled runs",
   EMPTY_RESPONSE: "(no response)",
@@ -261,7 +260,6 @@ export class SchedulerRunner {
     return runId;
   }
 
-
   private buildAuditOutput(schedule: ResolvedSchedule): {
     type: NonNullable<ResolvedSchedule["output"]>["type"];
     channel_id: string;
@@ -353,7 +351,9 @@ export class SchedulerRunner {
     };
   }
 
-  private async executeAgentRun(ctx: PreparedRunContext): Promise<ExecutionOutcome> {
+  private async executeAgentRun(
+    ctx: PreparedRunContext,
+  ): Promise<ExecutionOutcome> {
     let sessionId: string | undefined;
     let responseText = "";
     let emptyResponse = false;

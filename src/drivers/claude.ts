@@ -133,7 +133,8 @@ export async function processClaudeEvents(
 
   for await (const msg of messages) {
     const msgTypeValue = readMessageField(msg, "type");
-    const msgType = msgTypeValue ?? (readMessageField(msg, "result") ? "result" : "unknown");
+    const msgType =
+      msgTypeValue ?? (readMessageField(msg, "result") ? "result" : "unknown");
     logger.debug({ msg_type: msgType }, "claude_sdk_message");
 
     const resultText = readMessageField(msg, "result");

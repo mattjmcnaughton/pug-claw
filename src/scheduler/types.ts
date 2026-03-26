@@ -108,10 +108,13 @@ export interface SchedulerAuditEvent {
   model?: string | undefined;
   cron_expression?: string | undefined;
   timezone?: string | undefined;
-  output?: {
-    type: ScheduleOutputType;
-    channel_id?: string | undefined;
-  } | null | undefined;
+  output?:
+    | {
+        type: ScheduleOutputType;
+        channel_id?: string | undefined;
+      }
+    | null
+    | undefined;
   status?: ScheduleRunStatus | undefined;
   delivery_status?: ScheduleDeliveryStatus | undefined;
   channel_id?: string | undefined;

@@ -92,7 +92,9 @@ export interface PiDriverEventPayload {
   isError?: unknown;
 }
 
-function getTextDeltaFromEvent(event: PiDriverEventPayload): string | undefined {
+function getTextDeltaFromEvent(
+  event: PiDriverEventPayload,
+): string | undefined {
   if (event.type !== "message_update") {
     return undefined;
   }

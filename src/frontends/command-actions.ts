@@ -39,7 +39,8 @@ export function createFrontendCommandActionsController(
     config: runtimeState.config,
     resolveAgentName: (channelId: string) =>
       options.channelHandler.resolveAgentName(channelId),
-    getAvailableAgentNames: () => options.channelHandler.getAvailableAgentNames(),
+    getAvailableAgentNames: () =>
+      options.channelHandler.getAvailableAgentNames(),
   });
 
   const reload = async (): Promise<void> => {

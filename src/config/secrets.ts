@@ -72,7 +72,9 @@ export function createSecretsProvider(
   secretsConfig?: ConfigFile["secrets"],
 ): SecretsProvider {
   if (secretsConfig?.provider === SecretsProviders.DOTENV) {
-    const rawDotenvPath = expandTilde(secretsConfig.dotenv_path ?? Paths.DOT_ENV);
+    const rawDotenvPath = expandTilde(
+      secretsConfig.dotenv_path ?? Paths.DOT_ENV,
+    );
     const dotenvPath = rawDotenvPath.startsWith("/")
       ? rawDotenvPath
       : resolve(homeDir, rawDotenvPath);

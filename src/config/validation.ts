@@ -74,7 +74,11 @@ export function validateConfigSemantics(
 
     validateCronExpression(schedule.cron, timezone, toError);
 
-    const agentSystemPath = resolve(paths.agentsDir, schedule.agent, Paths.SYSTEM_MD);
+    const agentSystemPath = resolve(
+      paths.agentsDir,
+      schedule.agent,
+      Paths.SYSTEM_MD,
+    );
     if (!existsSync(agentSystemPath)) {
       throw new Error(
         `Schedule "${name}" references unknown agent "${schedule.agent}" at ${agentSystemPath}`,
@@ -92,8 +96,11 @@ export function validateConfigSemantics(
   const dotenvPath = rawConfig.secrets?.dotenv_path;
   if (dotenvPath) {
     const expanded = expandTilde(dotenvPath);
-    if (!expanded.startsWith("/")) {
-      resolve(homeDir, expanded);
+    const resolved = expanded.startsWith("/")
+      ? expanded
+      : resolve(homeDir, expanded);
+    if (!existsSync(resolved)) {
+      throw new Error(`secrets.dotenv_path does not exist: ${resolved}`);
     }
   }
 }
