@@ -16,10 +16,15 @@ const EXPECTED_SKILLS = [
   "create-agent",
   "create-skill",
   "read-pug-claw-codebase",
+  "second-brain",
 ];
 
+const EXPECTED_MANAGER_SKILLS = EXPECTED_SKILLS.filter(
+  (s) => s !== "second-brain",
+);
+
 describe("built-in skills", () => {
-  test("discovers all 7 expected skills from builtins/skills/", () => {
+  test("discovers all expected skills from builtins/skills/", () => {
     const dirs = readdirSync(BUILTINS_SKILLS, { withFileTypes: true })
       .filter((d) => d.isDirectory())
       .map((d) => d.name)
@@ -80,11 +85,13 @@ describe("built-in agents", () => {
     expect(parsed.systemPrompt.length).toBeGreaterThan(0);
   });
 
-  test("pug-claw-manager allowed-skills lists all 7 skill names", () => {
+  test("pug-claw-manager allowed-skills lists all manager skill names", () => {
     const agentDir = resolve(BUILTINS_AGENTS, "pug-claw-manager");
     const parsed = parseAgentSystemMd(agentDir);
     expect(parsed.meta.allowedSkills).toBeDefined();
-    expect(parsed.meta.allowedSkills?.sort()).toEqual(EXPECTED_SKILLS.sort());
+    expect(parsed.meta.allowedSkills?.sort()).toEqual(
+      EXPECTED_MANAGER_SKILLS.sort(),
+    );
   });
 
   test("pug-claw-manager has metadata.managed-by: pug-claw", () => {
@@ -108,7 +115,7 @@ describe("built-in agents", () => {
       parsed.meta.allowedSkills,
     );
     const names = skills.map((s) => s.name).sort();
-    expect(names).toEqual(EXPECTED_SKILLS.sort());
+    expect(names).toEqual(EXPECTED_MANAGER_SKILLS.sort());
   });
 
   test("pug-claw-manager discovers no skills without globalSkillsDir (regression)", () => {
