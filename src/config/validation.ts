@@ -11,9 +11,7 @@ function validateTimezone(timezone: string, toError: ToErrorFn): void {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
   } catch (err) {
-    throw new Error(
-      `Invalid scheduler timezone "${timezone}": ${toError(err).message}`,
-    );
+    throw new Error(`Invalid timezone "${timezone}": ${toError(err).message}`);
   }
 }
 
@@ -52,7 +50,7 @@ export function validateConfigSemantics(
     throw new Error(`Unknown default driver: ${defaultDriver}`);
   }
 
-  const timezone = rawConfig.scheduler?.timezone;
+  const timezone = rawConfig.timezone;
   if (timezone) {
     validateTimezone(timezone, toError);
   }
@@ -68,7 +66,7 @@ export function validateConfigSemantics(
   for (const [name, schedule] of Object.entries(rawConfig.schedules ?? {})) {
     if (!timezone) {
       throw new Error(
-        `scheduler.timezone is required when schedules are configured (missing for schedule "${name}")`,
+        `timezone is required when schedules are configured (missing for schedule "${name}")`,
       );
     }
 

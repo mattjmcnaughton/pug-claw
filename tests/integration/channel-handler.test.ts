@@ -59,6 +59,7 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
         global: [],
       },
     },
+    timezone: "UTC",
     defaultAgent: "default",
     defaultDriver: "fake",
     drivers: {},

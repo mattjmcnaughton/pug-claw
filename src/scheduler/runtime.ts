@@ -202,10 +202,7 @@ export class SchedulerRuntime {
     }
 
     const now = new Date();
-    const timezone = this.config.scheduler?.timezone;
-    if (!timezone) {
-      return;
-    }
+    const timezone = this.config.timezone;
 
     for (const state of this.schedules.values()) {
       if (!state.schedule.enabled || !state.nextRunAt) {
@@ -232,10 +229,7 @@ export class SchedulerRuntime {
 
   private refreshSchedules(): void {
     this.schedules.clear();
-    const timezone = this.config.scheduler?.timezone;
-    if (!timezone) {
-      return;
-    }
+    const timezone = this.config.timezone;
 
     for (const schedule of getResolvedSchedules(this.config)) {
       const cron = new Cron(schedule.cron, {

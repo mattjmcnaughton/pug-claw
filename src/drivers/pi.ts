@@ -47,11 +47,13 @@ export function buildPiSystemPrompt(
   basePrompt: string,
   skills?: DriverOptions["skills"],
   memoryBlock?: string,
+  timezone?: string,
 ): string {
   return buildFinalSystemPrompt(basePrompt, {
     skills,
     memoryBlock,
     skillMode: "strict",
+    timezone,
   });
 }
 
@@ -227,6 +229,7 @@ export class PiDriver implements Driver {
       options.systemPrompt,
       options.skills,
       options.memoryBlock,
+      options.timezone,
     );
 
     logger.info({ systemPrompt }, "pi_session_system_prompt");

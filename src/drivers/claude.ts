@@ -72,6 +72,7 @@ export function resolveClaudeSessionOptions(
     skills: options.skills,
     memoryBlock: options.memoryBlock,
     pluginHint: !!options.pluginDir,
+    timezone: options.timezone,
   });
 
   return {

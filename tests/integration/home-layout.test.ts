@@ -37,6 +37,7 @@ function makeConfig(homeDir: string): ResolvedConfig {
         global: [],
       },
     },
+    timezone: "UTC",
     defaultAgent: "default",
     defaultDriver: "claude",
     drivers: {},

@@ -22,10 +22,8 @@ import {
   loadAndValidateConfig,
   type ResolvedMemoryConfig,
   type ResolvedScheduleConfig,
-  type ResolvedSchedulerConfig,
   type ScheduleConfig,
   type ScheduleOutputConfig,
-  type SchedulerConfig,
 } from "./config/schema.ts";
 import {
   normalizeSchedules,
@@ -40,10 +38,8 @@ export type {
   ResolvedConfigPaths,
   ResolvedMemoryConfig,
   ResolvedScheduleConfig,
-  ResolvedSchedulerConfig,
   ScheduleConfig,
   ScheduleOutputConfig,
-  SchedulerConfig,
   SecretsProvider,
 };
 
@@ -71,6 +67,7 @@ export interface ResolvedConfig {
   backupIncludeDirs: BackupIncludeDirKey[];
   backupOutputDir?: string | undefined;
   memory: ResolvedMemoryConfig;
+  timezone: string;
 
   defaultAgent: string;
   defaultDriver: string;
@@ -82,7 +79,6 @@ export interface ResolvedConfig {
     }
   >;
   channels: Record<string, ChannelConfig>;
-  scheduler?: ResolvedSchedulerConfig | undefined;
   schedules: Record<string, ResolvedScheduleConfig>;
 
   discord?: DiscordIdentity | undefined;
@@ -177,6 +173,11 @@ export async function resolveConfig(
     }
   }
 
+  const timezone =
+    rawConfig.timezone ??
+    Intl.DateTimeFormat().resolvedOptions().timeZone ??
+    "UTC";
+
   const config: ResolvedConfig = {
     homeDir,
     agentsDir: paths.agentsDir,
@@ -201,15 +202,11 @@ export async function resolveConfig(
         global: rawConfig.memory?.seed?.global ?? [],
       },
     },
+    timezone,
     defaultAgent: rawConfig.default_agent ?? Defaults.AGENT,
     defaultDriver: rawConfig.default_driver ?? Defaults.DRIVER,
     drivers,
     channels: rawConfig.channels ?? {},
-    scheduler: rawConfig.scheduler
-      ? {
-          timezone: rawConfig.scheduler.timezone,
-        }
-      : undefined,
     schedules: normalizeSchedules(rawConfig.schedules),
     discord,
     secrets: createSecretsProvider(homeDir, rawConfig.secrets),

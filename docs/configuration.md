@@ -11,7 +11,7 @@ pug-claw init
 # or: bun run init
 ```
 
-This creates `~/.pug-claw/` with a `config.json`, default agent, and optional `.env` template. It also initializes `scheduler.timezone` from the host machine's current timezone.
+This creates `~/.pug-claw/` with a `config.json`, default agent, and optional `.env` template. It also initializes `timezone` from the host machine's current timezone.
 
 ## Home directory
 
@@ -43,7 +43,7 @@ The home directory must exist and contain a `config.json`. If it doesn't, pug-cl
 
 ## config.json
 
-Most fields are optional. Missing fields use sensible defaults. One exception: `scheduler.timezone` is required whenever `schedules` are configured.
+Most fields are optional. Missing fields use sensible defaults. One exception: `timezone` is required whenever `schedules` are configured.
 
 ### Full schema
 
@@ -63,9 +63,7 @@ Most fields are optional. Missing fields use sensible defaults. One exception: `
     "include_dirs": ["data_dir", "code_dir"],
     "output_dir": "backups"
   },
-  "scheduler": {
-    "timezone": "America/New_York"
-  },
+  "timezone": "America/New_York",
   "drivers": {
     "claude": {},
     "pi": {
@@ -111,7 +109,7 @@ Most fields are optional. Missing fields use sensible defaults. One exception: `
 | `default_driver` | string | `"claude"` | Driver to use by default (`claude` or `pi`) |
 | `paths` | object | — | Custom paths for agents, skills, internal runtime data, workspace data, code, and logs |
 | `backup` | object | — | Backup configuration for optional directory inclusion |
-| `scheduler` | object | — | Scheduler configuration, currently `timezone` |
+| `timezone` | string | host system timezone | IANA timezone (e.g. `America/New_York`). Used for agent date/time awareness and cron scheduling. Required when `schedules` is present. |
 | `drivers` | object | `{}` | Per-driver configuration |
 | `channels` | object | `{}` | Per-channel overrides keyed by Discord channel ID |
 | `schedules` | object | `{}` | Scheduled agent jobs keyed by schedule name |
@@ -141,12 +139,6 @@ All paths are relative to the home directory unless absolute. Each can also be o
 | `output_dir` | string | current working directory | Default directory for backup archives when `pug-claw export` is run without `--output` or `--output-dir`. Relative paths are resolved from the pug-claw home directory. |
 
 Home content (`config.json`, `config.last-good.json`, agents, skills) and the runtime SQLite DB are always included. `.env`, runtime locks, and generated plugins are always excluded.
-
-### Scheduler
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `timezone` | string | Required when `schedules` is present. Must be a valid IANA timezone such as `America/New_York` or `UTC`. |
 
 ### Schedules
 
@@ -239,7 +231,7 @@ For each runtime setting, pug-claw resolves in this order:
 
 Scheduler validation includes:
 
-- missing `scheduler.timezone` when `schedules` are present
+- missing `timezone` when `schedules` are present
 - invalid schedule names
 - invalid IANA timezone names
 - invalid cron expressions

@@ -123,6 +123,22 @@ describe("resolveClaudeSessionOptions", () => {
     });
     expect(result.cwd).toBe("/work");
   });
+
+  test("appends date/time block when timezone is provided", () => {
+    const result = resolveClaudeSessionOptions({
+      systemPrompt: "test",
+      timezone: "America/New_York",
+    });
+    expect(result.systemPrompt).toContain("# Current Date & Time");
+    expect(result.systemPrompt).toContain("America/New_York");
+  });
+
+  test("omits date/time block when timezone is not provided", () => {
+    const result = resolveClaudeSessionOptions({
+      systemPrompt: "test",
+    });
+    expect(result.systemPrompt).not.toContain("# Current Date & Time");
+  });
 });
 
 // --- buildClaudeSdkOptions ---
