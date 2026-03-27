@@ -86,9 +86,7 @@ function makeConfig(homeDir: string): ResolvedConfig {
     defaultDriver: "fake",
     drivers: {},
     channels: {},
-    scheduler: {
-      timezone: "UTC",
-    },
+    timezone: "UTC",
     schedules: {
       "daily-summary": {
         enabled: true,

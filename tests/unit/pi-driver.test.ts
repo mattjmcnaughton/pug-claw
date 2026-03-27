@@ -110,6 +110,22 @@ describe("buildPiSystemPrompt", () => {
     const result = buildPiSystemPrompt("base");
     expect(result).toContain("# Environment");
   });
+
+  test("appends date/time block when timezone is provided", () => {
+    const result = buildPiSystemPrompt(
+      "base",
+      undefined,
+      undefined,
+      "America/New_York",
+    );
+    expect(result).toContain("# Current Date & Time");
+    expect(result).toContain("America/New_York");
+  });
+
+  test("omits date/time block when timezone is not provided", () => {
+    const result = buildPiSystemPrompt("base");
+    expect(result).not.toContain("# Current Date & Time");
+  });
 });
 
 // --- createPiEventHandler ---

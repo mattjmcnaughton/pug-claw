@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { buildFinalSystemPrompt } from "../../src/prompt.ts";
+import {
+  buildDateTimeBlock,
+  buildFinalSystemPrompt,
+} from "../../src/prompt.ts";
 
 const skills = [
   {
@@ -54,5 +57,45 @@ describe("buildFinalSystemPrompt", () => {
     expect(prompt.indexOf("# Memory")).toBeLessThan(
       prompt.indexOf("# Environment"),
     );
+  });
+
+  test("appends date/time block after environment when timezone is provided", () => {
+    const prompt = buildFinalSystemPrompt("base", {
+      timezone: "America/New_York",
+    });
+
+    expect(prompt).toContain("# Current Date & Time");
+    expect(prompt).toContain("America/New_York");
+    expect(prompt.indexOf("# Environment")).toBeLessThan(
+      prompt.indexOf("# Current Date & Time"),
+    );
+  });
+
+  test("omits date/time block when timezone is not provided", () => {
+    const prompt = buildFinalSystemPrompt("base", {});
+
+    expect(prompt).not.toContain("# Current Date & Time");
+  });
+});
+
+describe("buildDateTimeBlock", () => {
+  const fixedDate = new Date("2026-03-27T14:30:00Z");
+
+  test("formats date with timezone name", () => {
+    const block = buildDateTimeBlock("America/New_York", fixedDate);
+
+    expect(block).toContain("# Current Date & Time");
+    expect(block).toContain("America/New_York");
+    expect(block).toContain("Friday");
+    expect(block).toContain("March");
+    expect(block).toContain("2026");
+  });
+
+  test("formats date in UTC", () => {
+    const block = buildDateTimeBlock("UTC", fixedDate);
+
+    expect(block).toContain("UTC");
+    expect(block).toContain("Friday");
+    expect(block).toContain("2:30");
   });
 });

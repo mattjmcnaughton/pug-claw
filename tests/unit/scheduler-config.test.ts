@@ -72,15 +72,13 @@ describe("scheduler config validation", () => {
     }),
   );
 
-  test("rejects invalid scheduler timezone", async () => {
+  test("rejects invalid timezone", async () => {
     const homeDir = makeTmpDir();
     try {
       writeHomeConfig(homeDir, {
         default_agent: "writer",
         default_driver: "claude",
-        scheduler: {
-          timezone: "Not/A_Timezone",
-        },
+        timezone: "Not/A_Timezone",
         schedules: {
           "daily-summary": {
             cron: "0 9 * * *",
@@ -91,7 +89,7 @@ describe("scheduler config validation", () => {
       });
 
       await expect(resolveConfig({ home: homeDir })).rejects.toThrow(
-        'Invalid scheduler timezone "Not/A_Timezone"',
+        'Invalid timezone "Not/A_Timezone"',
       );
     } finally {
       rmSync(homeDir, { recursive: true, force: true });
@@ -108,9 +106,7 @@ describe("scheduler config validation", () => {
           {
             default_agent: "writer",
             default_driver: "claude",
-            scheduler: {
-              timezone: "UTC",
-            },
+            timezone: "UTC",
             schedules: {
               "daily-summary": {
                 cron: "0 9 * * *",
@@ -159,9 +155,7 @@ describe("scheduler config validation", () => {
       writeHomeConfig(homeDir, {
         default_agent: "writer",
         default_driver: "claude",
-        scheduler: {
-          timezone: "UTC",
-        },
+        timezone: "UTC",
         schedules: {
           "daily-summary": {
             cron: "bad cron",

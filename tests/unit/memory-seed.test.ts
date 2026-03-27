@@ -33,6 +33,7 @@ function makeConfig(globalSeeds: string[]): ResolvedConfig {
         global: globalSeeds,
       },
     },
+    timezone: "UTC",
     defaultAgent: "default",
     defaultDriver: "claude",
     drivers: {},

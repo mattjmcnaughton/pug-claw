@@ -14,6 +14,7 @@ export interface DriverOptions {
     | undefined;
   pluginDir?: string | undefined;
   cwd?: string | undefined;
+  timezone?: string | undefined;
 }
 
 export type DriverEvent =

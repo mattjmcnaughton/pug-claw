@@ -23,7 +23,7 @@ The config file is a JSON object with these top-level fields:
 | `default_driver` | string | Default AI driver (e.g., "claude") |
 | `drivers` | object | Per-driver config (each key is a driver name, value has optional `default_model`) |
 | `channels` | object | Per-channel overrides (each key is a channel ID, value has optional `agent`, `driver`, `model`, `tools`) |
-| `scheduler` | object | Scheduler config, currently `timezone` |
+| `timezone` | string | IANA timezone (e.g., "America/New_York"). Falls back to host system timezone. Required when `schedules` is present. |
 | `schedules` | object | Scheduled jobs keyed by schedule name |
 | `paths` | object | Optional path overrides: `agents_dir`, `skills_dir`, `data_dir` |
 | `secrets` | object | Secrets provider config: `provider` ("env" or "dotenv"), optional `dotenv_path` |
@@ -39,9 +39,7 @@ Use the Read tool to read `$PUG_CLAW_HOME/config.json`. If `PUG_CLAW_HOME` is no
 
 ```json
 {
-  "scheduler": {
-    "timezone": "America/New_York"
-  },
+  "timezone": "America/New_York",
   "schedules": {
     "daily-summary": {
       "cron": "0 9 * * *",
@@ -58,7 +56,7 @@ Use the Read tool to read `$PUG_CLAW_HOME/config.json`. If `PUG_CLAW_HOME` is no
 
 Schedule notes:
 
-- `scheduler.timezone` is required when `schedules` is present
+- `timezone` is required when `schedules` is present
 - each schedule needs `cron`, `agent`, and `prompt`
 - optional fields include `description`, `enabled`, `driver`, `model`, and `output`
 - schedules do not inherit channel-specific config

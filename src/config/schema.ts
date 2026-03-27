@@ -69,12 +69,6 @@ const MemoryConfigSchema = z
   })
   .strict();
 
-const SchedulerConfigSchema = z
-  .object({
-    timezone: z.string().min(1),
-  })
-  .strict();
-
 const ScheduleOutputConfigSchema = z
   .object({
     type: z.literal(ScheduleOutputTypes.DISCORD_CHANNEL),
@@ -102,7 +96,7 @@ export const ConfigFileSchema = z
     backup: BackupConfigSchema.optional(),
     discord: DiscordConfigSchema.optional(),
     memory: MemoryConfigSchema.optional(),
-    scheduler: SchedulerConfigSchema.optional(),
+    timezone: z.string().min(1).optional(),
     default_agent: z.string().optional(),
     default_driver: z.string().optional(),
     drivers: z.record(z.string(), DriverConfigSchema).optional(),
@@ -111,15 +105,6 @@ export const ConfigFileSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.schedules && Object.keys(data.schedules).length > 0) {
-      if (!data.scheduler?.timezone) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["scheduler", "timezone"],
-          message:
-            "scheduler.timezone is required when schedules are configured",
-        });
-      }
-
       for (const name of Object.keys(data.schedules)) {
         if (!SCHEDULE_NAME_REGEX.test(name)) {
           ctx.addIssue({
@@ -134,13 +119,8 @@ export const ConfigFileSchema = z
 
 export type ConfigFile = z.infer<typeof ConfigFileSchema>;
 export type ChannelConfig = z.infer<typeof ChannelConfigSchema>;
-export type SchedulerConfig = z.infer<typeof SchedulerConfigSchema>;
 export type ScheduleConfig = z.infer<typeof ScheduleConfigSchema>;
 export type ScheduleOutputConfig = z.infer<typeof ScheduleOutputConfigSchema>;
-
-export interface ResolvedSchedulerConfig {
-  timezone: string;
-}
 
 export interface ResolvedScheduleOutput {
   type: typeof ScheduleOutputTypes.DISCORD_CHANNEL;

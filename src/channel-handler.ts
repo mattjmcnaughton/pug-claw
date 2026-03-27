@@ -240,6 +240,7 @@ export class ChannelHandler {
       memoryToolContext,
       pluginDir: this.pluginDirs.get(agentName),
       cwd,
+      timezone: this.config.timezone,
     });
     state.sessionId = sessionId;
     state.sessionDriverName = driverName;

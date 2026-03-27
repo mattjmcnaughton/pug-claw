@@ -19,9 +19,7 @@ The scheduler does **not** run in TUI mode.
 
 ```json
 {
-  "scheduler": {
-    "timezone": "America/New_York"
-  },
+  "timezone": "America/New_York",
   "schedules": {
     "daily-summary": {
       "description": "Post a morning summary to Discord",
@@ -55,7 +53,7 @@ Optional:
 
 Notes:
 
-- `scheduler.timezone` is required when `schedules` is present
+- `timezone` is required when `schedules` is present
 - schedule names must match `^[a-z0-9][a-z0-9_-]*$`
 - schedules are enabled by default
 - `enabled: false` disables cron execution, but manual runs still work

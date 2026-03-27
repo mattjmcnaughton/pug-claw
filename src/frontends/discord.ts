@@ -357,8 +357,7 @@ export class DiscordFrontend implements Frontend {
                 return DiscordFrontendMessages.RELOAD_COMPLETED;
               },
               listSchedules: async () => {
-                const timezone =
-                  runtimeState.config.scheduler?.timezone ?? "UTC";
+                const timezone = runtimeState.config.timezone;
                 const summaries = schedulerRuntime?.listSchedules() ?? [];
                 return formatSchedulesMessages(
                   summaries,

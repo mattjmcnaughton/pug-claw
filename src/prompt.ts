@@ -7,6 +7,7 @@ export interface BuildFinalSystemPromptOptions {
   memoryBlock?: string | undefined;
   pluginHint?: boolean | undefined;
   skillMode?: "default" | "strict" | undefined;
+  timezone?: string | undefined;
 }
 
 function appendSkillCatalog(
@@ -69,5 +70,28 @@ export function buildFinalSystemPrompt(
 
   systemPrompt += buildEnvironmentBlock();
 
+  if (options.timezone) {
+    systemPrompt += buildDateTimeBlock(options.timezone);
+  }
+
   return systemPrompt;
+}
+
+export function buildDateTimeBlock(
+  timezone: string,
+  now: Date = new Date(),
+): string {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZoneName: "short",
+  });
+  const formatted = formatter.format(now);
+  return `\n\n# Current Date & Time\n\n${formatted} (${timezone})`;
 }

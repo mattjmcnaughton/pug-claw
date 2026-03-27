@@ -33,6 +33,7 @@ function createBaseConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
         global: [],
       },
     },
+    timezone: "UTC",
     defaultAgent: "writer",
     defaultDriver: "claude",
     drivers: {},
@@ -203,9 +204,7 @@ describe("SchedulerRunner full lifecycle", () => {
     const driver = createMockDriver(driverOverrides);
     return createRunnerFixture(runtime, {
       drivers: { claude: driver },
-      config: createBaseConfig({
-        scheduler: { timezone: "UTC" },
-      }),
+      config: createBaseConfig(),
       resolveAgent: () => ({
         systemPrompt: "You are a writer.",
         skills: [],
@@ -295,30 +294,10 @@ describe("SchedulerRunner full lifecycle", () => {
     );
   });
 
-  test("missing timezone throws and surfaces as unhandled error", async () => {
-    const fixture = createRunnerFixture(runtime, {
-      drivers: { claude: createMockDriver() },
-      config: createBaseConfig(), // no scheduler.timezone
-      resolveAgent: () => ({
-        systemPrompt: "You are a writer.",
-        skills: [],
-        memory: false,
-      }),
-    });
-    const schedule = createSchedule();
-
-    fixture.runner.startRun(schedule, "cron");
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(fixture.errors).toContain("schedule_run_unhandled_error");
-  });
-
   test("unknown driver throws and surfaces as unhandled error", async () => {
     const fixture = createRunnerFixture(runtime, {
       drivers: {}, // no drivers registered
-      config: createBaseConfig({
-        scheduler: { timezone: "UTC" },
-      }),
+      config: createBaseConfig(),
       resolveAgent: () => ({
         systemPrompt: "You are a writer.",
         skills: [],

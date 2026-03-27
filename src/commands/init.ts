@@ -308,9 +308,7 @@ export async function runInit(builtinsOnly = false): Promise<CommandResult> {
   const config: ConfigFile = {
     default_agent: defaultAgent,
     default_driver: defaultDriver,
-    scheduler: {
-      timezone: serverTimezone,
-    },
+    timezone: serverTimezone,
     drivers: {
       [Drivers.CLAUDE]: {},
       [Drivers.PI]: {},

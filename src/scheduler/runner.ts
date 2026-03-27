@@ -76,7 +76,6 @@ interface DeliveryOutcome {
 const SchedulerRunnerMessages = {
   OVERLAP_SKIP_ERROR: "Skipped because the previous run was still in progress.",
   OVERLAP_SKIP_AUDIT: "Skipped due to overlapping run.",
-  TIMEZONE_REQUIRED: "scheduler.timezone is required for scheduled runs",
   EMPTY_RESPONSE: "(no response)",
   RUN_COMPLETED_SUCCESS: "Schedule run completed successfully.",
   RUN_COMPLETED_FAILURE: "Schedule run finished with failure.",
@@ -279,10 +278,7 @@ export class SchedulerRunner {
     schedule: ResolvedSchedule,
     triggerSource: ScheduleTriggerSource,
   ): PreparedRunContext {
-    const timezone = this.ctx.config.scheduler?.timezone;
-    if (!timezone) {
-      throw new Error(SchedulerRunnerMessages.TIMEZONE_REQUIRED);
-    }
+    const timezone = this.ctx.config.timezone;
 
     const agentDir = resolve(this.ctx.config.agentsDir, schedule.agent);
     const resolvedAgent = this.ctx.resolveAgent(agentDir);
@@ -386,6 +382,7 @@ export class SchedulerRunner {
         memoryToolContext,
         pluginDir: this.ctx.pluginDirs.get(ctx.schedule.agent),
         cwd,
+        timezone: this.ctx.config.timezone,
       });
 
       const response = await ctx.driver.query(
