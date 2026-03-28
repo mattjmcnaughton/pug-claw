@@ -14,6 +14,12 @@ export interface SshContainer {
 
 const CONTAINER_NAME_PREFIX = "pug-claw-ssh-test";
 
+const ACPX_API_KEY_VARS = [
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "OPENROUTER_API_KEY",
+] as const;
+
 /**
  * Check whether Docker is available and responsive.
  */
@@ -26,11 +32,28 @@ export function isDockerAvailable(): boolean {
 }
 
 /**
+ * Check whether at least one acpx API key is set in the environment.
+ */
+export function isAcpxAvailable(): boolean {
+  return ACPX_API_KEY_VARS.some((key) => {
+    const val = process.env[key];
+    return val !== undefined && val.length > 0;
+  });
+}
+
+export interface StartContainerOptions {
+  /** Install acpx and forward API keys into the container. */
+  withAcpx?: boolean | undefined;
+}
+
+/**
  * Start an Alpine container with openssh-server for integration testing.
  * Generates an ephemeral SSH key pair and injects the public key.
  * Returns connection details and a cleanup function.
  */
-export async function startSshContainer(): Promise<SshContainer> {
+export async function startSshContainer(
+  options?: StartContainerOptions,
+): Promise<SshContainer> {
   const tmpDir = resolve(
     tmpdir(),
     `${CONTAINER_NAME_PREFIX}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -52,31 +75,47 @@ export async function startSshContainer(): Promise<SshContainer> {
 
   const pubKey = await Bun.file(`${keyPath}.pub`).text();
 
+  const setupSteps = [
+    "apk add --no-cache openssh-server tmux git nodejs npm",
+    "ssh-keygen -A",
+    "mkdir -p /root/.ssh",
+    "chmod 700 /root/.ssh",
+    `echo '${pubKey.trim()}' > /root/.ssh/authorized_keys`,
+    "chmod 600 /root/.ssh/authorized_keys",
+  ];
+
+  if (options?.withAcpx) {
+    setupSteps.push("npm install -g acpx@latest 2>/dev/null");
+  }
+
+  // SSHD must be last — it runs in the foreground
+  setupSteps.push("/usr/sbin/sshd -D -e");
+
+  // Build docker run args
+  const dockerArgs = [
+    "docker",
+    "run",
+    "-d",
+    "--name",
+    containerName,
+    "-p",
+    "0:22",
+  ];
+
+  // Forward API keys as env vars
+  if (options?.withAcpx) {
+    for (const key of ACPX_API_KEY_VARS) {
+      const val = process.env[key];
+      if (val !== undefined && val.length > 0) {
+        dockerArgs.push("-e", `${key}=${val}`);
+      }
+    }
+  }
+
+  dockerArgs.push("alpine:3.20", "sh", "-c", setupSteps.join(" && "));
+
   // Start container with SSHD
-  const run = Bun.spawnSync(
-    [
-      "docker",
-      "run",
-      "-d",
-      "--name",
-      containerName,
-      "-p",
-      "0:22",
-      "alpine:3.20",
-      "sh",
-      "-c",
-      [
-        "apk add --no-cache openssh-server tmux",
-        "ssh-keygen -A",
-        "mkdir -p /root/.ssh",
-        "chmod 700 /root/.ssh",
-        `echo '${pubKey.trim()}' > /root/.ssh/authorized_keys`,
-        "chmod 600 /root/.ssh/authorized_keys",
-        "/usr/sbin/sshd -D -e",
-      ].join(" && "),
-    ],
-    { stdout: "pipe", stderr: "pipe" },
-  );
+  const run = Bun.spawnSync(dockerArgs, { stdout: "pipe", stderr: "pipe" });
 
   if (run.exitCode !== 0) {
     rmSync(tmpDir, { recursive: true, force: true });
@@ -126,7 +165,7 @@ export async function startSshContainer(): Promise<SshContainer> {
 async function waitForSshd(
   containerName: string,
   keyPath: string,
-  maxAttempts = 20,
+  maxAttempts = 30,
 ): Promise<void> {
   // First wait for the container to be running and SSHD log to appear
   for (let i = 0; i < maxAttempts; i++) {
