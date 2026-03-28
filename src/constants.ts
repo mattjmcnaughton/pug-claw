@@ -88,4 +88,10 @@ export const Limits = {
   DISCORD_MESSAGE_LENGTH: 2000,
 } as const;
 
+export const CodingDefaults = {
+  AGENT: "claude",
+  POLL_INTERVAL_SECONDS: 15,
+  TASK_TIMEOUT_MINUTES: 30,
+} as const;
+
 export const VERSION = "0.1.0";
