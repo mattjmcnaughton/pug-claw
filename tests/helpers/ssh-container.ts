@@ -66,7 +66,7 @@ export async function startSshContainer(): Promise<SshContainer> {
       "sh",
       "-c",
       [
-        "apk add --no-cache openssh-server",
+        "apk add --no-cache openssh-server tmux",
         "ssh-keygen -A",
         "mkdir -p /root/.ssh",
         "chmod 700 /root/.ssh",
