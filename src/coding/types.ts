@@ -102,3 +102,5 @@ export type CodingNotificationCallback = (
 ) => Promise<void>;
 
 export type StatusPoller = (task: CodingTask) => Promise<CodingStatus>;
+
+export type ResultFetcher = (task: CodingTask) => Promise<string>;
